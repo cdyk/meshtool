@@ -48,17 +48,15 @@ private:
     Mat4f PMinv;
     Quatf orientation;
     Vec3f coi;
-    Vec2f mouse;
+    Vec2f mouse2;
     Vec3f mouse3;
+    float dist;
   };
   CamState init;
   CamState curr;
-
   Vec2f winSize;
   BBox3f viewVolume;
   float fov = 1.f;            // fov along y
-  float dist;
   float viewVolumeRadius;
-
-  Vec3f position;
+  bool needsUpdate = true;
 };
