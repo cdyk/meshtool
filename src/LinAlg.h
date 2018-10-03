@@ -42,6 +42,10 @@ struct Vec3f
 
 struct Vec4f
 {
+  Vec4f() = default;
+  Vec4f(const Vec4f&) = default;
+  Vec4f(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
+  Vec4f(const Vec3f& a, float w) : x(a.x), y(a.y), z(a.z), w(w) {}
   union {
     struct {
       float x;
@@ -52,19 +56,21 @@ struct Vec4f
     float data[4];
   };
 
+  float& operator[](unsigned i) { return data[i]; }
+  const float& operator[](unsigned i) const { return data[i]; }
 };
 
 struct Quatf
 {
   Quatf() = default;
-  Quatf(float w, float x, float y, float z) : w(w), x(x), y(y), z(z) {}
+  Quatf(float x, float y, float z, float w) : x(x), y(y), z(z), w(w) {}
 
   union {
     struct {
-      float w;
       float x;
       float y;
       float z;
+      float w;
     };
     float data[4];
   };

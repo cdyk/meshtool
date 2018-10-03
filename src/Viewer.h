@@ -22,8 +22,8 @@ public:
 
   void dolly(float x, float y);
 
-  const Mat4f& getProjectionMatrix() const { return P; }
-  const Mat4f& getViewMatrix() const { return M; }
+  const Mat4f& getProjectionMatrix() const { return curr.P; }
+  const Mat4f& getViewMatrix() const { return curr.M; }
 
 private:
   enum Projection {
@@ -31,22 +31,34 @@ private:
     Orthographic
   } projection = Projection::Perspective;
 
-  enum State {
+  enum Mode {
     None,
     Rotation,
     Pan,
     Zoom
-  } state = State::None;
+  } mode = Mode::None;
+
+  struct CamState
+  {
+    Mat4f P;
+    Mat4f M;
+    Mat4f PM;
+    Mat4f Pinv;
+    Mat4f Minv;
+    Mat4f PMinv;
+    Quatf orientation;
+    Vec3f coi;
+    Vec2f mouse;
+    Vec3f mouse3;
+  };
+  CamState init;
+  CamState curr;
 
   Vec2f winSize;
   BBox3f viewVolume;
-  Quatf orientation;
-  Vec3f coi;
   float fov = 1.f;            // fov along y
   float dist;
   float viewVolumeRadius;
 
   Vec3f position;
-  Mat4f P;              // Current projection matrix,
-  Mat4f M;              // Current view matrix.
 };

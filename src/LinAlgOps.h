@@ -3,11 +3,20 @@
 #include <cfloat>
 #include "LinAlg.h"
 
+// Vec2f
+
 inline Vec2f operator*(const float a, const Vec2f& b) { return Vec2f(a*b.x, a*b.y); }
 
 inline Vec2f operator-(const Vec2f& a, const Vec2f& b) { return Vec2f(a.x - b.x, a.y - b.y); }
 
 inline Vec2f operator+(const Vec2f& a, const Vec2f& b) { return Vec2f(a.x + b.x, a.y + b.y); }
+
+inline float dot(const Vec2f& a, const Vec2f& b) { return a.x * b.x + a.y * b.y; }
+
+inline float lengthSquared(const Vec2f& a) { return dot(a, a); }
+
+
+// Vec3f
 
 inline Vec3f cross(const Vec3f& a, const Vec3f& b)
 {
@@ -52,11 +61,9 @@ inline Vec3f min(const Vec3f& a, const Vec3f& b)
                a.z < b.z ? a.z : b.z);
 }
 
-Mat3f inverse(const Mat3f& M);
+// Quatf
 
-Mat3f mul(const Mat3f& A, const Mat3f& B);
-
-Mat4f mul(const Mat4f& A, const Mat4f& B);
+inline Quatf creatUnitQuatf() { return Quatf(0, 0, 0, 1); }
 
 Quatf mul(const Quatf& a, const Quatf& b);
 
@@ -68,7 +75,7 @@ Quatf axisAngleRotation(const Vec3f& axis, float angle);
 
 Quatf greatCircleRotation(const Vec3f& a, const Vec3f& b);
 
-inline Quatf conjugate(const Quatf& a) { return Quatf(a.w, -a.x, -a.y, -a.z); }
+inline Quatf conjugate(const Quatf& a) { return Quatf(-a.x, -a.y, -a.z, a.w); }
 
 inline Vec3f rotate(const Quatf& q, const Vec3f v)
 {
@@ -81,6 +88,13 @@ inline Vec3f rotate(const Vec3f v, const Quatf& q)
   auto t = mul(mul(q, v), conjugate(q));
   return Vec3f(t.x, t.y, t.z);
 }
+
+
+// Mat3f
+
+Mat3f inverse(const Mat3f& M);
+
+Mat3f mul(const Mat3f& A, const Mat3f& B);
 
 
 float getScale(const Mat3f& M);
@@ -107,6 +121,21 @@ inline Vec3f mul(const Mat3x4f& A, const Vec3f& x)
   }
   return r;
 }
+
+// Mat4f
+
+Mat4f mul(const Mat4f& A, const Mat4f& B);
+
+inline Vec4f mul(const Mat4f& A, const Vec4f& p)
+{
+  return Vec4f(A.data[4 * 0 + 0] * p.x + A.data[4 * 1 + 0] * p.y + A.data[4 * 2 + 0] * p.z + A.data[4 * 3 + 0] * p.w,
+               A.data[4 * 0 + 1] * p.x + A.data[4 * 1 + 1] * p.y + A.data[4 * 2 + 1] * p.z + A.data[4 * 3 + 1] * p.w,
+               A.data[4 * 0 + 2] * p.x + A.data[4 * 1 + 2] * p.y + A.data[4 * 2 + 2] * p.z + A.data[4 * 3 + 2] * p.w,
+               A.data[4 * 0 + 3] * p.x + A.data[4 * 1 + 3] * p.y + A.data[4 * 2 + 3] * p.z + A.data[4 * 3 + 3] * p.w);
+}
+
+
+// BBox3f
 
 inline BBox3f createEmptyBBox3f()
 {

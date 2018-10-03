@@ -116,15 +116,15 @@ Mat3f rotationMatrix(const Quatf& q)
 
   Mat3f M;
   M.data[0] = 1.f - 2.f*(yy + zz);
-  M.data[1] = 2.f*(xy + zw);
-  M.data[2] = 2.f*(xz - yw);
+  M.data[1] = 2.f*(xy - zw);
+  M.data[2] = 2.f*(xz + yw);
 
-  M.data[3] = 2.f*(xy - zw);
+  M.data[3] = 2.f*(xy + zw);
   M.data[4] = 1.f - 2.f*(xx + zz);
-  M.data[5] = 2.f*(yz + xw);
+  M.data[5] = 2.f*(yz - xw);
 
-  M.data[6] = 2.f*(xz + yw);
-  M.data[7] = 2.f*(yz - xw);
+  M.data[6] = 2.f*(xz - yw);
+  M.data[7] = 2.f*(yz + xw);
   M.data[8] = 1.f - 2.f*(xx + yy);
   return M;
 }
@@ -142,7 +142,7 @@ Quatf axisAngleRotation(const Vec3f& axis, float angle)
 {
   auto c = std::cos(0.5f*angle);
   auto s = std::sin(0.5f*angle);
-  return Quatf(c, s*axis.x, s*axis.y, s*axis.z);
+  return Quatf(s*axis.x, s*axis.y, s*axis.z, c);
 }
 
 Quatf greatCircleRotation(const Vec3f& a, const Vec3f& b)
@@ -152,38 +152,32 @@ Quatf greatCircleRotation(const Vec3f& a, const Vec3f& b)
     auto angle = std::acos(dot(a, b));
     auto c = std::cos(0.5f*angle);
     auto s = std::sin(0.5f*angle);
-    return Quatf(c, s*axis.x, s*axis.y, s*axis.z);
+    return Quatf(s*axis.x, s*axis.y, s*axis.z, c);
   }
   else {
-    return Quatf(1.f, 0.f, 0.f, 0.f);
+    return Quatf(0.f, 0.f, 0.f, 1.f);
   }
 }
 
 
 Quatf mul(const Quatf& a, const Quatf& b)
 {
-  return Quatf(a.w * b.w - (a.x * b.x + a.y * b.y + a.z * b.z),
-               a.w * b.x + b.w * a.x + a.y * b.z - b.y * a.z,
-               a.w * b.y + b.w * a.y + b.x * a.z - a.x * b.z,
-               a.w * b.z + b.w * a.z + a.x * b.y - b.x * a.y);
+  return Quatf(a.w*b.x + a.x*b.w + a.y*b.z - a.z*b.y,
+               a.w*b.y - a.x*b.z + a.y*b.w + a.z*b.x,
+               a.w*b.z + a.x*b.y - a.y*b.x + a.z*b.w,
+               a.w*b.w - a.x*b.x - a.y*b.y - a.z*b.z);
 }
 
 Quatf mul(const Quatf& q, const Vec3f& v)
 {
   // Assumes that the vector is a quaternion with zero scalar part.
-  return Quatf(-(q.x * v.x + q.y * v.y + q.z * v.z),
-               q.w * v.x + q.y * v.z - v.y * q.z,
-               q.w * v.y + v.x * q.z - q.x * v.z,
-               q.w * v.z + q.x * v.y - v.x * q.y);
+  return mul(q, Quatf(v.x, v.y, v.z, 0));
 }
 
 Quatf mul(const Vec3f& v, const Quatf& q )
 {
   // Assumes that the vector is a quaternion with zero scalar part.
-  return Quatf(-(v.x * q.x + v.y * q.y + v.z * q.z),
-               +q.w * v.x + v.y * q.z - q.y * v.z,
-               +q.w * v.y + q.x * v.z - v.x * q.z,
-               +q.w * v.z + v.x * q.y - q.x * v.y);
+  return mul(Quatf(v.x, v.y, v.z, 0), q);
 }
 
 
