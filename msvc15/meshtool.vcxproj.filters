@@ -10,5 +10,22 @@
     <ClCompile Include="..\src\main.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\LinAlgOps.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\Viewer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\src\LinAlg.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\LinAlgOps.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\Viewer.h">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
