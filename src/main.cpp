@@ -1,17 +1,23 @@
+#define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
+#include <Windows.h>
 //#include <GL/gl3w.h>
 #include <imgui.h>
+#include <list>
+#include <cctype>
+#include <chrono>
 #include <examples/imgui_impl_glfw.h>
 #include <examples/imgui_impl_opengl2.h>
 
 #include <GLFW/glfw3.h>
 #include <cstdio>
 #include "Viewer.h"
-
+#include "Common.h"
 
 namespace {
 
   Viewer viewer;
+  Tasks tasks;
 
 
   void glfw_error_callback(int error, const char* description)
@@ -55,6 +61,57 @@ namespace {
     viewer.dolly(float(x), float(y));
   }
 
+  void logger(unsigned level, const char* msg, ...)
+  {
+    switch (level) {
+    case 0: fprintf(stderr, "[I] "); break;
+    case 1: fprintf(stderr, "[W] "); break;
+    case 2: fprintf(stderr, "[E] "); break;
+    }
+
+    va_list argptr;
+    va_start(argptr, msg);
+    vfprintf(stderr, msg, argptr);
+    va_end(argptr);
+    fprintf(stderr, "\n");
+  }
+
+  void runObjReader(Logger logger, std::string path)
+  {
+    auto time0 = std::chrono::high_resolution_clock::now();
+    bool success = false;
+    HANDLE h = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h == INVALID_HANDLE_VALUE) {
+      logger(2, "Failed to open file %s: %d", path.c_str(), GetLastError());
+    }
+    else {
+      DWORD hiSize;
+      DWORD loSize = GetFileSize(h, &hiSize);
+      size_t fileSize = (size_t(hiSize) << 32u) + loSize;
+
+      HANDLE m = CreateFileMappingA(h, 0, PAGE_READONLY, 0, 0, NULL);
+      if (m == INVALID_HANDLE_VALUE) {
+        logger(2, "Failed to map file %s: %d", path.c_str(), GetLastError());
+      }
+      else {
+        const void * ptr = MapViewOfFile(m, FILE_MAP_READ, 0, 0, 0);
+        if (ptr == nullptr) {
+          logger(2, "Failed to map view of file %s: %d", path.c_str(), GetLastError());
+        }
+        else {
+          success = readObj(logger, ptr, fileSize);
+          UnmapViewOfFile(ptr);
+        }
+        CloseHandle(m);
+      }
+      CloseHandle(h);
+    }
+    auto time1 = std::chrono::high_resolution_clock::now();
+    auto e = std::chrono::duration_cast<std::chrono::milliseconds>((time1 - time0)).count();
+    logger(0, "%s read %s in %lldms", success ? "Successfully" : "Failed to", path.c_str(), e);
+  }
+
+
 }
 
 
@@ -62,6 +119,7 @@ namespace {
 int main(int argc, char** argv)
 {
   GLFWwindow* window;
+  tasks.init(logger);
 
   glfwSetErrorCallback(glfw_error_callback);
   if (!glfwInit()) return -1;
@@ -92,8 +150,29 @@ int main(int argc, char** argv)
   viewer.setViewVolume(viewVolume);
   viewer.resize(1280, 720);
 
+
+
+  for (int i = 1; i < argc; i++) {
+    auto arg = std::string(argv[i]);
+    if (arg.substr(0, 2) == "--") {
+    }
+    else {
+      auto argLower = arg;
+      for(auto & c :argLower) c = std::tolower(c);
+      auto l = argLower.rfind(".obj");
+      if (l != std::string::npos) {
+        TaskFunc taskFunc = [arg]() {runObjReader(logger, arg); };
+        tasks.enqueue(taskFunc);
+      }
+    }
+
+  }
+
+
+
   while (!glfwWindowShouldClose(window))
   {
+    tasks.update();
 
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGlfw_NewFrame();

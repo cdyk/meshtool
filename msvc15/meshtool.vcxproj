@@ -84,6 +84,8 @@
     <ClCompile Include="..\libs\imgui\imgui_widgets.cpp" />
     <ClCompile Include="..\src\LinAlgOps.cpp" />
     <ClCompile Include="..\src\main.cpp" />
+    <ClCompile Include="..\src\ObjReader.cpp" />
+    <ClCompile Include="..\src\Tasks.cpp" />
     <ClCompile Include="..\src\Viewer.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -95,6 +97,7 @@
     <ClInclude Include="..\libs\imgui\imstb_rectpack.h" />
     <ClInclude Include="..\libs\imgui\imstb_textedit.h" />
     <ClInclude Include="..\libs\imgui\imstb_truetype.h" />
+    <ClInclude Include="..\src\Common.h" />
     <ClInclude Include="..\src\LinAlg.h" />
     <ClInclude Include="..\src\LinAlgOps.h" />
     <ClInclude Include="..\src\Viewer.h" />

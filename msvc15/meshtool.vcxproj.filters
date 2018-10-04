@@ -40,6 +40,12 @@
     <ClCompile Include="..\libs\imgui\examples\imgui_impl_opengl2.cpp">
       <Filter>imgui\examples</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\ObjReader.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\Tasks.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\LinAlg.h">
@@ -74,6 +80,9 @@
     </ClInclude>
     <ClInclude Include="..\libs\imgui\examples\imgui_impl_opengl2.h">
       <Filter>imgui\examples</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\Common.h">
+      <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
