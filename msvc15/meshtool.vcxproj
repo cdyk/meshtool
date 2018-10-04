@@ -49,7 +49,7 @@
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..\libs\glfw\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\libs\glfw\include; ..\libs\imgui;..\libs\gl3w\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -65,7 +65,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..\libs\glfw\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\libs\glfw\include; ..\libs\imgui;..\libs\gl3w\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -76,11 +76,25 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\libs\imgui\examples\imgui_impl_glfw.cpp" />
+    <ClCompile Include="..\libs\imgui\examples\imgui_impl_opengl2.cpp" />
+    <ClCompile Include="..\libs\imgui\imgui.cpp" />
+    <ClCompile Include="..\libs\imgui\imgui_demo.cpp" />
+    <ClCompile Include="..\libs\imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\libs\imgui\imgui_widgets.cpp" />
     <ClCompile Include="..\src\LinAlgOps.cpp" />
     <ClCompile Include="..\src\main.cpp" />
     <ClCompile Include="..\src\Viewer.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\libs\imgui\examples\imgui_impl_glfw.h" />
+    <ClInclude Include="..\libs\imgui\examples\imgui_impl_opengl2.h" />
+    <ClInclude Include="..\libs\imgui\imconfig.h" />
+    <ClInclude Include="..\libs\imgui\imgui.h" />
+    <ClInclude Include="..\libs\imgui\imgui_internal.h" />
+    <ClInclude Include="..\libs\imgui\imstb_rectpack.h" />
+    <ClInclude Include="..\libs\imgui\imstb_textedit.h" />
+    <ClInclude Include="..\libs\imgui\imstb_truetype.h" />
     <ClInclude Include="..\src\LinAlg.h" />
     <ClInclude Include="..\src\LinAlgOps.h" />
     <ClInclude Include="..\src\Viewer.h" />
