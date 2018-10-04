@@ -62,6 +62,109 @@ namespace {
     return rv;
   }
 
+  const char* parseInt(Logger logger, int32_t& value, const char* p, const char* end)
+  {
+    p = skipSpacing(p, end);
+
+    int32_t sign = 1;
+    if (p < end) {
+      if (*p == '-') { sign = -1; p++; }
+      else if (*p == '+') p++;
+    }
+
+    int64_t t = 0;
+    for (; p < end && '0' <= *p && *p <= '9'; p++) {
+      if (t < 0x100000000) {
+        t = 10 * t + (*p - '0');
+      }
+    }
+    t = sign * t;
+
+    if (t < std::numeric_limits<int32_t>::min()) value = std::numeric_limits<int>::min();
+    else if (std::numeric_limits<int32_t>::max() < t) value = std::numeric_limits<int>::max();
+    else value = int32_t(t);
+
+    return p;
+  }
+
+  const char* parseFloat(Logger logger, float& value, const char* p, const char* end)
+  {
+    auto *s = p;
+
+    // Note: no attempt on correct rounding.
+
+    // read sign
+    int32_t sign = 1;
+    if (p < end) {
+      if (*p == '-') { sign = -1; p++; }
+      else if (*p == '+') p++;
+    }
+
+    int32_t mantissa = 0;
+    int32_t exponent = 0;
+    for (; p < end && '0' <= *p && *p <= '9'; p++) {
+      if (mantissa < 100000000) {
+        mantissa = 10 * mantissa + (*p - '0');
+      }
+      else {
+        exponent++;
+      }
+    }
+    if (p < end && *p == '.') {
+      p++;
+      for (; p < end && '0' <= *p && *p <= '9'; p++) {
+        if (mantissa < 100000000) {
+          mantissa = 10 * mantissa + (*p - '0');
+          exponent--;
+        }
+      }
+    }
+    if (p < end && *p == 'e') {
+      p++;
+      int32_t expSign = 1;
+      if (p < end) {
+        if (*p == '-') { expSign = -1; p++; }
+        else if (*p == '+') p++;
+      }
+
+      int32_t exp = 0;
+      for (; p < end && '0' <= *p && *p <= '9'; p++) {
+        if (exp < 100000000) {
+          exp = 10 * exp + (*p - '0');
+        }
+      }
+
+      exponent += expSign * exp;
+    }
+    value = float(sign*mantissa)*pow(10.f, exponent);
+    return p;
+  }
+
+  void parseV(Logger logger, const char * a, const char* b)
+  {
+    float v;
+    while (a < b) {
+      a = skipSpacing(a, b);
+      auto * q = a;
+      a = parseFloat(logger, v, a, b);
+      //logger(1, "%f  '%.*s'", v, b - q, q);
+      //int a = 2;
+    }
+  }
+
+  void parseF(Logger logger, const char* a, const char* b)
+  {
+    int32_t i;
+    while (a < b) {
+      a = skipSpacing(a, b);
+      while (a < b && *a == '/') a++;
+      auto * q = a;
+      a = parseInt(logger, i, a, b);
+      //logger(1, "%d  '%.*s'", i, b - q, q);
+      //int a = 2;
+    }
+  }
+
 }
 
 bool readObj(Logger logger, const void * ptr, size_t size)
@@ -85,13 +188,17 @@ bool readObj(Logger logger, const void * ptr, size_t size)
         unsigned keyword = key(p, l);
         switch (keyword) {
         case key('v'):
-          vertices++;
+          parseV(logger, r, q);
           recognized = true;
           break;
 
         case key('p'):        // point primitive
         case key('l'):        // line primitive
         case key('f'):        // face primitive
+          parseF(logger, r, q);
+          recognized = true;
+          break;
+
         case key('v', 't'):
         case key('v', 'n'):
         case key('g'):        // g group_name1 group_name2
