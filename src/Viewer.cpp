@@ -205,7 +205,7 @@ void Viewer::dolly(float x, float y)
   auto b = getPointOnInterestPlane(curr.PM, curr.PMinv, curr.coi, winSize, Vec2f(winSize.x, 0.5f*winSize.y));
   auto l = length(b - a);
 
-  auto zh = mul(curr.PMinv, Vec4f(0, 0, 1, 0));
+  auto zh = mul(curr.Minv, Vec4f(0, 0, 1, 0));
   auto z = normalize(Vec3f(zh.x, zh.y, zh.z));
 
   curr.coi = curr.coi + 0.05f*y*l*z;

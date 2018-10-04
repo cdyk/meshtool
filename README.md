@@ -18,3 +18,10 @@ cmake-gui ..
 ```
 Press "Configure" button and select 64bit VS2017. Open libs\glfw\build\GLFW.sln and build.
 
+## Credits
+
+Developed by Christopher Dyken.
+
+## License
+
+Meshtool is licensed under the MIT license, see LICENSE for more information.

@@ -6,6 +6,7 @@
 #include <list>
 #include <cctype>
 #include <chrono>
+#include <mutex>
 #include <examples/imgui_impl_glfw.h>
 #include <examples/imgui_impl_opengl2.h>
 
@@ -13,12 +14,18 @@
 #include <cstdio>
 #include "Viewer.h"
 #include "Common.h"
+#include "Mesh.h"
+#include "LinAlgOps.h"
 
 namespace {
 
   Viewer viewer;
   Tasks tasks;
 
+  std::mutex incomingMeshLock;
+  std::list<Mesh*> incomingMeshes;
+
+  std::list<Mesh*> meshes;
 
   void glfw_error_callback(int error, const char* description)
   {
@@ -79,7 +86,7 @@ namespace {
   void runObjReader(Logger logger, std::string path)
   {
     auto time0 = std::chrono::high_resolution_clock::now();
-    bool success = false;
+    Mesh* mesh = nullptr;
     HANDLE h = CreateFileA(path.c_str(), GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (h == INVALID_HANDLE_VALUE) {
       logger(2, "Failed to open file %s: %d", path.c_str(), GetLastError());
@@ -99,16 +106,28 @@ namespace {
           logger(2, "Failed to map view of file %s: %d", path.c_str(), GetLastError());
         }
         else {
-          success = readObj(logger, ptr, fileSize);
+          mesh = readObj(logger, ptr, fileSize);
           UnmapViewOfFile(ptr);
         }
         CloseHandle(m);
       }
       CloseHandle(h);
     }
-    auto time1 = std::chrono::high_resolution_clock::now();
-    auto e = std::chrono::duration_cast<std::chrono::milliseconds>((time1 - time0)).count();
-    logger(0, "%s read %s in %lldms", success ? "Successfully" : "Failed to", path.c_str(), e);
+    if (mesh) {
+
+      auto * name = path.c_str();
+      for (auto * t = name; *t != '\0'; t++) {
+        if (*t == '\\' || *t == '//') name = t + 1;
+      }
+      mesh->name = mesh->strings.intern(name);
+
+      auto time1 = std::chrono::high_resolution_clock::now();
+      auto e = std::chrono::duration_cast<std::chrono::milliseconds>((time1 - time0)).count();
+      std::lock_guard<std::mutex> guard(incomingMeshLock);
+      incomingMeshes.push_back(mesh);
+      logger(0, "Read %s in %lldms", path.c_str(), e);
+    }
+    logger(0, "Failed to read %s", path.c_str());
   }
 
 
@@ -174,6 +193,30 @@ int main(int argc, char** argv)
   {
     tasks.update();
 
+    bool change = false;
+    {
+      std::lock_guard<std::mutex> guard(incomingMeshLock);
+      if (!incomingMeshes.empty()) {
+        for (auto &m : incomingMeshes) {
+          meshes.push_back(m);
+        }
+        incomingMeshes.clear();
+        change = true;
+      }
+    }
+    if (change) {
+      auto bbox = createEmptyBBox3f();
+      for (auto * m : meshes) {
+        if (isEmpty(m->bbox)) continue;
+        engulf(bbox, m->bbox);
+      }
+      if (isEmpty(bbox)) {
+        bbox = BBox3f(Vec3f(-1.f), Vec3f(1.f));
+      }
+      viewer.setViewVolume(bbox);
+      viewer.viewAll();
+    }
+
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -184,8 +227,10 @@ int main(int argc, char** argv)
         if (ImGui::MenuItem("Quit", nullptr, nullptr)) { glfwSetWindowShouldClose(window, true); }
         ImGui::EndMenu();
       }
-
-
+      if (ImGui::BeginMenu("View")) {
+        if (ImGui::MenuItem("View all", nullptr, nullptr)) { viewer.viewAll(); }
+        ImGui::EndMenu();
+      }
       ImGui::EndMainMenuBar();
     }
 
@@ -195,24 +240,25 @@ int main(int argc, char** argv)
     ImVec2 mainSize;
 
     {
-      static float f = 0.0f;
-      static int counter = 0;
+      ImGui::Begin("Hello, world!");
+      if (ImGui::TreeNodeEx("Meshes", ImGuiTreeNodeFlags_DefaultOpen)) {
 
-      ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+        for (auto &m : meshes) {
+          if (ImGui::TreeNodeEx(m, ImGuiTreeNodeFlags_DefaultOpen, "%s Vn=%d Tn=%d", m->name? m->name : "unnamed", m->vtx_n, m->tri_n)) {
+            for (unsigned o = 0; o < m->obj_n; o++) {
+              if (ImGui::Button(m->obj[o])) {
 
-      ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-
-      ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f    
-
-      if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-        counter++;
-      ImGui::SameLine();
-      ImGui::Text("counter = %d", counter);
-
-      ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+              }
+            }
+            ImGui::TreePop();
+          }
+        }
+        ImGui::TreePop();
+      }
       ImGui::End();
     }
 
+    ImGui::ShowDemoWindow();
 
     ImGui::Render();
 
@@ -226,7 +272,6 @@ int main(int argc, char** argv)
 
     viewer.update();
 
-#if 1
     glMatrixMode(GL_PROJECTION);
     glLoadMatrixf(viewer.getProjectionMatrix().data);
 
@@ -234,8 +279,31 @@ int main(int argc, char** argv)
     glMatrixMode(GL_MODELVIEW);
     glLoadMatrixf(viewer.getViewMatrix().data);
 
+    glPolygonOffset(1.f, 1.f);
+    glEnable(GL_POLYGON_OFFSET_FILL);
+    glColor3f(0.2f, 0.2f, 0.6f);
+    for (auto * m : meshes) {
+      glBegin(GL_TRIANGLES);
+      for (unsigned i = 0; i < 3*m->tri_n; i++) {
+        glVertex3fv(m->vtx[m->tri[i]].data);
+      }
+      glEnd();
+    }
+    glDisable(GL_POLYGON_OFFSET_FILL);
 
-    glBegin(GL_QUADS);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    glColor3f(1.f, 1.f, 1.f);
+    for (auto * m : meshes) {
+      glBegin(GL_TRIANGLES);
+      for (unsigned i = 0; i < 3 * m->tri_n; i++) {
+        glVertex3fv(m->vtx[m->tri[i]].data);
+      }
+      glEnd();
+    }
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+
+
+    /*
     glColor3f(1, 0, 0);
     glVertex3f(-1, -1, -1);
     glVertex3f( 1, -1, -1);
@@ -246,9 +314,7 @@ int main(int argc, char** argv)
     glVertex3f(1, -1, 1);
     glVertex3f(1, 1, 1);
     glVertex3f(-1, 1, 1);
-    glEnd();
-#endif
-
+    */
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
 
     glfwSwapBuffers(window);

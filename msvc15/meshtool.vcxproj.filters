@@ -46,6 +46,12 @@
     <ClCompile Include="..\src\Tasks.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\Common.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\Mesh.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\LinAlg.h">
@@ -82,6 +88,9 @@
       <Filter>imgui\examples</Filter>
     </ClInclude>
     <ClInclude Include="..\src\Common.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\Mesh.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
