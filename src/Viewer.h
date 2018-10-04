@@ -12,7 +12,7 @@ public:
 
   void update();
 
-  void resize(int w, int h);
+  void resize(const Vec2f& pos, const Vec2f& size);
   void startRotation(float x, float y);
   void startPan(float x, float y);
   void startZoom(float x, float y);
@@ -20,7 +20,7 @@ public:
 
   void move(float x, float y);
 
-  void dolly(float x, float y);
+  void dolly(float x, float y, float speed, bool distance=false);
 
   const Mat4f& getProjectionMatrix() const { return curr.P; }
   const Mat4f& getViewMatrix() const { return curr.M; }
@@ -54,6 +54,7 @@ private:
   };
   CamState init;
   CamState curr;
+  Vec2f winPos;
   Vec2f winSize;
   BBox3f viewVolume;
   float fov = 1.f;            // fov along y

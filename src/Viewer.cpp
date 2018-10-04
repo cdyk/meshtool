@@ -80,7 +80,7 @@ void Viewer::viewAll()
 {
   stopAction();
   curr.coi = 0.5f * (viewVolume.min + viewVolume.max);
-  curr.dist = viewVolumeRadius / std::tan(0.5f*fov);
+  curr.dist = 0.5f*viewVolumeRadius / std::tan(0.5f*fov);
   needsUpdate = true;
 }
 
@@ -164,18 +164,25 @@ void Viewer::update()
 
 }
 
-void Viewer::resize(int w, int h)
+void Viewer::resize(const Vec2f& pos, const Vec2f& size)
 {
+  auto s = size;
+  if (s.x < 1.f) s.x = 1.f;
+  if (s.y < 1.f) s.y = 1.f;
+
+  if (winPos.x == pos.x && winPos.y == pos.y && winSize.x == s.x && winSize.y == s.y) return;
+
   stopAction();
-  winSize.x = float(w < 1 ? 1 : w);
-  winSize.y = float(h < 1 ? 1 : h);
+
+  winPos = pos;
+  winSize = s;
   needsUpdate = true;
 }
 
 void Viewer::startRotation(float x, float y)
 {
   stopAction();
-  curr.mouse2 = Vec2f(x, y);
+  curr.mouse2 = Vec2f(x, y)-winPos;
   init = curr;
   mode = Mode::Rotation;
 }
@@ -183,7 +190,8 @@ void Viewer::startRotation(float x, float y)
 void Viewer::startPan(float x, float y)
 {
   stopAction();
-  curr.mouse3 = getPointOnInterestPlane(curr.PM, curr.PMinv, curr.coi, winSize, Vec2f(x, y));
+  curr.mouse2 = Vec2f(x, y) - winPos;
+  curr.mouse3 = getPointOnInterestPlane(curr.PM, curr.PMinv, curr.coi, winSize, curr.mouse2);
   init = curr;
   mode = Mode::Pan;
 }
@@ -191,13 +199,13 @@ void Viewer::startPan(float x, float y)
 void Viewer::startZoom(float x, float y)
 {
   stopAction();
-  curr.mouse2 = Vec2f(x, y);
-  curr.mouse3 = getPointOnInterestPlane(curr.PM, curr.PMinv, curr.coi, winSize, Vec2f(x, y));
+  curr.mouse2 = Vec2f(x, y) - winPos;
+  curr.mouse3 = getPointOnInterestPlane(curr.PM, curr.PMinv, curr.coi, winSize, curr.mouse2);
   init = curr;
   mode = Mode::Zoom;
 }
 
-void Viewer::dolly(float x, float y)
+void Viewer::dolly(float x, float y, float speed, bool distance)
 {
   stopAction();
 
@@ -207,8 +215,13 @@ void Viewer::dolly(float x, float y)
 
   auto zh = mul(curr.Minv, Vec4f(0, 0, 1, 0));
   auto z = normalize(Vec3f(zh.x, zh.y, zh.z));
+  float delta = speed * 0.05f*y*l;
+  curr.coi = curr.coi - delta*z;
+  if (distance) {
+    curr.dist += delta;
+    if (curr.dist < 0.01f*viewVolumeRadius) curr.dist = 0.01f*viewVolumeRadius;
+  }
 
-  curr.coi = curr.coi + 0.05f*y*l*z;
   needsUpdate = true;
 }
 
@@ -220,7 +233,7 @@ void Viewer::stopAction()
 
 void Viewer::move(float x, float y)
 {
-  curr.mouse2 = Vec2f(x, y);
+  curr.mouse2 = Vec2f(x, y) - winPos;
 
   switch (mode) {
   case  Mode::Rotation: {
@@ -233,13 +246,12 @@ void Viewer::move(float x, float y)
     break;
   }
   case Mode::Pan:
-    curr.mouse3 = getPointOnInterestPlane(init.PM, init.PMinv, init.coi, winSize, Vec2f(x, y));
+    curr.mouse3 = getPointOnInterestPlane(init.PM, init.PMinv, init.coi, winSize, curr.mouse2);
     curr.coi = init.coi - (curr.mouse3 - init.mouse3);
     needsUpdate = true;
     break;
   case Mode::Zoom:
-    curr.mouse2 = Vec2f(x, y);
-    curr.mouse3 = getPointOnInterestPlane(init.PM, init.PMinv, init.coi, winSize, Vec2f(x, y));
+    curr.mouse3 = getPointOnInterestPlane(init.PM, init.PMinv, init.coi, winSize, curr.mouse2);
     curr.dist = init.dist + std::copysign(2.f*length(curr.mouse3 - init.mouse3), init.mouse2.y-curr.mouse2.y);
     if (curr.dist < 0.01f*viewVolumeRadius) curr.dist = 0.01f*viewVolumeRadius;
     needsUpdate = true;

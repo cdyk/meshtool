@@ -3,6 +3,7 @@
 #include <Windows.h>
 //#include <GL/gl3w.h>
 #include <imgui.h>
+#include <imgui_internal.h>
 #include <list>
 #include <cctype>
 #include <chrono>
@@ -17,10 +18,16 @@
 #include "Mesh.h"
 #include "LinAlgOps.h"
 
+
 namespace {
 
   Viewer viewer;
   Tasks tasks;
+  int width, height;
+  float leftSplit = 100;
+  float thickness = 8;
+
+  bool solid = true;
 
   std::mutex incomingMeshLock;
   std::list<Mesh*> incomingMeshes;
@@ -34,7 +41,6 @@ namespace {
 
   void resizeFunc(GLFWwindow* window, int w, int h)
   {
-    viewer.resize(w, h);
   }
 
   void moveFunc(GLFWwindow* window, double x, double y)
@@ -65,7 +71,17 @@ namespace {
  
   void scrollFunc(GLFWwindow* window, double x, double y)
   {
-    viewer.dolly(float(x), float(y));
+    float speed = 1.f;
+    if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+      speed = 0.1f;
+    }
+    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) {
+      speed = 0.01f;
+    }
+
+    bool distance = glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS;
+
+    viewer.dolly(float(x), float(y), speed, distance);
   }
 
   void logger(unsigned level, const char* msg, ...)
@@ -130,6 +146,7 @@ namespace {
     logger(0, "Failed to read %s", path.c_str());
   }
 
+  
 
 }
 
@@ -188,6 +205,8 @@ int main(int argc, char** argv)
   }
 
 
+  glfwGetFramebufferSize(window, &width, &height);
+  leftSplit = 0.25f*width;
 
   while (!glfwWindowShouldClose(window))
   {
@@ -217,10 +236,13 @@ int main(int argc, char** argv)
       viewer.viewAll();
     }
 
+    glfwGetFramebufferSize(window, &width, &height);
+
     ImGui_ImplOpenGL2_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
+    float menuHeight = 0.f;
     if (ImGui::BeginMainMenuBar())
     {
       if (ImGui::BeginMenu("File")) {
@@ -229,92 +251,106 @@ int main(int argc, char** argv)
       }
       if (ImGui::BeginMenu("View")) {
         if (ImGui::MenuItem("View all", nullptr, nullptr)) { viewer.viewAll(); }
+        if (ImGui::MenuItem("Solid", nullptr, &solid)) {  }
         ImGui::EndMenu();
       }
+      menuHeight = ImGui::GetWindowSize().y;
       ImGui::EndMainMenuBar();
     }
 
 
-
-    ImVec2 mainPos;
-    ImVec2 mainSize;
-
     {
-      ImGui::Begin("Hello, world!");
-      if (ImGui::TreeNodeEx("Meshes", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::SetNextWindowPos(ImVec2(0, menuHeight));
+      ImGui::SetNextWindowSize(ImVec2(leftSplit, height - menuHeight));
+      ImGui::Begin("##left", nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
 
-        for (auto &m : meshes) {
-          if (ImGui::TreeNodeEx(m, ImGuiTreeNodeFlags_DefaultOpen, "%s Vn=%d Tn=%d", m->name? m->name : "unnamed", m->vtx_n, m->tri_n)) {
-            for (unsigned o = 0; o < m->obj_n; o++) {
-              if (ImGui::Button(m->obj[o])) {
 
-              }
-            }
-            ImGui::TreePop();
-          }
-        }
-        ImGui::TreePop();
+      //ImGuiContext& g = *GImGui;
+      //ImGuiWindow* window = g.CurrentWindow;
+
+      ImVec2 backup_pos = ImGui::GetCursorPos();
+      ImGui::SetCursorPosX(leftSplit - thickness);
+
+      ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0, 0, 0, 0));
+      ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0, 0, 0, 0));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.6f, 0.6f, 0.6f, 0.10f));
+      ImGui::Button("##Splitter", ImVec2(thickness, -1));
+
+      ImGui::PopStyleColor(3);
+      if (ImGui::IsItemActive()) {
+        leftSplit += ImGui::GetIO().MouseDelta.x;
+        if (leftSplit < 50) leftSplit = 50;
+        if (width - thickness < leftSplit) leftSplit = width - thickness;
       }
+
+      ImGui::SetCursorPos(backup_pos);
+      ImGui::BeginChild("Meshes", ImVec2(leftSplit - thickness - backup_pos.x, -1), false, ImGuiWindowFlags_AlwaysHorizontalScrollbar);
+      for (auto &m : meshes) {
+        if (ImGui::TreeNodeEx(m, ImGuiTreeNodeFlags_DefaultOpen, "%s Vn=%d Tn=%d", m->name ? m->name : "unnamed", m->vtx_n, m->tri_n)) {
+          for (unsigned o = 0; o < m->obj_n; o++) {
+            if (ImGui::Button(m->obj[o])) {
+
+            }
+          }
+          ImGui::TreePop();
+        }
+      }
+      ImGui::EndChild();
       ImGui::End();
     }
-
-    ImGui::ShowDemoWindow();
+    //ImGui::ShowDemoWindow();
 
     ImGui::Render();
 
 
-    int w, h;
-    glfwGetFramebufferSize(window, &w, &h);
-    glViewport(0, 0, w, h);
+    glViewport(0, 0, width, height);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    glEnable(GL_DEPTH_TEST);
 
-    viewer.update();
+    {
+      Vec2f viewerPos(leftSplit, menuHeight);
+      Vec2f viewerSize(width - viewerPos.x, height - viewerPos.y);
+      glViewport(int(viewerPos.x), int(viewerPos.y), int(viewerSize.x), int(viewerSize.y));
+      viewer.resize(viewerPos, viewerSize);
 
-    glMatrixMode(GL_PROJECTION);
-    glLoadMatrixf(viewer.getProjectionMatrix().data);
+      glEnable(GL_DEPTH_TEST);
+
+      viewer.update();
+
+      glMatrixMode(GL_PROJECTION);
+      glLoadMatrixf(viewer.getProjectionMatrix().data);
 
 
-    glMatrixMode(GL_MODELVIEW);
-    glLoadMatrixf(viewer.getViewMatrix().data);
+      glMatrixMode(GL_MODELVIEW);
+      glLoadMatrixf(viewer.getViewMatrix().data);
 
-    glPolygonOffset(1.f, 1.f);
-    glEnable(GL_POLYGON_OFFSET_FILL);
-    glColor3f(0.2f, 0.2f, 0.6f);
-    for (auto * m : meshes) {
-      glBegin(GL_TRIANGLES);
-      for (unsigned i = 0; i < 3*m->tri_n; i++) {
-        glVertex3fv(m->vtx[m->tri[i]].data);
+      if (solid) {
+        glPolygonOffset(1.f, 1.f);
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glColor3f(0.2f, 0.2f, 0.6f);
+        for (auto * m : meshes) {
+          glBegin(GL_TRIANGLES);
+          for (unsigned i = 0; i < 3 * m->tri_n; i++) {
+            glVertex3fv(m->vtx[m->tri[i]].data);
+          }
+          glEnd();
+        }
+        glDisable(GL_POLYGON_OFFSET_FILL);
       }
-      glEnd();
-    }
-    glDisable(GL_POLYGON_OFFSET_FILL);
 
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-    glColor3f(1.f, 1.f, 1.f);
-    for (auto * m : meshes) {
-      glBegin(GL_TRIANGLES);
-      for (unsigned i = 0; i < 3 * m->tri_n; i++) {
-        glVertex3fv(m->vtx[m->tri[i]].data);
+      glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+      glColor3f(1.f, 1.f, 1.f);
+      for (auto * m : meshes) {
+        glBegin(GL_TRIANGLES);
+        for (unsigned i = 0; i < 3 * m->tri_n; i++) {
+          glVertex3fv(m->vtx[m->tri[i]].data);
+        }
+        glEnd();
       }
-      glEnd();
+      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     }
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
 
-    /*
-    glColor3f(1, 0, 0);
-    glVertex3f(-1, -1, -1);
-    glVertex3f( 1, -1, -1);
-    glVertex3f( 1,  1, -1);
-    glVertex3f(-1,  1, -1);
-    glColor3f(0, 1, 0);
-    glVertex3f(-1, -1, 1);
-    glVertex3f(1, -1, 1);
-    glVertex3f(1, 1, 1);
-    glVertex3f(-1, 1, 1);
-    */
     ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
 
     glfwSwapBuffers(window);
