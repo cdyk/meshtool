@@ -11,6 +11,9 @@
     <Filter Include="imgui\examples">
       <UniqueIdentifier>{135aa6d4-b902-4146-9cd0-30f1f15ced16}</UniqueIdentifier>
     </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{9d1aa265-aba9-48c1-98b1-df45244f477a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\main.cpp">
@@ -51,6 +54,9 @@
     </ClCompile>
     <ClCompile Include="..\libs\imgui\examples\imgui_impl_vulkan.cpp">
       <Filter>imgui\examples</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\Renderer.cpp">
+      <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -93,5 +99,16 @@
     <ClInclude Include="..\libs\imgui\examples\imgui_impl_vulkan.h">
       <Filter>imgui\examples</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\Renderer.h">
+      <Filter>src</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\shaders\vanillaVS.glsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\shaders\vanillaPS.glsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

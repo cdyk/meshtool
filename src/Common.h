@@ -74,12 +74,20 @@ struct ListHeader
 
 struct BufferBase
 {
+public:
+  size_t getCount()
+  {
+    if (ptr) return ((size_t*)ptr)[-1];
+    else return 0;
+  }
+
 protected:
   char* ptr = nullptr;
 
   ~BufferBase() { free(); }
 
   void free();
+
 
   void _accommodate(size_t typeSize, size_t count)
   {

@@ -1,6 +1,8 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
 //#include <GL/gl3w.h>
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -12,14 +14,12 @@
 #include <examples/imgui_impl_glfw.h>
 #include <examples/imgui_impl_vulkan.h>
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
 #include <cstdio>
 #include "Viewer.h"
 #include "Common.h"
 #include "Mesh.h"
 #include "LinAlgOps.h"
-
+#include "Renderer.h"
 
 namespace {
 
@@ -30,6 +30,8 @@ namespace {
   float thickness = 8;
 
   bool solid = true;
+
+  Renderer* renderer = nullptr;
 
   ImGui_ImplVulkanH_WindowData imguiWindowData;
 
@@ -581,6 +583,8 @@ int main(int argc, char** argv)
 
   initSwapChain(window, instance, physicalDevice, queueFamilyIndex);
 
+  renderer = new Renderer(logger, device);
+
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui_ImplGlfw_InitForVulkan(window, true);
@@ -707,9 +711,12 @@ int main(int argc, char** argv)
   auto rv = vkDeviceWaitIdle(device);
   assert(rv == VK_SUCCESS);
 
+
   ImGui_ImplVulkan_Shutdown();
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
+
+  delete renderer;
 
   vkFreeCommandBuffers(device, cmdPool, 1, &cmdBuf);
   vkDestroyCommandPool(device, cmdPool, nullptr);
