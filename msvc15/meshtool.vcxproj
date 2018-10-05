@@ -98,6 +98,7 @@
     <ClCompile Include="..\src\Renderer.cpp" />
     <ClCompile Include="..\src\Tasks.cpp" />
     <ClCompile Include="..\src\Viewer.cpp" />
+    <ClCompile Include="..\src\VulkanContext.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\libs\imgui\examples\imgui_impl_glfw.h" />
@@ -114,6 +115,7 @@
     <ClInclude Include="..\src\Mesh.h" />
     <ClInclude Include="..\src\Renderer.h" />
     <ClInclude Include="..\src\Viewer.h" />
+    <ClInclude Include="..\src\VulkanContext.h" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\shaders\vanillaPS.glsl">

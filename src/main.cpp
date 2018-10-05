@@ -38,7 +38,13 @@ namespace {
   std::mutex incomingMeshLock;
   std::list<Mesh*> incomingMeshes;
 
-  std::list<Mesh*> meshes;
+  struct MeshItem
+  {
+    Mesh* mesh;
+    RenderMesh* renderMesh;
+  };
+
+  std::list<MeshItem> meshItems;
 
   void logger(unsigned level, const char* msg, ...)
   {
@@ -230,6 +236,9 @@ namespace {
 
     return true;
   }
+
+  
+
 
   bool initSwapChain(GLFWwindow* window, VkInstance instance, VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex)
   {
@@ -448,7 +457,9 @@ namespace {
       incomingMeshes.push_back(mesh);
       logger(0, "Read %s in %lldms", path.c_str(), e);
     }
-    logger(0, "Failed to read %s", path.c_str());
+    else {
+      logger(0, "Failed to read %s", path.c_str());
+    }
   }
 
   void guiTraversal(GLFWwindow* window)
@@ -496,7 +507,8 @@ namespace {
 
       ImGui::SetCursorPos(backup_pos);
       ImGui::BeginChild("Meshes", ImVec2(leftSplit - thickness - backup_pos.x, -1), false, ImGuiWindowFlags_AlwaysHorizontalScrollbar);
-      for (auto &m : meshes) {
+      for(auto & item : meshItems) {
+        auto * m = item.mesh;
         if (ImGui::TreeNodeEx(m, ImGuiTreeNodeFlags_DefaultOpen, "%s Vn=%d Tn=%d", m->name ? m->name : "unnamed", m->vtx_n, m->tri_n)) {
           for (unsigned o = 0; o < m->obj_n; o++) {
             if (ImGui::Button(m->obj[o])) {
@@ -514,20 +526,21 @@ namespace {
 
   void checkQueues()
   {
-    bool change = false;
+    std::list<Mesh*> newMeshes;
     {
       std::lock_guard<std::mutex> guard(incomingMeshLock);
       if (!incomingMeshes.empty()) {
-        for (auto &m : incomingMeshes) {
-          meshes.push_back(m);
-        }
+        newMeshes = std::move(incomingMeshes);
         incomingMeshes.clear();
-        change = true;
       }
     }
-    if (change) {
+    if (!newMeshes.empty()) {
+      for (auto & m : newMeshes) {
+        meshItems.push_back({ m, renderer->createRenderMesh(m) });
+      }
       auto bbox = createEmptyBBox3f();
-      for (auto * m : meshes) {
+      for (auto & item : meshItems) {
+        auto * m = item.mesh;
         if (isEmpty(m->bbox)) continue;
         engulf(bbox, m->bbox);
       }
@@ -561,6 +574,7 @@ int main(int argc, char** argv)
     logger(2, "GLFW: Vulkan not supported");
     return -1;
   }
+  glfwGetFramebufferSize(window, &width, &height);
 
   VkInstance instance;
   createInstance(instance);
@@ -583,7 +597,6 @@ int main(int argc, char** argv)
 
   initSwapChain(window, instance, physicalDevice, queueFamilyIndex);
 
-  renderer = new Renderer(logger, device);
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
@@ -591,6 +604,33 @@ int main(int argc, char** argv)
 
   ImGui_ImplVulkanH_CreateWindowDataCommandBuffers(physicalDevice, device, queueFamilyIndex, &imguiWindowData, nullptr);
   ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(physicalDevice, device, &imguiWindowData, nullptr, width, height);
+
+#if 0
+  struct ImGui_ImplVulkanH_WindowData
+  {
+    int                 Width;
+    int                 Height;
+    VkSwapchainKHR      Swapchain;
+    VkSurfaceKHR        Surface;
+    VkSurfaceFormatKHR  SurfaceFormat;
+    VkPresentModeKHR    PresentMode;
+    VkRenderPass        RenderPass;
+    bool                ClearEnable;
+    VkClearValue        ClearValue;
+    uint32_t            BackBufferCount;
+    VkImage             BackBuffer[16];
+    VkImageView         BackBufferView[16];
+    VkFramebuffer       Framebuffer[16];
+    uint32_t            FrameIndex;
+    ImGui_ImplVulkanH_FrameData Frames[IMGUI_VK_QUEUED_FRAMES];
+
+    IMGUI_IMPL_API ImGui_ImplVulkanH_WindowData();
+  };
+#endif
+
+
+  renderer = new Renderer(logger, physicalDevice, device, imguiWindowData.BackBufferView, imguiWindowData.BackBufferCount, width, height);
+
 
   ImGui_ImplVulkan_InitInfo init_info = {};
   init_info.Instance = instance;
@@ -711,6 +751,10 @@ int main(int argc, char** argv)
   auto rv = vkDeviceWaitIdle(device);
   assert(rv == VK_SUCCESS);
 
+  for (auto & item : meshItems) {
+    renderer->destroyRenderMesh(item.renderMesh);
+  }
+  meshItems.clear();
 
   ImGui_ImplVulkan_Shutdown();
   ImGui_ImplGlfw_Shutdown();

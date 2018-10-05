@@ -58,6 +58,9 @@
     <ClCompile Include="..\src\Renderer.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\VulkanContext.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\LinAlg.h">
@@ -100,6 +103,9 @@
       <Filter>imgui\examples</Filter>
     </ClInclude>
     <ClInclude Include="..\src\Renderer.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\VulkanContext.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
