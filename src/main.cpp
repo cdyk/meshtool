@@ -26,6 +26,7 @@ namespace {
 
   Viewer viewer;
   Tasks tasks;
+  bool wasResized = false;
   int width, height;
   float leftSplit = 100;
   float thickness = 8;
@@ -34,7 +35,9 @@ namespace {
 
   VulkanContext* vCtx = nullptr;
   Renderer* renderer = nullptr;
-  
+
+  RenderPassHandle mainPass;
+  Vector<FrameBufferHandle> frameBuffers;
 
   ImGui_ImplVulkanH_WindowData imguiWindowData;
 
@@ -158,6 +161,26 @@ namespace {
     rv = vkBeginCommandBuffer(frameData->CommandBuffer, &info);
     assert(rv == VK_SUCCESS);
 
+    VkClearValue clearValues[2] = {};
+    clearValues[0].color.float32[0] = 0.5f;
+    clearValues[1].depthStencil.depth = 0.f;
+
+    {
+      VkRenderPassBeginInfo beginInfo = {};
+      beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+      beginInfo.renderPass = mainPass.resource->pass;
+      beginInfo.framebuffer = frameBuffers[imguiWindowData.FrameIndex].resource->fb;
+      beginInfo.renderArea.extent.width = width;
+      beginInfo.renderArea.extent.height = height;
+      beginInfo.clearValueCount = 2;
+      beginInfo.pClearValues = clearValues;
+
+      vkCmdBeginRenderPass(frameData->CommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+      //ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), frameData->CommandBuffer);
+
+      vkCmdEndRenderPass(frameData->CommandBuffer);
+    }
+
     VkRenderPassBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     beginInfo.renderPass = imguiWindowData.RenderPass;
@@ -205,6 +228,9 @@ namespace {
 
   void resizeFunc(GLFWwindow* window, int w, int h)
   {
+    wasResized = true;
+    width = w;
+    height = h;
   }
 
   void moveFunc(GLFWwindow* window, double x, double y)
@@ -247,8 +273,6 @@ namespace {
 
     viewer.dolly(float(x), float(y), speed, distance);
   }
-
-  
 
   void runObjReader(Logger logger, std::string path)
   {
@@ -389,6 +413,70 @@ namespace {
     }
   }
 
+  void setupFramebuffer(VulkanContext* vCtx)
+  {
+    auto * wd = &imguiWindowData;
+
+    auto depthFormat = VK_FORMAT_D32_SFLOAT;
+
+    wd->ClearEnable = false;
+    ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(vCtx->physicalDevice, vCtx->device, wd, nullptr, width, height);
+
+    {
+      VkAttachmentDescription attachments[2];
+      attachments[0].format = wd->SurfaceFormat.format;
+      attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
+      attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+      attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+      attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+      attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+      attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+      attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+      attachments[0].flags = 0;
+
+      attachments[1].format = depthFormat;
+      attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
+      attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+      attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+      attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+      attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+      attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+      attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+      attachments[1].flags = 0;
+
+      VkAttachmentReference color_reference = {};
+      color_reference.attachment = 0;
+      color_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+      VkAttachmentReference depth_reference = {};
+      depth_reference.attachment = 1;
+      depth_reference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+
+      VkSubpassDescription subpass = {};
+      subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+      subpass.flags = 0;
+      subpass.inputAttachmentCount = 0;
+      subpass.pInputAttachments = NULL;
+      subpass.colorAttachmentCount = 1;
+      subpass.pColorAttachments = &color_reference;
+      subpass.pResolveAttachments = NULL;
+      subpass.pDepthStencilAttachment = &depth_reference;
+      subpass.preserveAttachmentCount = 0;
+      subpass.pPreserveAttachments = NULL;
+      mainPass = vCtx->createRenderPass(attachments, 2, &subpass, 1);
+    }
+
+    Vector<RenderImageHandle> attachments(2);
+    attachments[1] = vCtx->createRenderImage(width, height, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_FORMAT_D32_SFLOAT);
+
+    frameBuffers.resize(wd->BackBufferCount);
+    for (uint32_t i = 0; i < wd->BackBufferCount; i++) {
+      attachments[0] = vCtx->wrapRenderImageView(wd->BackBufferView[i]);
+      frameBuffers[i] = vCtx->createFrameBuffer(mainPass, width, height, attachments);
+    }
+   
+  }
+
 }
 
 
@@ -417,10 +505,7 @@ int main(int argc, char** argv)
   const char** extensions = glfwGetRequiredInstanceExtensions(&extensions_count);
 
   vCtx = new VulkanContext(logger, extensions, extensions_count, glfwGetPhysicalDevicePresentationSupport);
-  {
-    auto h = vCtx->createFrameBuffer();
-    auto w = h;
-  }
+  
 
   initSwapChain(window, vCtx->instance, vCtx->physicalDevice, vCtx->queueFamilyIndex);
 
@@ -429,31 +514,8 @@ int main(int argc, char** argv)
   ImGui_ImplGlfw_InitForVulkan(window, true);
 
   ImGui_ImplVulkanH_CreateWindowDataCommandBuffers(vCtx->physicalDevice, vCtx->device, vCtx->queueFamilyIndex, &imguiWindowData, nullptr);
-  ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(vCtx->physicalDevice, vCtx->device, &imguiWindowData, nullptr, width, height);
-#if 0
-  struct ImGui_ImplVulkanH_WindowData
-  {
-    int                 Width;
-    int                 Height;
-    VkSwapchainKHR      Swapchain;
-    VkSurfaceKHR        Surface;
-    VkSurfaceFormatKHR  SurfaceFormat;
-    VkPresentModeKHR    PresentMode;
-    VkRenderPass        RenderPass;
-    bool                ClearEnable;
-    VkClearValue        ClearValue;
-    uint32_t            BackBufferCount;
-    VkImage             BackBuffer[16];
-    VkImageView         BackBufferView[16];
-    VkFramebuffer       Framebuffer[16];
-    uint32_t            FrameIndex;
-    ImGui_ImplVulkanH_FrameData Frames[IMGUI_VK_QUEUED_FRAMES];
 
-    IMGUI_IMPL_API ImGui_ImplVulkanH_WindowData();
-  };
-#endif
-
-
+  setupFramebuffer(vCtx);
 
   renderer = new Renderer(logger, vCtx, imguiWindowData.BackBufferView, imguiWindowData.BackBufferCount, width, height);
 
@@ -506,15 +568,20 @@ int main(int argc, char** argv)
     }
   }
 
-  glfwGetFramebufferSize(window, &width, &height);
   leftSplit = 0.25f*width;
   while (!glfwWindowShouldClose(window))
   {
+    glfwPollEvents();
+    if (wasResized) {
+      wasResized = false;
+      setupFramebuffer(vCtx);
+    }
+
     vCtx->houseKeep();
 
     tasks.update();
     checkQueues();
-    glfwGetFramebufferSize(window, &width, &height);
+
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -573,7 +640,6 @@ int main(int argc, char** argv)
 
     frameRender(vCtx);
     framePresent(vCtx);
-    glfwPollEvents();
   }
 
   auto rv = vkDeviceWaitIdle(vCtx->device);

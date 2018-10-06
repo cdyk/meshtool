@@ -4,10 +4,15 @@
 
 struct ResourceBase
 {
+  enum struct Flags : uint32_t {
+    None = 0,
+    External = 1
+  };
   uint32_t refs = 0;
+  Flags flags = Flags::None;
 
-
-
+  bool hasFlag(Flags flag) const { return (uint32_t)flags & (uint32_t)flag; }
+  void setFlag(Flags flag) { (Flags)((uint32_t)flags | (uint32_t)flag); }
 };
 
 template<typename T>
@@ -18,9 +23,11 @@ struct ResourceHandle
   ResourceHandle() = default;
   ResourceHandle(ResourceHandle& rhs) { resource = rhs.resource; resource->refs++; }
   ResourceHandle(ResourceHandle&& rhs) { resource = rhs.resource; rhs.resource = nullptr; }
-  ResourceHandle& operator=(ResourceHandle&& rhs) { resource = rhs.resource; rhs.resource = nullptr; }
+  ResourceHandle& operator=(ResourceHandle& rhs) { release(); resource = rhs.resource;  resource->refs++; return *this; }
+  ResourceHandle& operator=(ResourceHandle&& rhs) { release(); resource = rhs.resource; rhs.resource = nullptr; return *this; }
   ~ResourceHandle() { release(); }
 
+  explicit operator bool() const { return resource; }
 
   ResourceHandle(T* resource)
     : resource(resource)

@@ -167,16 +167,6 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
   vCtx(vCtx)
 {
 
-  depthImage = new RenderImage;
-  vCtx->createDepthImage(*depthImage, w, h);
-
-  
-
-  //for (i = 0; i < info.swapchainImageCount; i++) {
-  //  vkDestroyFramebuffer(info.device, info.framebuffers[i], NULL);
-  //}
-  //free(info.framebuffers);
-
 
 
   ShaderInputSpec stages[] = {

@@ -70,7 +70,7 @@ VulkanContext::VulkanContext(Logger logger,
     debugCallbackCI.pNext = nullptr;
     debugCallbackCI.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
     debugCallbackCI.pfnCallback = &MyDebugReportCallback;
-    debugCallbackCI.pUserData = nullptr;
+    debugCallbackCI.pUserData = logger;
 
     auto vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
     VkResult result = vkCreateDebugReportCallbackEXT(instance, &debugCallbackCI, nullptr, &debugCallback);
@@ -219,22 +219,31 @@ VulkanContext::~VulkanContext()
 
 void VulkanContext::houseKeep()
 {
-
-  frameBufferResources.purge();
-  unsigned d = 0;
-  for (auto * r = frameBufferResources.getPurged(); r; r = frameBufferResources.getPurged()) {
-    d++;
-    delete r; 
+  {
+    uint32_t d = 0;
+    renderPassResources.purge();
+    for (auto * r = renderPassResources.getPurged(); r; r = renderPassResources.getPurged()) {
+      delete r; d++;
+    }
+    if (d) logger(0, "Deleted %d renderpasses", d);
   }
-  if (d) logger(0, "Deleted %d framebuffers", d);
-
-}
-
-
-FrameBufferHandle VulkanContext::createFrameBuffer()
-{
-  auto * fb = new FrameBuffer();
-  return frameBufferResources.createResource();
+  {
+    uint32_t d = 0;
+    frameBufferResources.purge();
+    for (auto * r = frameBufferResources.getPurged(); r; r = frameBufferResources.getPurged()) {
+      delete r; d++;
+    }
+    if (d) logger(0, "Deleted %d framebuffers", d);
+  }
+  {
+    uint32_t d = 0;
+    renderImageResources.purge();
+    for (auto * r = renderImageResources.getPurged(); r; r = renderImageResources.getPurged()) {
+      destroyRenderImage(r);
+      delete r; d++;
+    }
+    if (d) logger(0, "Deleted %d render images", d);
+  }
 }
 
 
@@ -451,10 +460,24 @@ RenderBuffer VulkanContext::createBuffer(size_t initialSize, VkImageUsageFlags u
   return buf;
 }
 
-void VulkanContext::createImage(RenderImage& renderImage, uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format)
-{
-  renderImage.format = format;
+//void VulkanContext::createImage(RenderImage& renderImage, uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format)
 
+RenderImageHandle VulkanContext::wrapRenderImageView(VkImageView view)
+{
+  auto renderImageHandle = renderImageResources.createResource();
+  auto * renderImage = renderImageHandle.resource;
+  renderImage->setFlag(ResourceBase::Flags::External);
+  renderImage->view = view;
+  return renderImageHandle;
+}
+
+
+RenderImageHandle VulkanContext::createRenderImage(uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format)
+{
+  auto renderImageHandle = renderImageResources.createResource();
+  auto * renderImage = renderImageHandle.resource;
+
+  renderImage->format = format;
 
   VkImageCreateInfo imageCI = {};
   imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -485,11 +508,11 @@ void VulkanContext::createImage(RenderImage& renderImage, uint32_t w, uint32_t h
   else {
     assert(false && "depth format unsupported");
   }
-  auto rv = vkCreateImage(device, &imageCI, nullptr, &renderImage.image);
+  auto rv = vkCreateImage(device, &imageCI, nullptr, &renderImage->image);
   assert(rv == VK_SUCCESS);
 
   VkMemoryRequirements memReqs;
-  vkGetImageMemoryRequirements(device, renderImage.image, &memReqs);
+  vkGetImageMemoryRequirements(device, renderImage->image, &memReqs);
 
   VkMemoryAllocateInfo memAllocInfo = {};
   memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -498,15 +521,13 @@ void VulkanContext::createImage(RenderImage& renderImage, uint32_t w, uint32_t h
   memAllocInfo.memoryTypeIndex = 0;
   memAllocInfo.allocationSize = memReqs.size;
 
-  
-
   auto rvb = getMemoryTypeIndex(memAllocInfo.memoryTypeIndex, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
   assert(rvb);
 
-  rv = vkAllocateMemory(device, &memAllocInfo, NULL, &renderImage.mem);
+  rv = vkAllocateMemory(device, &memAllocInfo, NULL, &renderImage->mem);
   assert(rv == VK_SUCCESS);
 
-  rv = vkBindImageMemory(device, renderImage.image, renderImage.mem, 0);
+  rv = vkBindImageMemory(device, renderImage->image, renderImage->mem, 0);
   assert(rv == VK_SUCCESS);
 
   VkImageViewCreateInfo imageViewCI = {};
@@ -525,48 +546,89 @@ void VulkanContext::createImage(RenderImage& renderImage, uint32_t w, uint32_t h
   imageViewCI.subresourceRange.layerCount = 1;
   imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
   imageViewCI.flags = 0;
-  imageViewCI.image = renderImage.image;
-  rv = vkCreateImageView(device, &imageViewCI, NULL, &renderImage.view);
+  imageViewCI.image = renderImage->image;
+  rv = vkCreateImageView(device, &imageViewCI, NULL, &renderImage->view);
   assert(rv == VK_SUCCESS);
+
+  return renderImageHandle;
 }
 
-void VulkanContext::destroyImage(RenderImage renderImage)
+void VulkanContext::destroyRenderImage(RenderImage* renderImage)
 {
-  vkDestroyImageView(device, renderImage.view, nullptr);
-  vkDestroyImage(device, renderImage.image, nullptr);
-  vkFreeMemory(device, renderImage.mem, nullptr);
+  if(renderImage->view && !renderImage->hasFlag(RenderImage::Flags::External)) vkDestroyImageView(device, renderImage->view, nullptr);
+  renderImage->view = VK_NULL_HANDLE;
+
+  if(renderImage->image && !renderImage->hasFlag(RenderImage::Flags::External))vkDestroyImage(device, renderImage->image, nullptr);
+  renderImage->image = VK_NULL_HANDLE;
+
+  if(renderImage->mem && !renderImage->hasFlag(RenderImage::Flags::External)) vkFreeMemory(device, renderImage->mem, nullptr);
+  renderImage->mem = VK_NULL_HANDLE;
 }
 
 
-void VulkanContext::createFrameBuffers(Buffer<VkFramebuffer>& frameBuffers, VkRenderPass renderPass, VkImageView depthView, VkImageView* colorViews, uint32_t colorViewCount, uint32_t w, uint32_t h)
+
+RenderPassHandle VulkanContext::createRenderPass(VkAttachmentDescription* attachments, uint32_t attachmentCount,
+                                                 VkSubpassDescription* subpasses, uint32_t subpassCount)
 {
-  VkImageView attachments[2];
-  attachments[1] = depthView;
+  auto passHandle = renderPassResources.createResource();
+  auto * pass = passHandle.resource;
 
-  VkFramebufferCreateInfo framebufferCI = {};
-  framebufferCI.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-  framebufferCI.pNext = NULL;
-  framebufferCI.renderPass = renderPass;
-  framebufferCI.attachmentCount = 2;
-  framebufferCI.pAttachments = attachments;
-  framebufferCI.width = w;
-  framebufferCI.height = h;
-  framebufferCI.layers = 1;
+  {
+    VkRenderPassCreateInfo rp_info = {};
 
-  frameBuffers.accommodate(colorViewCount);
-  for (uint32_t i = 0; i < colorViewCount; i++) {
-    attachments[0] = colorViews[i];
-    auto rv = vkCreateFramebuffer(device, &framebufferCI, NULL, frameBuffers.data()+i);
+    rp_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    rp_info.pNext = NULL;
+    rp_info.attachmentCount = 2;
+    rp_info.pAttachments = attachments;
+    rp_info.subpassCount = subpassCount;
+    rp_info.pSubpasses = subpasses;
+    rp_info.dependencyCount = 0;
+    rp_info.pDependencies = NULL;
+
+    auto rv = vkCreateRenderPass(device, &rp_info, NULL, &pass->pass);
     assert(rv == VK_SUCCESS);
   }
+
+  return passHandle;
 }
 
-void VulkanContext::destroyFrameBuffers(Buffer<VkFramebuffer>& frameBuffers)
+
+void VulkanContext::destroyRenderPass(RenderPass* pass)
 {
-  for (size_t i = 0; i < frameBuffers.getCount(); i++) {
-    vkDestroyFramebuffer(device, frameBuffers[i], nullptr);
-  }
+  if (pass->pass) vkDestroyRenderPass(device, pass->pass, nullptr);
+  pass->pass = nullptr;
 }
+
+
+FrameBufferHandle VulkanContext::createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<RenderImageHandle>& attachments)
+{
+  auto fbHandle = frameBufferResources.createResource();
+  auto * fb = fbHandle.resource;
+
+  fb->pass = pass;
+
+  Buffer<VkImageView> att(attachments.size());
+  fb->attachments.resize(attachments.size());
+  for (size_t i = 0; i < attachments.size(); i++) {
+    fb->attachments[i] = attachments[i];
+    att[i] = attachments[i].resource->view;
+  }
+
+  VkFramebufferCreateInfo info = {};
+  info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+  info.pNext = NULL;
+  info.renderPass = pass.resource->pass;
+  info.attachmentCount = uint32_t(attachments.size());
+  info.pAttachments = att.data();
+  info.width = w;
+  info.height = h;
+  info.layers = 1;
+  auto rv = vkCreateFramebuffer(device, &info, NULL, &fb->fb);
+  assert(rv == VK_SUCCESS);
+
+  return fbHandle;
+}
+
 
 bool VulkanContext::getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements)
 {

@@ -9,11 +9,7 @@ struct ShaderInputSpec {
   VkShaderStageFlagBits stage;
 };
 
-struct RenderPass
-{
-  VkSemaphore imgAcqSem;
 
-};
 
 struct RenderShader
 {
@@ -22,22 +18,32 @@ struct RenderShader
 
 struct RenderBuffer
 {
-  VkBuffer buffer;
-  VkDeviceMemory mem;
-  size_t size;
+  VkBuffer buffer = VK_NULL_HANDLE;
+  VkDeviceMemory mem = VK_NULL_HANDLE;
+  size_t size = 0;
 };
 
-struct RenderImage
+struct RenderPass : ResourceBase
 {
-  VkImage image;
-  VkDeviceMemory mem;
+  VkRenderPass pass = VK_NULL_HANDLE;
+};
+typedef ResourceHandle<RenderPass> RenderPassHandle;
+
+
+struct RenderImage : ResourceBase
+{
+  VkImage image = VK_NULL_HANDLE;
+  VkDeviceMemory mem = VK_NULL_HANDLE;
   VkImageView view;
   VkFormat format;
 };
+typedef ResourceHandle<RenderImage> RenderImageHandle;
 
 struct FrameBuffer : ResourceBase
 {
-
+  VkFramebuffer fb = VK_NULL_HANDLE;
+  RenderPassHandle pass;
+  Vector<RenderImageHandle> attachments;
 };
 typedef ResourceHandle<FrameBuffer> FrameBufferHandle;
 
@@ -71,17 +77,11 @@ struct VulkanContext
 
   bool getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements);
 
-  void createImage(RenderImage& renderImage, uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat depthFormat);
-  void destroyImage(RenderImage renderImage);
-
-  void createDepthImage(RenderImage& renderImage, uint32_t w, uint32_t h, VkFormat depthFormat = VK_FORMAT_D32_SFLOAT) {
-    createImage(renderImage, w, h, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, depthFormat);
-  }
-
-  void createFrameBuffers(Buffer<VkFramebuffer>& frameBuffers, VkRenderPass renderPass, VkImageView depthView, VkImageView* colorViews, uint32_t colorViewCount, uint32_t w, uint32_t h);
-  void destroyFrameBuffers(Buffer<VkFramebuffer>& frameBuffers);
-
-  FrameBufferHandle createFrameBuffer();
+  RenderPassHandle createRenderPass(VkAttachmentDescription* attachments, uint32_t attachmentCount,
+                                    VkSubpassDescription* subpasses, uint32_t subpassCount);
+  RenderImageHandle wrapRenderImageView(VkImageView view);
+  RenderImageHandle createRenderImage(uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format);
+  FrameBufferHandle createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<RenderImageHandle>& attachments);
 
   Logger logger = nullptr;
   VkInstance instance = VK_NULL_HANDLE;
@@ -97,6 +97,11 @@ struct VulkanContext
   VkPhysicalDeviceProperties physicalDeviceProperties;
   VkPhysicalDeviceMemoryProperties memoryProperties;
 
-  ResourceManager<FrameBuffer> frameBufferResources;
+private:
+  void destroyRenderPass(RenderPass*);
+  void destroyRenderImage(RenderImage*);
 
+  ResourceManager<RenderPass> renderPassResources;
+  ResourceManager<FrameBuffer> frameBufferResources;
+  ResourceManager<RenderImage> renderImageResources;
 };
