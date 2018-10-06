@@ -30,6 +30,7 @@ namespace {
   int width, height;
   float leftSplit = 100;
   float thickness = 8;
+  float menuHeight = 0.f;
 
   bool solid = true;
 
@@ -163,16 +164,10 @@ namespace {
 
     VkClearValue clearValues[2] = {};
     clearValues[0].color.float32[0] = 0.5f;
-    clearValues[1].depthStencil.depth = 0.f;
+    clearValues[1].depthStencil.depth = 1.f;
 
     {
-      {
-        //VkDebugMarkerMarkerInfoEXT info = {};
-        //info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
-        //info.pNext = nullptr;
-        //info.pMarkerName = "foo";
-        //vCtx->vkCmdDebugMarkerBeginEXT(frameData->CommandBuffer, &info);
-      }
+      DebugScope debugScope(vCtx, frameData->CommandBuffer, "My render pass");
 
       VkRenderPassBeginInfo beginInfo = {};
       beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -183,18 +178,20 @@ namespace {
       beginInfo.clearValueCount = 2;
       beginInfo.pClearValues = clearValues;
 
+      Vec4f viewport(leftSplit, menuHeight, width - leftSplit, height - menuHeight);
 
-      auto MVP = mul(viewer.getProjectionMatrix(), viewer.getViewMatrix());
+      Mat4f Z(1, 0, 0, 0,
+              0, -1, 0, 0,
+              0, 0, 0.5f, 0,
+              0, 0, 0.5, 1.f);
+
+      auto MVP =  mul(Z, mul(viewer.getProjectionMatrix(), viewer.getViewMatrix()));
 
       vkCmdBeginRenderPass(frameData->CommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
       for (auto & item : meshItems) {
-        renderer->drawRenderMesh(frameData->CommandBuffer, mainPass, item.renderMesh, MVP);
+        renderer->drawRenderMesh(frameData->CommandBuffer, mainPass, item.renderMesh, viewport, MVP);
       }
       vkCmdEndRenderPass(frameData->CommandBuffer);
-
-      {
-        //vCtx->vkCmdDebugMarkerEndEXT(frameData->CommandBuffer);
-      }
     }
 
     VkRenderPassBeginInfo beginInfo = {};
@@ -341,7 +338,6 @@ namespace {
 
   void guiTraversal(GLFWwindow* window)
   {
-    float menuHeight = 0.f;
     if (ImGui::BeginMainMenuBar())
     {
       if (ImGui::BeginMenu("File")) {
@@ -592,7 +588,12 @@ int main(int argc, char** argv)
       wasResized = false;
       setupFramebuffer(vCtx);
     }
-
+    {
+      Vec2f viewerPos(leftSplit, menuHeight);
+      Vec2f viewerSize(width - viewerPos.x, height - viewerPos.y);
+      viewer.resize(viewerPos, viewerSize);
+      viewer.update();
+    }
     vCtx->houseKeep();
 
     tasks.update();

@@ -5,6 +5,7 @@
 
 
 struct RenderMesh;
+struct Vec4f;
 struct Mat4f;
 
 class Renderer
@@ -15,7 +16,7 @@ public:
 
   RenderMesh* createRenderMesh(Mesh* mesh);
 
-  void drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMesh* renderMesh, const Mat4f& MVP);
+  void drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMesh* renderMesh, const Vec4f& viewport, const Mat4f& MVP);
   void destroyRenderMesh(RenderMesh* renderMesh);
 
 private:
@@ -24,6 +25,15 @@ private:
 
   PipelineHandle vanillaPipeline;
   ShaderHandle vanillaShader;
-  DescriptorSetHandle vanillaDescSet;
-  RenderBufferHandle objectBuffer;
+  uint32_t viewport[4];
+  uint32_t frameCount;
+
+
+  struct Rename {
+    RenderFenceHandle ready;
+    DescriptorSetHandle vanillaDescSet;
+    RenderBufferHandle objectBuffer;
+  };
+  Vector<Rename> renaming;
+  unsigned renamingCurr = 0;
 };

@@ -15,6 +15,13 @@ struct DescriptorSet : ResourceBase
 };
 typedef ResourceHandle<DescriptorSet> DescriptorSetHandle;
 
+struct RenderFence : ResourceBase
+{
+  VkFence fence = VK_NULL_HANDLE;
+};
+typedef ResourceHandle<RenderFence> RenderFenceHandle;
+
+
 struct Shader : ResourceBase
 {
   Vector<VkPipelineShaderStageCreateInfo> stageCreateInfo;
@@ -89,6 +96,10 @@ struct VulkanContext
 
   bool getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements);
 
+  RenderFenceHandle createFence(bool signalled);
+
+
+
   RenderBufferHandle createBuffer(size_t initialSize, VkImageUsageFlags usageFlags);
   RenderBufferHandle createVertexBuffer(size_t initialSize) { return createBuffer(initialSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT); }
   RenderBufferHandle createUniformBuffer(size_t initialSize) { return createBuffer(initialSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT); }
@@ -121,10 +132,12 @@ struct VulkanContext
   PFN_vkCmdDebugMarkerEndEXT vkCmdDebugMarkerEndEXT;
 
 private:
+  void destroyFence(RenderFence*);
   void destroyRenderPass(RenderPass*);
   void destroyRenderImage(RenderImage*);
   void destroyShader(Shader* shader);
 
+  ResourceManager<RenderFence> fenceResources;
   ResourceManager<RenderBuffer> bufferResources;
   ResourceManager<DescriptorSet> descriptorSetResources;
   ResourceManager<Shader> shaderResources;
@@ -152,4 +165,15 @@ struct MappedBuffer : MappedBufferBase
   MappedBuffer(VulkanContext* vCtx, RenderBufferHandle h) : MappedBufferBase((void**)&mem, vCtx, h) {}
 
   T* mem;
+};
+
+struct DebugScope
+{
+  VulkanContext* vCtx;
+  VkCommandBuffer cmdBuf;
+
+  DebugScope() = delete;
+  DebugScope(const DebugScope&) = delete;
+  DebugScope(VulkanContext* vCtx, VkCommandBuffer cmdBuf, const char* name);
+  ~DebugScope();
 };

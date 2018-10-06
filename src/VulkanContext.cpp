@@ -25,21 +25,24 @@ namespace
 VulkanContext::VulkanContext(Logger logger,
                              const char** instanceExts, uint32_t instanceExtCount,
                              int hasPresentationSupport(VkInstance, VkPhysicalDevice, uint32_t queueFamily)) :
-  logger(logger),
-  physicalDevice(physicalDevice),
-  device(device)
+  logger(logger)
 {
+
   // create instance
   { 
-    const char* enabledLayers[] = { "VK_LAYER_LUNARG_standard_validation" };
+    const char* enabledLayers[] = {
+      "VK_LAYER_LUNARG_standard_validation"
+    };
     auto enabledLayerCount = uint32_t(sizeof(enabledLayers) / sizeof(const char*));
 
-    const char* extraInstanceExts[] = { "VK_EXT_debug_report" };
+    const char* extraInstanceExts[] = {
+      "VK_EXT_debug_report"
+    };
     uint32_t extraInstanceExtCont = uint32_t(sizeof(extraInstanceExts) / sizeof(const char*));
 
-    Buffer<const char*> allInstanceExts;
-    allInstanceExts.accommodate(instanceExtCount + extraInstanceExtCont);
+    Vector<const char*> allInstanceExts(instanceExtCount);
     for (uint32_t i = 0; i < instanceExtCount; i++) allInstanceExts[i] = instanceExts[i];
+    allInstanceExts.resize(instanceExtCount + extraInstanceExtCont);
     for (uint32_t i = 0; i < extraInstanceExtCont; i++) allInstanceExts[instanceExtCount + i] = extraInstanceExts[i];
 
     VkApplicationInfo app_info = {};
@@ -56,16 +59,17 @@ VulkanContext::VulkanContext(Logger logger,
     instanceCI.pNext = nullptr;
     instanceCI.flags = 0;
     instanceCI.pApplicationInfo = &app_info;
-    instanceCI.enabledExtensionCount = instanceExtCount + extraInstanceExtCont;
+    instanceCI.enabledExtensionCount = uint32_t(allInstanceExts.size());
     instanceCI.ppEnabledExtensionNames = allInstanceExts.data();
+#if 1
     instanceCI.enabledLayerCount = enabledLayerCount;
     instanceCI.ppEnabledLayerNames = enabledLayers;
-
+#else
+    instanceCI.enabledLayerCount = 0;// enabledLayerCount;
+    instanceCI.ppEnabledLayerNames = nullptr;// enabledLayers;
+#endif
     auto rv = vkCreateInstance(&instanceCI, nullptr, &instance);
     assert(rv == 0 && "vkCreateInstance");
-
-
-
 
     VkDebugReportCallbackCreateInfoEXT debugCallbackCI;
     debugCallbackCI.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT;
@@ -74,12 +78,8 @@ VulkanContext::VulkanContext(Logger logger,
     debugCallbackCI.pfnCallback = &MyDebugReportCallback;
     debugCallbackCI.pUserData = logger;
 
-    vkCmdDebugMarkerBeginEXT = (PFN_vkCmdDebugMarkerBeginEXT)vkGetInstanceProcAddr(instance, "vkCmdDebugMarkerBeginEXT");
-    vkCmdDebugMarkerEndEXT = (PFN_vkCmdDebugMarkerEndEXT)vkGetInstanceProcAddr(instance, "vkCmdDebugMarkerEndEXT");
-
     auto vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
     VkResult result = vkCreateDebugReportCallbackEXT(instance, &debugCallbackCI, nullptr, &debugCallback);
-
     //auto vkDebugReportMessageEXT = (PFN_vkDebugReportMessageEXT)vkGetInstanceProcAddr(instance, "vkDebugReportMessageEXT");
   }
   // choose physical device
@@ -141,8 +141,10 @@ VulkanContext::VulkanContext(Logger logger,
     queueInfo.queueCount = 1;
     queueInfo.pQueuePriorities = queuePriorities;
 
-    const char* deviceExt[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-
+    const char* deviceExt[] = {
+      VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+      VK_EXT_DEBUG_MARKER_EXTENSION_NAME
+    };
     VkDeviceCreateInfo deviceInfo = {};
     deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     deviceInfo.pNext = nullptr;
@@ -156,6 +158,9 @@ VulkanContext::VulkanContext(Logger logger,
 
     auto rv = vkCreateDevice(physicalDevice, &deviceInfo, NULL, &device);
     assert(rv == VK_SUCCESS);
+
+    vkCmdDebugMarkerBeginEXT = (PFN_vkCmdDebugMarkerBeginEXT)vkGetInstanceProcAddr(instance, "vkCmdDebugMarkerBeginEXT");
+    vkCmdDebugMarkerEndEXT = (PFN_vkCmdDebugMarkerEndEXT)vkGetInstanceProcAddr(instance, "vkCmdDebugMarkerEndEXT");
 
     vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
   }
@@ -668,10 +673,29 @@ RenderPassHandle VulkanContext::createRenderPass(VkAttachmentDescription* attach
 }
 
 
+RenderFenceHandle VulkanContext::createFence(bool signalled)
+{
+  VkFenceCreateInfo info = {};
+  info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+  info.flags = signalled ? VK_FENCE_CREATE_SIGNALED_BIT : 0;
+
+  auto fenceHandle = fenceResources.createResource();
+  auto rv = vkCreateFence(device, &info, nullptr, &fenceHandle.resource->fence);
+  assert(rv == VK_SUCCESS);
+  return fenceHandle;
+}
+
 void VulkanContext::destroyRenderPass(RenderPass* pass)
 {
   if (pass->pass) vkDestroyRenderPass(device, pass->pass, nullptr);
   pass->pass = nullptr;
+}
+
+
+void VulkanContext::destroyFence(RenderFence* fence)
+{
+  if (fence->fence) vkDestroyFence(device, fence->fence, nullptr);
+  fence->fence = nullptr;
 }
 
 
@@ -730,4 +754,19 @@ MappedBufferBase::MappedBufferBase(void** ptr, VulkanContext* vCtx, RenderBuffer
 MappedBufferBase::~MappedBufferBase()
 {
   vkUnmapMemory(vCtx->device, h.resource->mem);
+}
+
+DebugScope::DebugScope(VulkanContext* vCtx, VkCommandBuffer cmdBuf, const char* name) :
+  vCtx(vCtx),
+  cmdBuf(cmdBuf)
+{
+  VkDebugMarkerMarkerInfoEXT info = {};
+  info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
+  info.pMarkerName = name;
+  vCtx->vkCmdDebugMarkerBeginEXT(cmdBuf, &info);
+}
+
+DebugScope::~DebugScope()
+{
+  vCtx->vkCmdDebugMarkerEndEXT(cmdBuf);
 }

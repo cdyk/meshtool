@@ -93,29 +93,11 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
     vanillaShader = vCtx->createShader(stages);
   }
 
-  objectBuffer = vCtx->createUniformBuffer(sizeof(ObjectBuffer));
-
-
-/* vanillaPipeline = new RenderPipeline;
-  vCtx->buildShader(vanillaPipeline->shader, stages, 2);
-
-
-  */
-
-  //buildPipeline(vanillaPipeline, device, vanillaShaders,
-  //              Buffer<VkVertexInputBindingDescription>& inputBind,
-  //              Buffer<VkVertexInputAttributeDescription>& inputAttrib,
-  //              VkPipelineLayout pipelineLayout,
-  //              VkRenderPass renderPass);
-
-
-  //execute_end_command_buffer(info);
-//execute_queue_command_buffer(info);
-
-  
-
-  logger(0, "moo %d", sizeof(vanillaVS));
-
+  renaming.resize(10);
+  for (size_t i = 0; i < renaming.size(); i++) {
+    renaming[i].ready = vCtx->createFence(true);
+    renaming[i].objectBuffer = vCtx->createUniformBuffer(sizeof(ObjectBuffer));
+  }
 
 }
 
@@ -146,23 +128,13 @@ RenderMesh* Renderer::createRenderMesh(Mesh* mesh)
     }
   }
 
-#if 0
-
-  VtxNrmTex *mem;
-  auto rv = vkMapMemory(vCtx->device, renderMesh->vtxNrmTex.mem, 0, renderMesh->vtxNrmTex.size, 0, (void **)&mem);
-  assert(rv == VK_SUCCESS);
-
-  vkUnmapMemory(vCtx->device, renderMesh->vtxNrmTex.mem);
-
-#endif
   logger(0, "CreateRenderMesh");
-  return nullptr;
+  return renderMesh;
 }
 
-void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMesh* renderMesh, const Mat4f& MVP)
+
+void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMesh* renderMesh, const Vec4f& viewport, const Mat4f& MVP)
 {
-
-
   if(!vanillaPipeline || vanillaPipeline.resource->pass != pass)
   {
     Vector<VkVertexInputBindingDescription> inputBind;
@@ -178,78 +150,55 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
                                            descLayoutCI,
                                            pass,
                                            vanillaShader);
-    vanillaDescSet = vCtx->createDescriptorSet(vanillaPipeline.resource->descLayout);
+    for (size_t i = 0; i < renaming.size(); i++) {
+      renaming[i].vanillaDescSet = vCtx->createDescriptorSet(vanillaPipeline.resource->descLayout);
+    }
   }
+  auto & rename = renaming[renamingCurr];
+
+  
+
 
   {
-    MappedBuffer<ObjectBuffer> map(vCtx, objectBuffer);
+    MappedBuffer<ObjectBuffer> map(vCtx, rename.objectBuffer);
     map.mem->MVP = MVP;
   }
-  vCtx->updateDescriptorSet(vanillaDescSet, objectBuffer);
+  vCtx->updateDescriptorSet(rename.vanillaDescSet, rename.objectBuffer);
 
 
   vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipe);
 
-  //VkDescriptorSet desc_set[1] = { g_DescriptorSet };
-  //vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, desc_set, 0, NULL);
+  VkDescriptorSet desc_set[1] = { rename.vanillaDescSet.resource->descSet };
+  vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, desc_set, 0, NULL);
 
-  int a = 2;
   {
-    //VkDescriptorSet desc_set[1] = { g_DescriptorSet };
-    //vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, g_PipelineLayout, 0, 1, desc_set, 0, NULL);
+    VkViewport vp = {};
+    vp.x = viewport.x;
+    vp.y = viewport.y;
+    vp.width = viewport.z;
+    vp.height = viewport.w;
+    vp.minDepth = 0.0f;
+    vp.maxDepth = 1.0f;
+    vkCmdSetViewport(cmdBuf, 0, 1, &vp);
+  }
+  {
+    VkRect2D scissor;
+    scissor.offset.x = int32_t(viewport.x);
+    scissor.offset.y = int32_t(viewport.y);
+    scissor.extent.width = uint32_t(viewport.z);
+    scissor.extent.height = uint32_t(viewport.w);
+    vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
   }
 
+  const VkDeviceSize offsets[1] = { 0 };
+  vkCmdBindVertexBuffers(cmdBuf, 0, 1, &renderMesh->vtxNrmTex.resource->buffer, offsets);
 
-#if 0
+  DebugScope debugScope(vCtx, cmdBuf, "Draw!");
+  vkCmdDraw(cmdBuf, 3*renderMesh->tri_n, 1, 0, 0);
+  
 
-  /* We cannot bind the vertex buffer until we begin a renderpass */
-  VkClearValue clear_values[2];
-  clear_values[0].color.float32[0] = 0.2f;
-  clear_values[0].color.float32[1] = 0.2f;
-  clear_values[0].color.float32[2] = 0.2f;
-  clear_values[0].color.float32[3] = 0.2f;
-  clear_values[1].depthStencil.depth = 1.0f;
-  clear_values[1].depthStencil.stencil = 0;
-
-  VkSemaphore imageAcquiredSemaphore;
-  VkSemaphoreCreateInfo imageAcquiredSemaphoreCreateInfo;
-  imageAcquiredSemaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-  imageAcquiredSemaphoreCreateInfo.pNext = NULL;
-  imageAcquiredSemaphoreCreateInfo.flags = 0;
-
-  res = vkCreateSemaphore(info.device, &imageAcquiredSemaphoreCreateInfo, NULL, &imageAcquiredSemaphore);
-  assert(res == VK_SUCCESS);
-
-  // Get the index of the next available swapchain image:
-  res = vkAcquireNextImageKHR(info.device, info.swap_chain, UINT64_MAX, imageAcquiredSemaphore, VK_NULL_HANDLE,
-                              &info.current_buffer);
-  // TODO: Deal with the VK_SUBOPTIMAL_KHR and VK_ERROR_OUT_OF_DATE_KHR
-  // return codes
-  assert(res == VK_SUCCESS);
-
-  VkRenderPassBeginInfo rp_begin = {};
-  rp_begin.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-  rp_begin.pNext = NULL;
-  rp_begin.renderPass = info.render_pass;
-  rp_begin.framebuffer = info.framebuffers[info.current_buffer];
-  rp_begin.renderArea.offset.x = 0;
-  rp_begin.renderArea.offset.y = 0;
-  rp_begin.renderArea.extent.width = info.width;
-  rp_begin.renderArea.extent.height = info.height;
-  rp_begin.clearValueCount = 2;
-  rp_begin.pClearValues = clear_values;
-
-  vkCmdBeginRenderPass(info.cmd, &rp_begin, VK_SUBPASS_CONTENTS_INLINE);
-
-  vkCmdBindVertexBuffers(info.cmd, 0,             /* Start Binding */
-                         1,                       /* Binding Count */
-                         &info.vertex_buffer.buf, /* pBuffers */
-                         offsets);                /* pOffsets */
-
-  vkCmdEndRenderPass(info.cmd);
-  execute_end_command_buffer(info);
-  execute_queue_command_buffer(info);
-#endif
+  renamingCurr = (renamingCurr + 1);
+  if (renaming.size() <= renamingCurr) renamingCurr = 0;
 }
 
 void Renderer::destroyRenderMesh(RenderMesh* renderMesh)
