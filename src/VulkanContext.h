@@ -45,7 +45,9 @@ struct VulkanContext
 {
   VulkanContext() = delete;
 
-  VulkanContext(Logger logger, VkPhysicalDevice physicalDevice, VkDevice device);
+  VulkanContext(Logger logger,
+                const char**instanceExts, uint32_t instanceExtCount,
+                int hasPresentationSupport(VkInstance, VkPhysicalDevice, uint32_t queueFamily));
   ~VulkanContext();
 
   void houseKeep();
@@ -81,9 +83,16 @@ struct VulkanContext
 
   FrameBufferHandle createFrameBuffer();
 
-  Logger logger;
-  VkPhysicalDevice physicalDevice;
-  VkDevice device;
+  Logger logger = nullptr;
+  VkInstance instance = VK_NULL_HANDLE;
+  VkDebugReportCallbackEXT debugCallback = VK_NULL_HANDLE;
+  VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+  VkDevice device = VK_NULL_HANDLE;;
+  VkQueue queue = VK_NULL_HANDLE;
+  uint32_t queueFamilyIndex = 0;
+  VkDescriptorPool descPool = VK_NULL_HANDLE;
+  VkCommandPool cmdPool = VK_NULL_HANDLE;
+  VkCommandBuffer cmdBuf = VK_NULL_HANDLE;
 
   VkPhysicalDeviceProperties physicalDeviceProperties;
   VkPhysicalDeviceMemoryProperties memoryProperties;

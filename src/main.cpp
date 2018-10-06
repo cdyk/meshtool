@@ -77,172 +77,6 @@ namespace {
       abort();
   }
 
-  bool createInstance(VkInstance& instance)
-  {
-    VkApplicationInfo app_info = {};
-    app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    app_info.pNext = nullptr;
-    app_info.pApplicationName = nullptr;
-    app_info.applicationVersion = 1;
-    app_info.pEngineName = nullptr;
-    app_info.engineVersion = 1;
-    app_info.apiVersion = VK_API_VERSION_1_1;
-
-    uint32_t extensions_count = 0;
-    const char** extensions = glfwGetRequiredInstanceExtensions(&extensions_count);
-
-    VkInstanceCreateInfo inst_info = {};
-    inst_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    inst_info.pNext = nullptr;
-    inst_info.flags = 0;
-    inst_info.pApplicationInfo = &app_info;
-    inst_info.enabledExtensionCount = extensions_count;
-    inst_info.ppEnabledExtensionNames = extensions;
-    inst_info.enabledLayerCount = 0;
-    inst_info.ppEnabledLayerNames = nullptr;
-
-    auto rv = vkCreateInstance(&inst_info, nullptr, &instance);
-    assert(rv == 0 && "vkCreateInstance");
-    
-    return true;
-  }
-
-  bool choosePhysicalDevice(VkPhysicalDevice& physicalDevice, VkInstance instance)
-  {
-    uint32_t gpuCount = 0;
-    auto rv = vkEnumeratePhysicalDevices(instance, &gpuCount, nullptr);
-    std::vector<VkPhysicalDevice> devices(gpuCount);
-    rv = vkEnumeratePhysicalDevices(instance, &gpuCount, devices.data());
-    assert(rv == 0 && "vkEnumeratePhysicalDevices");
-    assert(gpuCount);
-
-    size_t chosenDevice = 0;
-    VkPhysicalDeviceProperties chosenProps = { 0 };
-    vkGetPhysicalDeviceProperties(devices[0], &chosenProps);
-    for (size_t i = 0; i < devices.size(); i++) {
-      VkPhysicalDeviceProperties props = { 0 };
-      vkGetPhysicalDeviceProperties(devices[i], &props);
-
-      uint64_t vmem = 0;
-
-      VkPhysicalDeviceMemoryProperties memProps = { 0 };
-      vkGetPhysicalDeviceMemoryProperties(devices[i], &memProps);
-      for (uint32_t k = 0; k < memProps.memoryHeapCount; k++) {
-        if (memProps.memoryHeaps[k].flags & VkMemoryHeapFlagBits::VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
-          vmem = memProps.memoryHeaps[k].size;
-        }
-      }
-      logger(0, "Device %d: name='%s', type=%d, mem=%lld", i, props.deviceName, props.deviceType, vmem);
-    }
-    physicalDevice = devices[chosenDevice];
-    return true;
-  }
-
-  bool createDevice(VkDevice& device, VkQueue& queue, uint32_t& queueFamilyIndex, VkInstance instance, VkPhysicalDevice physicalDevice)
-  {
-    VkDeviceQueueCreateInfo queueInfo = {};
-
-    uint32_t queueFamilyCount = 0;
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
-    assert(queueFamilyCount);
-    std::vector<VkQueueFamilyProperties> queueProps(queueFamilyCount);
-    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueProps.data());
-
-    bool found = false;
-    for (uint32_t i = 0; i < queueFamilyCount; i++) {
-      if (queueProps[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-        if (glfwGetPhysicalDevicePresentationSupport(instance, physicalDevice, i)) {
-          queueInfo.queueFamilyIndex = i;
-          found = true;
-          break;
-        }
-      }
-    }
-    assert(found);
-    queueFamilyIndex = queueInfo.queueFamilyIndex;
-
-    float queuePriorities[1] = { 0.0 };
-    queueInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queueInfo.pNext = nullptr;
-    queueInfo.queueCount = 1;
-    queueInfo.pQueuePriorities = queuePriorities;
-
-    const char* deviceExt[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
-
-    VkDeviceCreateInfo deviceInfo = {};
-    deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    deviceInfo.pNext = nullptr;
-    deviceInfo.queueCreateInfoCount = 1;
-    deviceInfo.pQueueCreateInfos = &queueInfo;
-    deviceInfo.enabledExtensionCount = sizeof(deviceExt)/sizeof(const char*);
-    deviceInfo.ppEnabledExtensionNames = deviceExt;
-    deviceInfo.enabledLayerCount = 0;
-    deviceInfo.ppEnabledLayerNames = nullptr;
-    deviceInfo.pEnabledFeatures = nullptr;
-
-    auto rv = vkCreateDevice(physicalDevice, &deviceInfo, NULL, &device);
-    assert(rv == VK_SUCCESS);
-
-    vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
-
-    return true;
-  }
-
-  bool createDescriptorPool(VkDescriptorPool& descPool, VkDevice device)
-  {
-    VkDescriptorPoolSize pool_sizes[] =
-    {
-        { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
-        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
-        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
-        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
-    };
-    VkDescriptorPoolCreateInfo pool_info = {};
-    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
-    pool_info.maxSets = 1000 * IM_ARRAYSIZE(pool_sizes);
-    pool_info.poolSizeCount = (uint32_t)IM_ARRAYSIZE(pool_sizes);
-    pool_info.pPoolSizes = pool_sizes;
-    auto rv = vkCreateDescriptorPool(device, &pool_info, nullptr, &descPool);
-    assert(rv == VK_SUCCESS);
-
-    return true;
-  }
-
-  bool createCommandBuffer(VkCommandBuffer& cmdBuf, VkCommandPool& cmdPool, uint32_t queueFamilyIndex, VkDevice device)
-  {
-    VkCommandPoolCreateInfo cmd_pool_info = {};
-    cmd_pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    cmd_pool_info.pNext = nullptr;
-    cmd_pool_info.queueFamilyIndex = queueFamilyIndex;
-    cmd_pool_info.flags = 0;
-
-    auto rv = vkCreateCommandPool(device, &cmd_pool_info, NULL, &cmdPool);
-    assert(rv == VK_SUCCESS);
-
-    VkCommandBufferAllocateInfo cmd = {};
-    cmd.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    cmd.pNext = NULL;
-    cmd.commandPool = cmdPool;
-    cmd.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    cmd.commandBufferCount = 1;
-
-    rv = vkAllocateCommandBuffers(device, &cmd, &cmdBuf);
-    assert(rv == VK_SUCCESS);
-
-    return true;
-  }
-
-  
-
-
   bool initSwapChain(GLFWwindow* window, VkInstance instance, VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex)
   {
     VkSurfaceKHR surface;
@@ -302,20 +136,20 @@ namespace {
     ImGui_ImplVulkan_InvalidateFontUploadObjects();
   }
 
-  void frameRender(VkDevice device, VkQueue queue)
+  void frameRender(VulkanContext* vCtx)
   {
     VkSemaphore& image_acquired_semaphore = imguiWindowData.Frames[imguiWindowData.FrameIndex].ImageAcquiredSemaphore;
-    auto rv = vkAcquireNextImageKHR(device, imguiWindowData.Swapchain, UINT64_MAX, image_acquired_semaphore, VK_NULL_HANDLE, &imguiWindowData.FrameIndex);
+    auto rv = vkAcquireNextImageKHR(vCtx->device, imguiWindowData.Swapchain, UINT64_MAX, image_acquired_semaphore, VK_NULL_HANDLE, &imguiWindowData.FrameIndex);
     assert(rv == VK_SUCCESS);
 
     auto * frameData = &imguiWindowData.Frames[imguiWindowData.FrameIndex];
-    rv = vkWaitForFences(device, 1, &frameData->Fence, VK_TRUE, UINT64_MAX);
+    rv = vkWaitForFences(vCtx->device, 1, &frameData->Fence, VK_TRUE, UINT64_MAX);
     assert(rv == VK_SUCCESS);
 
-    rv = vkResetFences(device, 1, &frameData->Fence);
+    rv = vkResetFences(vCtx->device, 1, &frameData->Fence);
     assert(rv == VK_SUCCESS);
 
-    rv = vkResetCommandPool(device, frameData->CommandPool, 0);
+    rv = vkResetCommandPool(vCtx->device, frameData->CommandPool, 0);
     assert(rv == VK_SUCCESS);
 
     VkCommandBufferBeginInfo info = {};
@@ -351,11 +185,11 @@ namespace {
     rv = vkEndCommandBuffer(frameData->CommandBuffer);
     assert(rv == VK_SUCCESS);
 
-    rv = vkQueueSubmit(queue, 1, &submitInfo, frameData->Fence);
+    rv = vkQueueSubmit(vCtx->queue, 1, &submitInfo, frameData->Fence);
     assert(rv == VK_SUCCESS);
   }
 
-  void framePresent(VkQueue queue)
+  void framePresent(VulkanContext* vCtx)
   {
     ImGui_ImplVulkanH_FrameData* fd = &imguiWindowData.Frames[imguiWindowData.FrameIndex];
     VkPresentInfoKHR info = {};
@@ -365,7 +199,7 @@ namespace {
     info.swapchainCount = 1;
     info.pSwapchains = &imguiWindowData.Swapchain;
     info.pImageIndices = &imguiWindowData.FrameIndex;
-    auto rv = vkQueuePresentKHR(queue, &info);
+    auto rv = vkQueuePresentKHR(vCtx->queue, &info);
     assert(rv == VK_SUCCESS);
   }
 
@@ -579,35 +413,23 @@ int main(int argc, char** argv)
   }
   glfwGetFramebufferSize(window, &width, &height);
 
-  VkInstance instance;
-  createInstance(instance);
+  uint32_t extensions_count = 0;
+  const char** extensions = glfwGetRequiredInstanceExtensions(&extensions_count);
 
-  VkPhysicalDevice physicalDevice;
-  choosePhysicalDevice(physicalDevice, instance);
+  vCtx = new VulkanContext(logger, extensions, extensions_count, glfwGetPhysicalDevicePresentationSupport);
+  {
+    auto h = vCtx->createFrameBuffer();
+    auto w = h;
+  }
 
-  VkDevice device;
-  VkQueue queue;
-  uint32_t queueFamilyIndex;
-  createDevice(device, queue, queueFamilyIndex, instance, physicalDevice);
-
-  VkDescriptorPool descPool;
-  createDescriptorPool(descPool, device);
-
-
-  VkCommandBuffer cmdBuf;
-  VkCommandPool cmdPool;
-  createCommandBuffer(cmdBuf, cmdPool, queueFamilyIndex, device);
-
-  initSwapChain(window, instance, physicalDevice, queueFamilyIndex);
-
+  initSwapChain(window, vCtx->instance, vCtx->physicalDevice, vCtx->queueFamilyIndex);
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGui_ImplGlfw_InitForVulkan(window, true);
 
-  ImGui_ImplVulkanH_CreateWindowDataCommandBuffers(physicalDevice, device, queueFamilyIndex, &imguiWindowData, nullptr);
-  ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(physicalDevice, device, &imguiWindowData, nullptr, width, height);
-
+  ImGui_ImplVulkanH_CreateWindowDataCommandBuffers(vCtx->physicalDevice, vCtx->device, vCtx->queueFamilyIndex, &imguiWindowData, nullptr);
+  ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(vCtx->physicalDevice, vCtx->device, &imguiWindowData, nullptr, width, height);
 #if 0
   struct ImGui_ImplVulkanH_WindowData
   {
@@ -632,27 +454,22 @@ int main(int argc, char** argv)
 #endif
 
 
-  vCtx = new VulkanContext(logger, physicalDevice, device);
-  {
-    auto h = vCtx->createFrameBuffer();
-    auto w = h;
-  }
 
   renderer = new Renderer(logger, vCtx, imguiWindowData.BackBufferView, imguiWindowData.BackBufferCount, width, height);
 
 
   ImGui_ImplVulkan_InitInfo init_info = {};
-  init_info.Instance = instance;
-  init_info.PhysicalDevice = physicalDevice;
-  init_info.Device = device;
-  init_info.QueueFamily = queueFamilyIndex;
-  init_info.Queue = queue;
+  init_info.Instance = vCtx->instance;
+  init_info.PhysicalDevice = vCtx->physicalDevice;
+  init_info.Device = vCtx->device;
+  init_info.QueueFamily = vCtx->queueFamilyIndex;
+  init_info.Queue = vCtx->queue;
   init_info.PipelineCache = nullptr;
-  init_info.DescriptorPool = descPool;
+  init_info.DescriptorPool = vCtx->descPool;
   init_info.Allocator = nullptr;
   init_info.CheckVkResultFn = check_vk_result;
   ImGui_ImplVulkan_Init(&init_info, imguiWindowData.RenderPass);
-  uploadFonts(device, queue);
+  uploadFonts(vCtx->device, vCtx->queue);
 
   glfwSetWindowSizeCallback(window, resizeFunc);
   glfwSetCursorPosCallback(window, moveFunc);
@@ -754,12 +571,12 @@ int main(int argc, char** argv)
     }
 #endif
 
-    frameRender(device, queue);
-    framePresent(queue);
+    frameRender(vCtx);
+    framePresent(vCtx);
     glfwPollEvents();
   }
 
-  auto rv = vkDeviceWaitIdle(device);
+  auto rv = vkDeviceWaitIdle(vCtx->device);
   assert(rv == VK_SUCCESS);
 
   for (auto & item : meshItems) {
@@ -772,12 +589,7 @@ int main(int argc, char** argv)
   ImGui::DestroyContext();
 
   delete renderer;
-
-  vkFreeCommandBuffers(device, cmdPool, 1, &cmdBuf);
-  vkDestroyCommandPool(device, cmdPool, nullptr);
-  vkDestroyDevice(device, nullptr);
-  vkDestroyInstance(instance, nullptr);
-
+  delete vCtx;
   glfwDestroyWindow(window);
 
   glfwTerminate();

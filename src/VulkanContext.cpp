@@ -1,19 +1,220 @@
 #include <cassert>
 #include "VulkanContext.h"
 
+namespace
+{
 
-VulkanContext::VulkanContext(Logger logger, VkPhysicalDevice physicalDevice, VkDevice device) :
+  VKAPI_ATTR VkBool32 VKAPI_CALL MyDebugReportCallback(VkDebugReportFlagsEXT       flags,
+                                                       VkDebugReportObjectTypeEXT  objectType,
+                                                       uint64_t                    object,
+                                                       size_t                      location,
+                                                       int32_t                     messageCode,
+                                                       const char*                 pLayerPrefix,
+                                                       const char*                 pMessage,
+                                                       void*                       pUserData)
+  {
+    auto logger = (Logger)pUserData;
+    logger(0, "Vulkan@%s: %s", pLayerPrefix, pMessage);
+
+    //std::cerr << pMessage << std::endl;
+    return VK_FALSE;
+  }
+}
+
+
+VulkanContext::VulkanContext(Logger logger,
+                             const char** instanceExts, uint32_t instanceExtCount,
+                             int hasPresentationSupport(VkInstance, VkPhysicalDevice, uint32_t queueFamily)) :
   logger(logger),
   physicalDevice(physicalDevice),
   device(device)
 {
+  // create instance
+  { 
+    const char* enabledLayers[] = { "VK_LAYER_LUNARG_standard_validation" };
+    auto enabledLayerCount = uint32_t(sizeof(enabledLayers) / sizeof(const char*));
+
+    const char* extraInstanceExts[] = { "VK_EXT_debug_report" };
+    uint32_t extraInstanceExtCont = uint32_t(sizeof(extraInstanceExts) / sizeof(const char*));
+
+    Buffer<const char*> allInstanceExts;
+    allInstanceExts.accommodate(instanceExtCount + extraInstanceExtCont);
+    for (uint32_t i = 0; i < instanceExtCount; i++) allInstanceExts[i] = instanceExts[i];
+    for (uint32_t i = 0; i < extraInstanceExtCont; i++) allInstanceExts[instanceExtCount + i] = extraInstanceExts[i];
+
+    VkApplicationInfo app_info = {};
+    app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    app_info.pNext = nullptr;
+    app_info.pApplicationName = nullptr;
+    app_info.applicationVersion = 1;
+    app_info.pEngineName = nullptr;
+    app_info.engineVersion = 1;
+    app_info.apiVersion = VK_API_VERSION_1_1;
+
+    VkInstanceCreateInfo instanceCI = {};
+    instanceCI.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    instanceCI.pNext = nullptr;
+    instanceCI.flags = 0;
+    instanceCI.pApplicationInfo = &app_info;
+    instanceCI.enabledExtensionCount = instanceExtCount + extraInstanceExtCont;
+    instanceCI.ppEnabledExtensionNames = allInstanceExts.data();
+    instanceCI.enabledLayerCount = enabledLayerCount;
+    instanceCI.ppEnabledLayerNames = enabledLayers;
+
+    auto rv = vkCreateInstance(&instanceCI, nullptr, &instance);
+    assert(rv == 0 && "vkCreateInstance");
+
+
+    VkDebugReportCallbackCreateInfoEXT debugCallbackCI;
+    debugCallbackCI.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT;
+    debugCallbackCI.pNext = nullptr;
+    debugCallbackCI.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
+    debugCallbackCI.pfnCallback = &MyDebugReportCallback;
+    debugCallbackCI.pUserData = nullptr;
+
+    auto vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
+    VkResult result = vkCreateDebugReportCallbackEXT(instance, &debugCallbackCI, nullptr, &debugCallback);
+
+    //auto vkDebugReportMessageEXT = (PFN_vkDebugReportMessageEXT)vkGetInstanceProcAddr(instance, "vkDebugReportMessageEXT");
+  }
+  // choose physical device
+  {
+    Buffer<VkPhysicalDevice> devices;
+
+    uint32_t gpuCount = 0;
+    auto rv = vkEnumeratePhysicalDevices(instance, &gpuCount, nullptr);
+    devices.accommodate(gpuCount);
+    rv = vkEnumeratePhysicalDevices(instance, &gpuCount, devices.data());
+    assert(rv == 0 && "vkEnumeratePhysicalDevices");
+    assert(gpuCount);
+
+    size_t chosenDevice = 0;
+    VkPhysicalDeviceProperties chosenProps = { 0 };
+    vkGetPhysicalDeviceProperties(devices[0], &chosenProps);
+    for (size_t i = 0; i < gpuCount; i++) {
+      VkPhysicalDeviceProperties props = { 0 };
+      vkGetPhysicalDeviceProperties(devices[i], &props);
+
+      uint64_t vmem = 0;
+      VkPhysicalDeviceMemoryProperties memProps = { 0 };
+      vkGetPhysicalDeviceMemoryProperties(devices[i], &memProps);
+      for (uint32_t k = 0; k < memProps.memoryHeapCount; k++) {
+        if (memProps.memoryHeaps[k].flags & VkMemoryHeapFlagBits::VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
+          vmem = memProps.memoryHeaps[k].size;
+        }
+      }
+      logger(0, "Device %d: name='%s', type=%d, mem=%lld", i, props.deviceName, props.deviceType, vmem);
+    }
+    physicalDevice = devices[chosenDevice];
+  }
+  // create device and queue
+  { 
+    VkDeviceQueueCreateInfo queueInfo = {};
+
+    uint32_t queueFamilyCount = 0;
+    Buffer<VkQueueFamilyProperties> queueProps;
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
+    queueProps.accommodate(queueFamilyCount);
+    vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueProps.data());
+
+    bool found = false;
+    for (uint32_t i = 0; i < queueFamilyCount; i++) {
+      if (queueProps[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+        if (hasPresentationSupport(instance, physicalDevice, i)) {
+          queueInfo.queueFamilyIndex = i;
+          found = true;
+          break;
+        }
+      }
+    }
+    assert(found);
+    queueFamilyIndex = queueInfo.queueFamilyIndex;
+
+    float queuePriorities[1] = { 0.0 };
+    queueInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queueInfo.pNext = nullptr;
+    queueInfo.queueCount = 1;
+    queueInfo.pQueuePriorities = queuePriorities;
+
+    const char* deviceExt[] = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+
+    VkDeviceCreateInfo deviceInfo = {};
+    deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    deviceInfo.pNext = nullptr;
+    deviceInfo.queueCreateInfoCount = 1;
+    deviceInfo.pQueueCreateInfos = &queueInfo;
+    deviceInfo.enabledExtensionCount = uint32_t(sizeof(deviceExt) / sizeof(const char*));
+    deviceInfo.ppEnabledExtensionNames = deviceExt;
+    deviceInfo.enabledLayerCount = 0;
+    deviceInfo.ppEnabledLayerNames = nullptr;
+    deviceInfo.pEnabledFeatures = nullptr;
+
+    auto rv = vkCreateDevice(physicalDevice, &deviceInfo, NULL, &device);
+    assert(rv == VK_SUCCESS);
+
+    vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
+  }
+  // create descriptoor pool
+  {
+    VkDescriptorPoolSize poolSizes[] =
+    {
+        { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+        { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+        { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+        { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+    };
+    VkDescriptorPoolCreateInfo pool_info = {};
+    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    pool_info.maxSets = 1000 * uint32_t(sizeof(poolSizes) / sizeof(VkDescriptorPoolSize));
+    pool_info.poolSizeCount = uint32_t(sizeof(poolSizes) / sizeof(VkDescriptorPoolSize));
+    pool_info.pPoolSizes = poolSizes;
+    auto rv = vkCreateDescriptorPool(device, &pool_info, nullptr, &descPool);
+    assert(rv == VK_SUCCESS);
+  }
+  // create command pool
+  {
+    VkCommandPoolCreateInfo cmdPoolCI = {};
+    cmdPoolCI.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    cmdPoolCI.pNext = nullptr;
+    cmdPoolCI.queueFamilyIndex = queueFamilyIndex;
+    cmdPoolCI.flags = 0;
+    auto rv = vkCreateCommandPool(device, &cmdPoolCI, NULL, &cmdPool);
+    assert(rv == VK_SUCCESS);
+  }
+  // create command buffer
+  {
+    VkCommandBufferAllocateInfo cmdBufAllocCI = {};
+    cmdBufAllocCI.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    cmdBufAllocCI.pNext = NULL;
+    cmdBufAllocCI.commandPool = cmdPool;
+    cmdBufAllocCI.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmdBufAllocCI.commandBufferCount = 1;
+    auto rv = vkAllocateCommandBuffers(device, &cmdBufAllocCI, &cmdBuf);
+    assert(rv == VK_SUCCESS);
+  }
+
   vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
   vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
 }
 
 VulkanContext::~VulkanContext()
 {
-
+  vkFreeCommandBuffers(device, cmdPool, 1, &cmdBuf);
+  vkDestroyCommandPool(device, cmdPool, nullptr);
+  vkDestroyDevice(device, nullptr);
+  if (debugCallback) {
+    auto vkDestroyDebugReportCallbackEXT = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
+    vkDestroyDebugReportCallbackEXT(instance, debugCallback, nullptr);
+  }
+  vkDestroyInstance(instance, nullptr);
 }
 
 void VulkanContext::houseKeep()
