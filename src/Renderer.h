@@ -11,7 +11,7 @@ struct RenderImage;
 class Renderer
 {
 public:
-  Renderer(Logger logger, VkPhysicalDevice physicalDevice, VkDevice device, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h);
+  Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h);
   ~Renderer();
 
   RenderMesh* createRenderMesh(Mesh* mesh);
@@ -21,7 +21,7 @@ public:
 
 private:
   Logger logger;
-  VulkanContext* vkCtx = nullptr;
+  VulkanContext* vCtx = nullptr;
   RenderPipeline* vanillaPipeline = nullptr;
 
   RenderImage* depthImage = nullptr;

@@ -1,6 +1,7 @@
 #pragma once
 #include <vulkan/vulkan.h>
 #include "Common.h"
+#include "ResourceManager.h"
 
 struct ShaderInputSpec {
   uint32_t* spv;
@@ -34,6 +35,11 @@ struct RenderImage
   VkFormat format;
 };
 
+struct FrameBuffer : ResourceBase
+{
+
+};
+typedef ResourceHandle<FrameBuffer> FrameBufferHandle;
 
 struct VulkanContext
 {
@@ -41,6 +47,8 @@ struct VulkanContext
 
   VulkanContext(Logger logger, VkPhysicalDevice physicalDevice, VkDevice device);
   ~VulkanContext();
+
+  void houseKeep();
 
   void buildShader(RenderShader& shader, ShaderInputSpec* spec, unsigned N);
   void destroyShader(RenderShader& shader);
@@ -71,10 +79,15 @@ struct VulkanContext
   void createFrameBuffers(Buffer<VkFramebuffer>& frameBuffers, VkRenderPass renderPass, VkImageView depthView, VkImageView* colorViews, uint32_t colorViewCount, uint32_t w, uint32_t h);
   void destroyFrameBuffers(Buffer<VkFramebuffer>& frameBuffers);
 
+  FrameBufferHandle createFrameBuffer();
+
   Logger logger;
   VkPhysicalDevice physicalDevice;
   VkDevice device;
 
   VkPhysicalDeviceProperties physicalDeviceProperties;
   VkPhysicalDeviceMemoryProperties memoryProperties;
+
+  ResourceManager<FrameBuffer> frameBufferResources;
+
 };

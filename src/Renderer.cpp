@@ -162,13 +162,13 @@ namespace {
 }
 
 
-Renderer::Renderer(Logger logger, VkPhysicalDevice physicalDevice, VkDevice device, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h) :
+Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h) :
   logger(logger),
-  vkCtx(new VulkanContext(logger, physicalDevice, device))
+  vCtx(vCtx)
 {
 
   depthImage = new RenderImage;
-  vkCtx->createDepthImage(*depthImage, w, h);
+  vCtx->createDepthImage(*depthImage, w, h);
 
   
 
@@ -184,13 +184,13 @@ Renderer::Renderer(Logger logger, VkPhysicalDevice physicalDevice, VkDevice devi
     {vanillaPS, sizeof(vanillaPS), VK_SHADER_STAGE_FRAGMENT_BIT}
   };
   vanillaPipeline = new RenderPipeline;
-  vkCtx->buildShader(vanillaPipeline->shader, stages, 2);
+  vCtx->buildShader(vanillaPipeline->shader, stages, 2);
 
   Buffer<VkVertexInputBindingDescription> inputBind;
   Buffer<VkVertexInputAttributeDescription> inputAttrib;
   createVanillaVertexInputDesc(inputBind, inputAttrib);
 
-  createVanillaPiplineLayout(vanillaPipeline->pipelineLayout, vanillaPipeline->descSetLayout, device);
+  createVanillaPiplineLayout(vanillaPipeline->pipelineLayout, vanillaPipeline->descSetLayout, vCtx->device);
 
 
   //buildPipeline(vanillaPipeline, device, vanillaShaders,
@@ -213,9 +213,9 @@ Renderer::Renderer(Logger logger, VkPhysicalDevice physicalDevice, VkDevice devi
 Renderer::~Renderer()
 {
   //vkDestroyPipeline(device, vanillaPipeline, nullptr);
-  vkCtx->destroyShader(vanillaPipeline->shader);
+  vCtx->destroyShader(vanillaPipeline->shader);
   delete vanillaPipeline;
-  delete vkCtx;
+  delete vCtx;
 }
 
 RenderMesh* Renderer::createRenderMesh(Mesh* mesh)
@@ -230,11 +230,11 @@ RenderMesh* Renderer::createRenderMesh(Mesh* mesh)
   auto * renderMesh = new RenderMesh();
   renderMesh->tri_n = mesh->tri_n;
   
-  renderMesh->vtxNrmTex = vkCtx->createVertexBuffer(sizeof(VtxNrmTex) * 3 * renderMesh->tri_n);
+  renderMesh->vtxNrmTex = vCtx->createVertexBuffer(sizeof(VtxNrmTex) * 3 * renderMesh->tri_n);
 
 
   VtxNrmTex *mem;
-  auto rv = vkMapMemory(vkCtx->device, renderMesh->vtxNrmTex.mem, 0, renderMesh->vtxNrmTex.size, 0, (void **)&mem);
+  auto rv = vkMapMemory(vCtx->device, renderMesh->vtxNrmTex.mem, 0, renderMesh->vtxNrmTex.size, 0, (void **)&mem);
   assert(rv == VK_SUCCESS);
 
   for (unsigned i = 0; i < 3 * mesh->tri_n; i++) {
@@ -242,7 +242,7 @@ RenderMesh* Renderer::createRenderMesh(Mesh* mesh)
     mem[i].nrm = Vec3f(0.f);
     mem[i].tex = Vec2f(0.f);
   }
-  vkUnmapMemory(vkCtx->device, renderMesh->vtxNrmTex.mem);
+  vkUnmapMemory(vCtx->device, renderMesh->vtxNrmTex.mem);
 
   logger(0, "CreateRenderMesh");
   return nullptr;
@@ -304,8 +304,8 @@ void Renderer::drawRenderMesh(RenderMesh* renderMesh)
 
 void Renderer::destroyRenderMesh(RenderMesh* renderMesh)
 {
-  vkDestroyBuffer(vkCtx->device, renderMesh->vtxNrmTex.buffer, NULL);
-  vkFreeMemory(vkCtx->device, renderMesh->vtxNrmTex.mem, NULL);
+  vkDestroyBuffer(vCtx->device, renderMesh->vtxNrmTex.buffer, NULL);
+  vkFreeMemory(vCtx->device, renderMesh->vtxNrmTex.mem, NULL);
   logger(0, "destroyRenderMesh");
   delete renderMesh;
 }

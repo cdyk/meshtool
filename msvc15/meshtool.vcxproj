@@ -96,6 +96,7 @@
     <ClCompile Include="..\src\Mesh.cpp" />
     <ClCompile Include="..\src\ObjReader.cpp" />
     <ClCompile Include="..\src\Renderer.cpp" />
+    <ClCompile Include="..\src\ResourceManager.cpp" />
     <ClCompile Include="..\src\Tasks.cpp" />
     <ClCompile Include="..\src\Viewer.cpp" />
     <ClCompile Include="..\src\VulkanContext.cpp" />
@@ -114,6 +115,7 @@
     <ClInclude Include="..\src\LinAlgOps.h" />
     <ClInclude Include="..\src\Mesh.h" />
     <ClInclude Include="..\src\Renderer.h" />
+    <ClInclude Include="..\src\ResourceManager.h" />
     <ClInclude Include="..\src\Viewer.h" />
     <ClInclude Include="..\src\VulkanContext.h" />
   </ItemGroup>

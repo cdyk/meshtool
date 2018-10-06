@@ -16,6 +16,27 @@ VulkanContext::~VulkanContext()
 
 }
 
+void VulkanContext::houseKeep()
+{
+
+  frameBufferResources.purge();
+  unsigned d = 0;
+  for (auto * r = frameBufferResources.getPurged(); r; r = frameBufferResources.getPurged()) {
+    d++;
+    delete r; 
+  }
+  if (d) logger(0, "Deleted %d framebuffers", d);
+
+}
+
+
+FrameBufferHandle VulkanContext::createFrameBuffer()
+{
+  auto * fb = new FrameBuffer();
+  return frameBufferResources.createResource();
+}
+
+
 //(/void VulkanContext::buildShaders(Buffer<VkPipelineShaderStageCreateInfo>& stageCreateInfo,
 //                                 ShaderInputSpec* spec, unsigned N)
 

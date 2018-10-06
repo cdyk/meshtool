@@ -20,6 +20,7 @@
 #include "Mesh.h"
 #include "LinAlgOps.h"
 #include "Renderer.h"
+#include "VulkanContext.h"
 
 namespace {
 
@@ -31,7 +32,9 @@ namespace {
 
   bool solid = true;
 
+  VulkanContext* vCtx = nullptr;
   Renderer* renderer = nullptr;
+  
 
   ImGui_ImplVulkanH_WindowData imguiWindowData;
 
@@ -629,7 +632,13 @@ int main(int argc, char** argv)
 #endif
 
 
-  renderer = new Renderer(logger, physicalDevice, device, imguiWindowData.BackBufferView, imguiWindowData.BackBufferCount, width, height);
+  vCtx = new VulkanContext(logger, physicalDevice, device);
+  {
+    auto h = vCtx->createFrameBuffer();
+    auto w = h;
+  }
+
+  renderer = new Renderer(logger, vCtx, imguiWindowData.BackBufferView, imguiWindowData.BackBufferCount, width, height);
 
 
   ImGui_ImplVulkan_InitInfo init_info = {};
@@ -684,6 +693,8 @@ int main(int argc, char** argv)
   leftSplit = 0.25f*width;
   while (!glfwWindowShouldClose(window))
   {
+    vCtx->houseKeep();
+
     tasks.update();
     checkQueues();
     glfwGetFramebufferSize(window, &width, &height);
