@@ -163,7 +163,6 @@ namespace {
     assert(rv == VK_SUCCESS);
 
     VkClearValue clearValues[2] = {};
-    clearValues[0].color.float32[0] = 0.5f;
     clearValues[1].depthStencil.depth = 1.f;
 
     {
@@ -182,14 +181,15 @@ namespace {
 
       Mat4f Z(1, 0, 0, 0,
               0, -1, 0, 0,
-              0, 0, 0.5f, 0,
-              0, 0, 0.5, 1.f);
+              0, 0, 0.5f, 0.5f,
+              0, 0, 0.0, 1.f);
 
       auto MVP =  mul(Z, mul(viewer.getProjectionMatrix(), viewer.getViewMatrix()));
 
+
       vkCmdBeginRenderPass(frameData->CommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
       for (auto & item : meshItems) {
-        renderer->drawRenderMesh(frameData->CommandBuffer, mainPass, item.renderMesh, viewport, MVP);
+        renderer->drawRenderMesh(frameData->CommandBuffer, mainPass, item.renderMesh, viewport, Mat3f(viewer.getViewMatrix()), MVP);
       }
       vkCmdEndRenderPass(frameData->CommandBuffer);
     }
@@ -670,6 +670,9 @@ int main(int argc, char** argv)
   ImGui_ImplVulkan_Shutdown();
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
+
+  mainPass.release();
+  frameBuffers.resize(0);
 
   delete renderer;
   delete vCtx;

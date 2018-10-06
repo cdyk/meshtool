@@ -98,6 +98,9 @@ struct Mat3f
   Mat3f() = default;
   Mat3f(const Mat3f&) = default;
   Mat3f(const float* ptr) { for (unsigned i = 0; i < 3 * 3; i++) data[i] = ptr[i]; }
+
+  Mat3f(const struct Mat4f& m);
+
   Mat3f(float m00, float m01, float m02,
         float m10, float m11, float m12,
         float m20, float m21, float m22) :
@@ -203,3 +206,9 @@ struct Mat4f
   };
 
 };
+
+inline Mat3f::Mat3f(const  Mat4f& m) :
+  m00(m.m00), m10(m.m10), m20(m.m20),
+  m01(m.m01), m11(m.m11), m21(m.m21),
+  m02(m.m02), m12(m.m12), m22(m.m22)
+{}

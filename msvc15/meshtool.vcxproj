@@ -100,6 +100,7 @@
     <ClCompile Include="..\src\Tasks.cpp" />
     <ClCompile Include="..\src\Viewer.cpp" />
     <ClCompile Include="..\src\VulkanContext.cpp" />
+    <ClCompile Include="..\src\VulkanInfos.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\libs\imgui\examples\imgui_impl_glfw.h" />
@@ -118,6 +119,7 @@
     <ClInclude Include="..\src\ResourceManager.h" />
     <ClInclude Include="..\src\Viewer.h" />
     <ClInclude Include="..\src\VulkanContext.h" />
+    <ClInclude Include="..\src\VulkanInfos.h" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\shaders\vanillaPS.glsl">
@@ -135,6 +137,15 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
       <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
       <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\shaders\flatVS.glsl">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslc.exe -c -mfmt=c %(FullPath) -o %(FullPath).h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslc.exe -c -mfmt=c %(FullPath) -o %(FullPath).h</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
     </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -126,6 +126,7 @@ public:
   Vector() = default;
   Vector(const Vector&) = delete;   // haven't bothered yet
   Vector& operator=(const Vector&) = delete;  //  haven't bothered yet
+  ~Vector() { resize(0); }
 
   Vector(size_t size) { resize(size); }
 

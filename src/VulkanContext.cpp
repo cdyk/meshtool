@@ -161,6 +161,7 @@ VulkanContext::VulkanContext(Logger logger,
 
     vkCmdDebugMarkerBeginEXT = (PFN_vkCmdDebugMarkerBeginEXT)vkGetInstanceProcAddr(instance, "vkCmdDebugMarkerBeginEXT");
     vkCmdDebugMarkerEndEXT = (PFN_vkCmdDebugMarkerEndEXT)vkGetInstanceProcAddr(instance, "vkCmdDebugMarkerEndEXT");
+    vkDebugMarkerSetObjectNameEXT = (PFN_vkDebugMarkerSetObjectNameEXT)vkGetInstanceProcAddr(instance, "vkDebugMarkerSetObjectNameEXT");
 
     vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
   }
@@ -230,41 +231,64 @@ VulkanContext::~VulkanContext()
 
 void VulkanContext::houseKeep()
 {
-  {
-    uint32_t d = 0;
-    shaderResources.purge();
-    for (auto * r = shaderResources.getPurged(); r; r = shaderResources.getPurged()) {
-      delete r; d++;
-    }
-    if (d) logger(0, "Deleted %d shaderResources", d);
+  fenceResources.purge();
+  for (auto * r = fenceResources.getPurged(); r; r = fenceResources.getPurged()) {
+    if (!r->hasFlag(ResourceBase::Flags::External)) destroyFence(r);
+    delete r;
   }
-  {
-    uint32_t d = 0;
-    renderPassResources.purge();
-    for (auto * r = renderPassResources.getPurged(); r; r = renderPassResources.getPurged()) {
-      delete r; d++;
-    }
-    if (d) logger(0, "Deleted %d renderpasses", d);
+
+  bufferResources.purge();
+  for (auto * r = bufferResources.getPurged(); r; r = bufferResources.getPurged()) {
+    if (!r->hasFlag(ResourceBase::Flags::External)) destroyBuffer(r);
+    delete r;
   }
-  {
-    uint32_t d = 0;
-    frameBufferResources.purge();
-    for (auto * r = frameBufferResources.getPurged(); r; r = frameBufferResources.getPurged()) {
-      delete r; d++;
-    }
-    if (d) logger(0, "Deleted %d framebuffers", d);
+
+  descriptorSetResources.purge();
+  for (auto * r = descriptorSetResources.getPurged(); r; r = descriptorSetResources.getPurged()) {
+    if (!r->hasFlag(ResourceBase::Flags::External)) destroyDescriptorSet(r);
+    delete r;
   }
-  {
-    uint32_t d = 0;
-    renderImageResources.purge();
-    for (auto * r = renderImageResources.getPurged(); r; r = renderImageResources.getPurged()) {
-      destroyRenderImage(r);
-      delete r; d++;
-    }
-    if (d) logger(0, "Deleted %d render images", d);
+
+  shaderResources.purge();
+  for (auto * r = shaderResources.getPurged(); r; r = shaderResources.getPurged()) {
+    if (!r->hasFlag(ResourceBase::Flags::External)) destroyShader(r);
+    delete r;
+  }
+
+  pipelineResources.purge();
+  for (auto * r = pipelineResources.getPurged(); r; r = pipelineResources.getPurged()) {
+    if (!r->hasFlag(ResourceBase::Flags::External)) destroyPipeline(r);
+    delete r;
+  }
+
+  renderPassResources.purge();
+  for (auto * r = renderPassResources.getPurged(); r; r = renderPassResources.getPurged()) {
+    if (!r->hasFlag(ResourceBase::Flags::External)) destroyRenderPass(r);
+    delete r;
+  }
+
+  frameBufferResources.purge();
+  for (auto * r = frameBufferResources.getPurged(); r; r = frameBufferResources.getPurged()) {
+    if (!r->hasFlag(ResourceBase::Flags::External)) destroyFrameBuffer(r);
+    delete r;
+  }
+ 
+  renderImageResources.purge();
+  for (auto * r = renderImageResources.getPurged(); r; r = renderImageResources.getPurged()) {
+    if (!r->hasFlag(ResourceBase::Flags::External)) destroyRenderImage(r);
+    delete r;
   }
 }
 
+void VulkanContext::annotate(VkDebugReportObjectTypeEXT type, uint64_t object, const char* name)
+{
+  VkDebugMarkerObjectNameInfoEXT info{};
+  info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT;
+  info.objectType = type;
+  info.object = object;
+  info.pObjectName = name;
+  vkDebugMarkerSetObjectNameEXT(device, &info);
+}
 
 
 
@@ -274,9 +298,8 @@ PipelineHandle VulkanContext::createPipeline(Vector<VkVertexInputBindingDescript
                                              VkDescriptorSetLayoutCreateInfo& descLayoutInfo,
                                              RenderPassHandle renderPass,
                                              ShaderHandle shader,
-                                             VkPrimitiveTopology primitiveTopology,
-                                             VkCullModeFlags cullMode,
-                                             VkPolygonMode polygonMode)
+                                             const VkPipelineRasterizationStateCreateInfo& rasterizationInfo,
+                                             VkPrimitiveTopology primitiveTopology)
 {
   auto pipeHandle = pipelineResources.createResource();
   auto * pipe = pipeHandle.resource;
@@ -317,21 +340,6 @@ PipelineHandle VulkanContext::createPipeline(Vector<VkVertexInputBindingDescript
   inputAssemblyCI.flags = 0;
   inputAssemblyCI.primitiveRestartEnable = VK_FALSE;
   inputAssemblyCI.topology = primitiveTopology;
-
-  VkPipelineRasterizationStateCreateInfo rasterizationCI;
-  rasterizationCI.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-  rasterizationCI.pNext = nullptr;
-  rasterizationCI.flags = 0;
-  rasterizationCI.polygonMode = polygonMode;
-  rasterizationCI.cullMode = cullMode;
-  rasterizationCI.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-  rasterizationCI.depthClampEnable = VK_FALSE;
-  rasterizationCI.rasterizerDiscardEnable = VK_FALSE;
-  rasterizationCI.depthBiasEnable = VK_FALSE;
-  rasterizationCI.depthBiasConstantFactor = 0;
-  rasterizationCI.depthBiasClamp = 0;
-  rasterizationCI.depthBiasSlopeFactor = 0;
-  rasterizationCI.lineWidth = 1.0f;
 
   VkPipelineColorBlendAttachmentState blendAttachmentState[1];
   blendAttachmentState[0].colorWriteMask = 0xf;
@@ -405,7 +413,7 @@ PipelineHandle VulkanContext::createPipeline(Vector<VkVertexInputBindingDescript
   pipelineCI.flags = 0;
   pipelineCI.pVertexInputState = &vtxInputCI;
   pipelineCI.pInputAssemblyState = &inputAssemblyCI;
-  pipelineCI.pRasterizationState = &rasterizationCI;
+  pipelineCI.pRasterizationState = &rasterizationInfo;
   pipelineCI.pColorBlendState = &blendCI;
   pipelineCI.pTessellationState = nullptr;
   pipelineCI.pMultisampleState = &multiSampleCI;
@@ -423,6 +431,14 @@ PipelineHandle VulkanContext::createPipeline(Vector<VkVertexInputBindingDescript
   logger(0, "Built pipeline");
   return pipeHandle;
 }
+
+void VulkanContext::destroyPipeline(Pipeline* pipe)
+{
+  if (pipe->pipe) vkDestroyPipeline(device, pipe->pipe, nullptr);
+  if (pipe->pipeLayout) vkDestroyPipelineLayout(device, pipe->pipeLayout, nullptr);
+  if (pipe->descLayout) vkDestroyDescriptorSetLayout(device, pipe->descLayout, nullptr);
+}
+
 
 RenderBufferHandle VulkanContext::createBuffer(size_t requestedSize, VkImageUsageFlags usageFlags)
 {
@@ -466,6 +482,14 @@ RenderBufferHandle VulkanContext::createBuffer(size_t requestedSize, VkImageUsag
   return bufHandle;
 }
 
+
+void VulkanContext::destroyBuffer(RenderBuffer* buffer)
+{
+  if (buffer->buffer) vkDestroyBuffer(device, buffer->buffer, nullptr);
+  if (buffer->mem) vkFreeMemory(device, buffer->mem, nullptr);
+}
+
+
 DescriptorSetHandle VulkanContext::createDescriptorSet(VkDescriptorSetLayout descLayout)
 {
   auto descSetHandle = descriptorSetResources.createResource();
@@ -482,6 +506,11 @@ DescriptorSetHandle VulkanContext::createDescriptorSet(VkDescriptorSetLayout des
   assert(rv == VK_SUCCESS);
 
   return descSetHandle;
+}
+
+void VulkanContext::destroyDescriptorSet(DescriptorSet* descSet)
+{
+  if (descSet->descSet) vkFreeDescriptorSets(device, descPool, 1, &descSet->descSet);
 }
 
 void VulkanContext::updateDescriptorSet(DescriptorSetHandle descriptorSet, RenderBufferHandle buffer)
@@ -505,8 +534,10 @@ void VulkanContext::updateDescriptorSet(DescriptorSetHandle descriptorSet, Rende
 }
 
 
-ShaderHandle VulkanContext::createShader(Vector<ShaderInputSpec>& spec)
+ShaderHandle VulkanContext::createShader(Vector<ShaderInputSpec>& spec, const char* name)
 {
+  char buf[256];
+
   auto shaderHandle = shaderResources.createResource();
   auto * shader = shaderHandle.resource;
 
@@ -527,18 +558,22 @@ ShaderHandle VulkanContext::createShader(Vector<ShaderInputSpec>& spec)
     moduleCreateInfo.pCode = spec[i].spv;
     auto rv = vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &shader->stageCreateInfo[i].module);
     assert(rv == VK_SUCCESS);
+
+    if (name) {
+      snprintf(buf, sizeof(buf), "%s:stage%d", name, int(i));
+      annotate(VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT, uint64_t(shader->stageCreateInfo[i].module), buf);
+    }
+
   }
   return shaderHandle;
 }
 
 void VulkanContext::destroyShader(Shader* shader)
 {
-  if (!shader->hasFlag(ResourceBase::Flags::External)) {
-    for (size_t i = 0; i < shader->stageCreateInfo.size(); i++) {
-      vkDestroyShaderModule(device, shader->stageCreateInfo[i].module, nullptr);
-    }
-    shader->stageCreateInfo.resize(0);
+  for (size_t i = 0; i < shader->stageCreateInfo.size(); i++) {
+    vkDestroyShaderModule(device, shader->stageCreateInfo[i].module, nullptr);
   }
+  shader->stageCreateInfo.resize(0);
 }
 
 
@@ -633,18 +668,13 @@ RenderImageHandle VulkanContext::createRenderImage(uint32_t w, uint32_t h, VkIma
   return renderImageHandle;
 }
 
+
 void VulkanContext::destroyRenderImage(RenderImage* renderImage)
 {
-  if(renderImage->view && !renderImage->hasFlag(RenderImage::Flags::External)) vkDestroyImageView(device, renderImage->view, nullptr);
-  renderImage->view = VK_NULL_HANDLE;
-
-  if(renderImage->image && !renderImage->hasFlag(RenderImage::Flags::External))vkDestroyImage(device, renderImage->image, nullptr);
-  renderImage->image = VK_NULL_HANDLE;
-
-  if(renderImage->mem && !renderImage->hasFlag(RenderImage::Flags::External)) vkFreeMemory(device, renderImage->mem, nullptr);
-  renderImage->mem = VK_NULL_HANDLE;
+  if(renderImage->view) vkDestroyImageView(device, renderImage->view, nullptr);
+  if(renderImage->image)vkDestroyImage(device, renderImage->image, nullptr);
+  if(renderImage->mem) vkFreeMemory(device, renderImage->mem, nullptr);
 }
-
 
 
 RenderPassHandle VulkanContext::createRenderPass(VkAttachmentDescription* attachments, uint32_t attachmentCount,
@@ -726,6 +756,12 @@ FrameBufferHandle VulkanContext::createFrameBuffer(RenderPassHandle pass, uint32
   assert(rv == VK_SUCCESS);
 
   return fbHandle;
+}
+
+
+void VulkanContext::destroyFrameBuffer(FrameBuffer* fb)
+{
+  if (fb->fb) vkDestroyFramebuffer(device, fb->fb, nullptr);
 }
 
 

@@ -3,6 +3,7 @@
 #include "Renderer.h"
 #include "Mesh.h"
 #include "VulkanContext.h"
+#include "LinAlgOps.h"
 
 struct ObjectBuffer
 {
@@ -19,6 +20,10 @@ struct RenderMesh
 
 namespace {
 
+  uint32_t flatVS[]
+#include "flatVS.glsl.h"
+    ;
+
   uint32_t vanillaVS[]
 #include "vanillaVS.glsl.h"
     ;
@@ -28,7 +33,8 @@ namespace {
     ;
 
 
-  void vanillaPipelineInfo(Vector<VkVertexInputBindingDescription>& inputBind,
+  void vanillaPipelineInfo(VulkanContext* vCtx,
+                           Vector<VkVertexInputBindingDescription>& inputBind,
                            Vector<VkVertexInputAttributeDescription>& inputAttrib,
                            VkPipelineLayoutCreateInfo& pipeLayoutCI,
                            VkDescriptorSetLayoutBinding& descSetLayoutBind,
@@ -36,23 +42,49 @@ namespace {
   {
     {
       inputBind.resize(1);
-      inputBind[0].binding = 0;
-      inputBind[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-      inputBind[0].stride = sizeof(Vec3f) + sizeof(Vec3f) + sizeof(Vec2f);
+      inputBind[0] = vCtx->infos.vertexInput.v32b;
 
       inputAttrib.resize(3);
-      inputAttrib[0].binding = 0;
-      inputAttrib[0].location = 0;
-      inputAttrib[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-      inputAttrib[0].offset = 0;
-      inputAttrib[1].binding = 0;
-      inputAttrib[1].location = 1;
-      inputAttrib[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-      inputAttrib[1].offset = sizeof(Vec3f);
-      inputAttrib[2].binding = 0;
-      inputAttrib[2].location = 2;
-      inputAttrib[2].format = VK_FORMAT_R32G32B32_SFLOAT;
-      inputAttrib[2].offset = sizeof(Vec3f) + sizeof(Vec3f);
+      inputAttrib[0] = vCtx->infos.vertexInput.v3f_0_0b;
+      inputAttrib[1] = vCtx->infos.vertexInput.v3f_1_12b;
+      inputAttrib[2] = vCtx->infos.vertexInput.v2f_2_24b;
+    }
+    {
+      descSetLayoutBind = {};
+      descSetLayoutBind.binding = 0;
+      descSetLayoutBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      descSetLayoutBind.descriptorCount = 1;
+      descSetLayoutBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+      descSetLayoutBind.pImmutableSamplers = NULL;
+
+      descLayoutCI = {};
+      descLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+      descLayoutCI.pNext = NULL;
+      descLayoutCI.bindingCount = 1;
+      descLayoutCI.pBindings = &descSetLayoutBind;
+    }
+    {
+      pipeLayoutCI = {};
+      pipeLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+      pipeLayoutCI.pNext = NULL;
+      pipeLayoutCI.pushConstantRangeCount = 0;
+      pipeLayoutCI.pPushConstantRanges = NULL;
+    }
+  }
+
+  void wirePipelineInfo(VulkanContext* vCtx, 
+                        Vector<VkVertexInputBindingDescription>& inputBind,
+                        Vector<VkVertexInputAttributeDescription>& inputAttrib,
+                        VkPipelineLayoutCreateInfo& pipeLayoutCI,
+                        VkDescriptorSetLayoutBinding& descSetLayoutBind,
+                        VkDescriptorSetLayoutCreateInfo& descLayoutCI)
+  {
+    {
+      inputBind.resize(1);
+      inputBind[0] = vCtx->infos.vertexInput.v32b;
+
+      inputAttrib.resize(1);
+      inputAttrib[0] = vCtx->infos.vertexInput.v3f_0_0b;
     }
     {
       descSetLayoutBind = {};
@@ -92,6 +124,12 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
     stages[1] = { vanillaPS, sizeof(vanillaPS), VK_SHADER_STAGE_FRAGMENT_BIT };
     vanillaShader = vCtx->createShader(stages);
   }
+  {
+    Vector<ShaderInputSpec> stages(2);
+    stages[0] = { flatVS, sizeof(vanillaVS), VK_SHADER_STAGE_VERTEX_BIT };
+    stages[1] = { vanillaPS, sizeof(vanillaPS), VK_SHADER_STAGE_FRAGMENT_BIT };
+    flatShader = vCtx->createShader(stages);
+  }
 
   renaming.resize(10);
   for (size_t i = 0; i < renaming.size(); i++) {
@@ -121,10 +159,15 @@ RenderMesh* Renderer::createRenderMesh(Mesh* mesh)
 
   {
     MappedBuffer<VtxNrmTex> map(vCtx, renderMesh->vtxNrmTex);
-    for (unsigned i = 0; i < 3 * mesh->tri_n; i++) {
-      map.mem[i].vtx = mesh->vtx[mesh->tri[i]];
-      map.mem[i].nrm = Vec3f(0.f);
-      map.mem[i].tex = Vec2f(0.f);
+    for (unsigned i = 0; i < mesh->tri_n; i++) {
+      Vec3f p[3];
+      for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->tri[3 * i + k]];
+      auto n = cross(p[1] - p[0], p[2] - p[0]);
+      for (unsigned k = 0; k < 3; k++) {
+        map.mem[3 * i + k].vtx = p[k];
+        map.mem[3 * i + k].nrm = n;
+        map.mem[3 * i + k].tex = Vec2f(0.f);
+      }
     }
   }
 
@@ -133,7 +176,7 @@ RenderMesh* Renderer::createRenderMesh(Mesh* mesh)
 }
 
 
-void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMesh* renderMesh, const Vec4f& viewport, const Mat4f& MVP)
+void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMesh* renderMesh, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP)
 {
   if(!vanillaPipeline || vanillaPipeline.resource->pass != pass)
   {
@@ -142,34 +185,38 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     VkPipelineLayoutCreateInfo pipeLayoutCI;
     VkDescriptorSetLayoutBinding descSetLayoutBind;
     VkDescriptorSetLayoutCreateInfo descLayoutCI;
-    vanillaPipelineInfo(inputBind, inputAttrib, pipeLayoutCI, descSetLayoutBind, descLayoutCI);
+    vanillaPipelineInfo(vCtx, inputBind, inputAttrib, pipeLayoutCI, descSetLayoutBind, descLayoutCI);
 
     vanillaPipeline = vCtx->createPipeline(inputBind,
                                            inputAttrib,
                                            pipeLayoutCI,
                                            descLayoutCI,
                                            pass,
-                                           vanillaShader);
+                                           vanillaShader,
+                                           vCtx->infos.pipelineRasterization.cullBackDepthBias);
+
+    wirePipelineInfo(vCtx, inputBind, inputAttrib, pipeLayoutCI, descSetLayoutBind, descLayoutCI);
+    wirePipeline = vCtx->createPipeline(inputBind,
+                                        inputAttrib,
+                                        pipeLayoutCI,
+                                        descLayoutCI,
+                                        pass,
+                                        flatShader,
+                                        vCtx->infos.pipelineRasterization.cullBackLine);
     for (size_t i = 0; i < renaming.size(); i++) {
       renaming[i].vanillaDescSet = vCtx->createDescriptorSet(vanillaPipeline.resource->descLayout);
+      renaming[i].wireDescSet = vCtx->createDescriptorSet(wirePipeline.resource->descLayout);
     }
   }
   auto & rename = renaming[renamingCurr];
 
-  
-
-
   {
     MappedBuffer<ObjectBuffer> map(vCtx, rename.objectBuffer);
     map.mem->MVP = MVP;
+    map.mem->N = N;
   }
   vCtx->updateDescriptorSet(rename.vanillaDescSet, rename.objectBuffer);
-
-
-  vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipe);
-
-  VkDescriptorSet desc_set[1] = { rename.vanillaDescSet.resource->descSet };
-  vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, desc_set, 0, NULL);
+  vCtx->updateDescriptorSet(rename.wireDescSet, rename.objectBuffer);
 
   {
     VkViewport vp = {};
@@ -193,9 +240,22 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
   const VkDeviceSize offsets[1] = { 0 };
   vkCmdBindVertexBuffers(cmdBuf, 0, 1, &renderMesh->vtxNrmTex.resource->buffer, offsets);
 
-  DebugScope debugScope(vCtx, cmdBuf, "Draw!");
-  vkCmdDraw(cmdBuf, 3*renderMesh->tri_n, 1, 0, 0);
-  
+  {
+    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipe);
+
+    VkDescriptorSet desc_set[1] = { rename.vanillaDescSet.resource->descSet };
+    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, desc_set, 0, NULL);
+    vkCmdDraw(cmdBuf, 3 * renderMesh->tri_n, 1, 0, 0);
+  }
+
+  {
+    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, wirePipeline.resource->pipe);
+
+    VkDescriptorSet desc_set[1] = { rename.wireDescSet.resource->descSet };
+    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, desc_set, 0, NULL);
+    vkCmdDraw(cmdBuf, 3 * renderMesh->tri_n, 1, 0, 0);
+  }
+
 
   renamingCurr = (renamingCurr + 1);
   if (renaming.size() <= renamingCurr) renamingCurr = 0;

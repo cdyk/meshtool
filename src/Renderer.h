@@ -7,6 +7,7 @@
 struct RenderMesh;
 struct Vec4f;
 struct Mat4f;
+struct Mat3f;
 
 class Renderer
 {
@@ -16,7 +17,7 @@ public:
 
   RenderMesh* createRenderMesh(Mesh* mesh);
 
-  void drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMesh* renderMesh, const Vec4f& viewport, const Mat4f& MVP);
+  void drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMesh* renderMesh, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP);
   void destroyRenderMesh(RenderMesh* renderMesh);
 
 private:
@@ -24,7 +25,12 @@ private:
   VulkanContext* vCtx = nullptr;
 
   PipelineHandle vanillaPipeline;
+
+  PipelineHandle wirePipeline;
+
   ShaderHandle vanillaShader;
+  ShaderHandle flatShader;
+
   uint32_t viewport[4];
   uint32_t frameCount;
 
@@ -32,6 +38,7 @@ private:
   struct Rename {
     RenderFenceHandle ready;
     DescriptorSetHandle vanillaDescSet;
+    DescriptorSetHandle wireDescSet;
     RenderBufferHandle objectBuffer;
   };
   Vector<Rename> renaming;

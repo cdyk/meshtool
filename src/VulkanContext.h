@@ -2,6 +2,7 @@
 #include <vulkan/vulkan.h>
 #include "Common.h"
 #include "ResourceManager.h"
+#include "VulkanInfos.h"
 
 struct ShaderInputSpec {
   uint32_t* spv;
@@ -71,6 +72,8 @@ struct FrameBuffer : ResourceBase
 };
 typedef ResourceHandle<FrameBuffer> FrameBufferHandle;
 
+
+
 struct VulkanContext
 {
   VulkanContext() = delete;
@@ -89,9 +92,8 @@ struct VulkanContext
                                 VkDescriptorSetLayoutCreateInfo& descLayoutInfo,
                                 RenderPassHandle renderPass,
                                 ShaderHandle shader,
-                                VkPrimitiveTopology primitiveTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-                                VkCullModeFlags cullMode = VK_CULL_MODE_BACK_BIT,
-                                VkPolygonMode polygonMode = VK_POLYGON_MODE_FILL);
+                                const VkPipelineRasterizationStateCreateInfo& rasterizationInfo,
+                                VkPrimitiveTopology primitiveTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
 
   bool getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements);
@@ -107,13 +109,14 @@ struct VulkanContext
   DescriptorSetHandle createDescriptorSet(VkDescriptorSetLayout descLayout);
   void updateDescriptorSet(DescriptorSetHandle descriptorSet, RenderBufferHandle buffer);
 
-  ShaderHandle createShader(Vector<ShaderInputSpec>& spec);
+  ShaderHandle createShader(Vector<ShaderInputSpec>& spec, const char* name = nullptr);
   RenderPassHandle createRenderPass(VkAttachmentDescription* attachments, uint32_t attachmentCount,
                                     VkSubpassDescription* subpasses, uint32_t subpassCount);
   RenderImageHandle wrapRenderImageView(VkImageView view);
   RenderImageHandle createRenderImage(uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format);
   FrameBufferHandle createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<RenderImageHandle>& attachments);
 
+  VulkanInfos infos;
   Logger logger = nullptr;
   VkInstance instance = VK_NULL_HANDLE;
   VkDebugReportCallbackEXT debugCallback = VK_NULL_HANDLE;
@@ -130,12 +133,19 @@ struct VulkanContext
 
   PFN_vkCmdDebugMarkerBeginEXT vkCmdDebugMarkerBeginEXT;
   PFN_vkCmdDebugMarkerEndEXT vkCmdDebugMarkerEndEXT;
+  PFN_vkDebugMarkerSetObjectNameEXT vkDebugMarkerSetObjectNameEXT;
 
 private:
+  void annotate(VkDebugReportObjectTypeEXT type, uint64_t object, const char* name);
+
   void destroyFence(RenderFence*);
-  void destroyRenderPass(RenderPass*);
-  void destroyRenderImage(RenderImage*);
+  void destroyBuffer(RenderBuffer*);
+  void destroyDescriptorSet(DescriptorSet*);
   void destroyShader(Shader* shader);
+  void destroyPipeline(Pipeline*);
+  void destroyRenderPass(RenderPass*);
+  void destroyFrameBuffer(FrameBuffer*);
+  void destroyRenderImage(RenderImage*);
 
   ResourceManager<RenderFence> fenceResources;
   ResourceManager<RenderBuffer> bufferResources;
