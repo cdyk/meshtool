@@ -4,19 +4,17 @@
 #include "Mesh.h"
 #include "VulkanContext.h"
 
+struct ObjectBuffer
+{
+  Mat4f MVP;
+  Mat3f N;
+};
+
 
 struct RenderMesh
 {
-  RenderBuffer vtxNrmTex;
+  RenderBufferHandle vtxNrmTex;
   uint32_t tri_n = 0;
-};
-
-struct RenderPipeline
-{
-  VkPipeline pipeline;
-  RenderShader shader;
-  Buffer<VkDescriptorSetLayout> descSetLayout;
-  VkPipelineLayout pipelineLayout;
 };
 
 namespace {
@@ -29,136 +27,57 @@ namespace {
 #include "vanillaPS.glsl.h"
     ;
 
-  void createVanillaVertexInputDesc(Buffer<VkVertexInputBindingDescription>& inputBind,
-                                    Buffer<VkVertexInputAttributeDescription>& inputAttrib)
-  {
-    inputBind.accommodate(1);
-    inputBind[0].binding = 0;
-    inputBind[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    inputBind[0].stride = sizeof(Vec3f) + sizeof(Vec3f) + sizeof(Vec2f);
 
-    inputAttrib.accommodate(3);
-    inputAttrib[0].binding = 0;
-    inputAttrib[0].location = 0;
-    inputAttrib[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-    inputAttrib[0].offset = 0;
-    inputAttrib[1].binding = 0;
-    inputAttrib[1].location = 1;
-    inputAttrib[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    inputAttrib[1].offset = sizeof(Vec3f);
-    inputAttrib[2].binding = 0;
-    inputAttrib[2].location = 2;
-    inputAttrib[2].format = VK_FORMAT_R32G32B32_SFLOAT;
-    inputAttrib[2].offset = sizeof(Vec3f) + sizeof(Vec3f);
+  void vanillaPipelineInfo(Vector<VkVertexInputBindingDescription>& inputBind,
+                           Vector<VkVertexInputAttributeDescription>& inputAttrib,
+                           VkPipelineLayoutCreateInfo& pipeLayoutCI,
+                           VkDescriptorSetLayoutBinding& descSetLayoutBind,
+                           VkDescriptorSetLayoutCreateInfo& descLayoutCI)
+  {
+    {
+      inputBind.resize(1);
+      inputBind[0].binding = 0;
+      inputBind[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+      inputBind[0].stride = sizeof(Vec3f) + sizeof(Vec3f) + sizeof(Vec2f);
+
+      inputAttrib.resize(3);
+      inputAttrib[0].binding = 0;
+      inputAttrib[0].location = 0;
+      inputAttrib[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+      inputAttrib[0].offset = 0;
+      inputAttrib[1].binding = 0;
+      inputAttrib[1].location = 1;
+      inputAttrib[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+      inputAttrib[1].offset = sizeof(Vec3f);
+      inputAttrib[2].binding = 0;
+      inputAttrib[2].location = 2;
+      inputAttrib[2].format = VK_FORMAT_R32G32B32_SFLOAT;
+      inputAttrib[2].offset = sizeof(Vec3f) + sizeof(Vec3f);
+    }
+    {
+      descSetLayoutBind = {};
+      descSetLayoutBind.binding = 0;
+      descSetLayoutBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      descSetLayoutBind.descriptorCount = 1;
+      descSetLayoutBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+      descSetLayoutBind.pImmutableSamplers = NULL;
+
+      descLayoutCI = {};
+      descLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+      descLayoutCI.pNext = NULL;
+      descLayoutCI.bindingCount = 1;
+      descLayoutCI.pBindings = &descSetLayoutBind;
+    }
+    {
+      pipeLayoutCI = {};
+      pipeLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+      pipeLayoutCI.pNext = NULL;
+      pipeLayoutCI.pushConstantRangeCount = 0;
+      pipeLayoutCI.pPushConstantRanges = NULL;
+    }
   }
 
-  void createVanillaPiplineLayout(VkPipelineLayout& pipelineLayout, Buffer<VkDescriptorSetLayout>& descSetLayout, VkDevice device)
-  {
-    VkDescriptorSetLayoutBinding descSetLayoutBind = {};
-    descSetLayoutBind.binding = 0;
-    descSetLayoutBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descSetLayoutBind.descriptorCount = 1;
-    descSetLayoutBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    descSetLayoutBind.pImmutableSamplers = NULL;
 
-    VkDescriptorSetLayoutCreateInfo descLayoutCI = {};
-    descLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descLayoutCI.pNext = NULL;
-    descLayoutCI.bindingCount = 1;
-    descLayoutCI.pBindings = &descSetLayoutBind;
-
-    descSetLayout.accommodate(1);
-    auto rv = vkCreateDescriptorSetLayout(device, &descLayoutCI, nullptr, descSetLayout.data());
-    assert(rv == VK_SUCCESS);
-
-    VkPipelineLayoutCreateInfo pipeLayoutCI = {};
-    pipeLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipeLayoutCI.pNext = NULL;
-    pipeLayoutCI.pushConstantRangeCount = 0;
-    pipeLayoutCI.pPushConstantRanges = NULL;
-    pipeLayoutCI.setLayoutCount = uint32_t(descSetLayout.getCount());
-    pipeLayoutCI.pSetLayouts = descSetLayout.data();
-
-    rv = vkCreatePipelineLayout(device, &pipeLayoutCI, NULL, &pipelineLayout);
-    assert(rv == VK_SUCCESS);
-  }
-
-  
-
-
-#if 0
-  void createRenderPass(RenderPass& renderPass, VkDevice device, VkSwapchainKHR swapChain )
-  {
-    VkFormat format;  // from wd->surfaceFormat.format
-
-    VkSemaphoreCreateInfo imgAcqSemCI;
-    imgAcqSemCI.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-    imgAcqSemCI.pNext = NULL;
-    imgAcqSemCI.flags = 0;
-
-    auto rv = vkCreateSemaphore(device, &imgAcqSemCI, NULL, &renderPass.imgAcqSem);
-    assert(rv == VK_SUCCESS);
-
-    // Acquire the swapchain image in order to set its layout
-    uint32_t bufferIndex;
-    rv = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX, renderPass.imgAcqSem, VK_NULL_HANDLE, &bufferIndex);
-    assert(rv == VK_SUCCESS);
-
-    VkAttachmentDescription attachments[2];
-    attachments[0].format = format;
-    attachments[0].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    attachments[0].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachments[0].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[0].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachments[0].finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    attachments[0].flags = 0;
-
-    attachments[1].format = info.depth.format;
-    attachments[1].samples = VK_SAMPLE_COUNT_1_BIT;
-    attachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    attachments[1].storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[1].stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    attachments[1].stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    attachments[1].initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachments[1].finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    attachments[1].flags = 0;
-
-    VkAttachmentReference color_reference = {};
-    color_reference.attachment = 0;
-    color_reference.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-
-    VkAttachmentReference depth_reference = {};
-    depth_reference.attachment = 1;
-    depth_reference.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-
-    VkSubpassDescription subpass = {};
-    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
-    subpass.flags = 0;
-    subpass.inputAttachmentCount = 0;
-    subpass.pInputAttachments = NULL;
-    subpass.colorAttachmentCount = 1;
-    subpass.pColorAttachments = &color_reference;
-    subpass.pResolveAttachments = NULL;
-    subpass.pDepthStencilAttachment = &depth_reference;
-    subpass.preserveAttachmentCount = 0;
-    subpass.pPreserveAttachments = NULL;
-
-    VkRenderPassCreateInfo rp_info = {};
-    rp_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    rp_info.pNext = NULL;
-    rp_info.attachmentCount = 2;
-    rp_info.pAttachments = attachments;
-    rp_info.subpassCount = 1;
-    rp_info.pSubpasses = &subpass;
-    rp_info.dependencyCount = 0;
-    rp_info.pDependencies = NULL;
-
-    res = vkCreateRenderPass(info.device, &rp_info, NULL, &info.render_pass);
-    assert(res == VK_SUCCESS);
-  }
-#endif
 }
 
 
@@ -167,21 +86,21 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
   vCtx(vCtx)
 {
 
+  {
+    Vector<ShaderInputSpec> stages(2);
+    stages[0] = { vanillaVS, sizeof(vanillaVS), VK_SHADER_STAGE_VERTEX_BIT };
+    stages[1] = { vanillaPS, sizeof(vanillaPS), VK_SHADER_STAGE_FRAGMENT_BIT };
+    vanillaShader = vCtx->createShader(stages);
+  }
+
+  objectBuffer = vCtx->createUniformBuffer(sizeof(ObjectBuffer));
 
 
-  ShaderInputSpec stages[] = {
-    {vanillaVS, sizeof(vanillaVS), VK_SHADER_STAGE_VERTEX_BIT},
-    {vanillaPS, sizeof(vanillaPS), VK_SHADER_STAGE_FRAGMENT_BIT}
-  };
-  vanillaPipeline = new RenderPipeline;
+/* vanillaPipeline = new RenderPipeline;
   vCtx->buildShader(vanillaPipeline->shader, stages, 2);
 
-  Buffer<VkVertexInputBindingDescription> inputBind;
-  Buffer<VkVertexInputAttributeDescription> inputAttrib;
-  createVanillaVertexInputDesc(inputBind, inputAttrib);
 
-  createVanillaPiplineLayout(vanillaPipeline->pipelineLayout, vanillaPipeline->descSetLayout, vCtx->device);
-
+  */
 
   //buildPipeline(vanillaPipeline, device, vanillaShaders,
   //              Buffer<VkVertexInputBindingDescription>& inputBind,
@@ -202,10 +121,6 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
 
 Renderer::~Renderer()
 {
-  //vkDestroyPipeline(device, vanillaPipeline, nullptr);
-  vCtx->destroyShader(vanillaPipeline->shader);
-  delete vanillaPipeline;
-  delete vCtx;
 }
 
 RenderMesh* Renderer::createRenderMesh(Mesh* mesh)
@@ -222,24 +137,69 @@ RenderMesh* Renderer::createRenderMesh(Mesh* mesh)
   
   renderMesh->vtxNrmTex = vCtx->createVertexBuffer(sizeof(VtxNrmTex) * 3 * renderMesh->tri_n);
 
+  {
+    MappedBuffer<VtxNrmTex> map(vCtx, renderMesh->vtxNrmTex);
+    for (unsigned i = 0; i < 3 * mesh->tri_n; i++) {
+      map.mem[i].vtx = mesh->vtx[mesh->tri[i]];
+      map.mem[i].nrm = Vec3f(0.f);
+      map.mem[i].tex = Vec2f(0.f);
+    }
+  }
+
+#if 0
 
   VtxNrmTex *mem;
   auto rv = vkMapMemory(vCtx->device, renderMesh->vtxNrmTex.mem, 0, renderMesh->vtxNrmTex.size, 0, (void **)&mem);
   assert(rv == VK_SUCCESS);
 
-  for (unsigned i = 0; i < 3 * mesh->tri_n; i++) {
-    mem[i].vtx = mesh->vtx[mesh->tri[i]];
-    mem[i].nrm = Vec3f(0.f);
-    mem[i].tex = Vec2f(0.f);
-  }
   vkUnmapMemory(vCtx->device, renderMesh->vtxNrmTex.mem);
 
+#endif
   logger(0, "CreateRenderMesh");
   return nullptr;
 }
 
-void Renderer::drawRenderMesh(RenderMesh* renderMesh)
+void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMesh* renderMesh, const Mat4f& MVP)
 {
+
+
+  if(!vanillaPipeline || vanillaPipeline.resource->pass != pass)
+  {
+    Vector<VkVertexInputBindingDescription> inputBind;
+    Vector<VkVertexInputAttributeDescription> inputAttrib;
+    VkPipelineLayoutCreateInfo pipeLayoutCI;
+    VkDescriptorSetLayoutBinding descSetLayoutBind;
+    VkDescriptorSetLayoutCreateInfo descLayoutCI;
+    vanillaPipelineInfo(inputBind, inputAttrib, pipeLayoutCI, descSetLayoutBind, descLayoutCI);
+
+    vanillaPipeline = vCtx->createPipeline(inputBind,
+                                           inputAttrib,
+                                           pipeLayoutCI,
+                                           descLayoutCI,
+                                           pass,
+                                           vanillaShader);
+    vanillaDescSet = vCtx->createDescriptorSet(vanillaPipeline.resource->descLayout);
+  }
+
+  {
+    MappedBuffer<ObjectBuffer> map(vCtx, objectBuffer);
+    map.mem->MVP = MVP;
+  }
+  vCtx->updateDescriptorSet(vanillaDescSet, objectBuffer);
+
+
+  vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipe);
+
+  //VkDescriptorSet desc_set[1] = { g_DescriptorSet };
+  //vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, desc_set, 0, NULL);
+
+  int a = 2;
+  {
+    //VkDescriptorSet desc_set[1] = { g_DescriptorSet };
+    //vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS, g_PipelineLayout, 0, 1, desc_set, 0, NULL);
+  }
+
+
 #if 0
 
   /* We cannot bind the vertex buffer until we begin a renderpass */
@@ -294,8 +254,6 @@ void Renderer::drawRenderMesh(RenderMesh* renderMesh)
 
 void Renderer::destroyRenderMesh(RenderMesh* renderMesh)
 {
-  vkDestroyBuffer(vCtx->device, renderMesh->vtxNrmTex.buffer, NULL);
-  vkFreeMemory(vCtx->device, renderMesh->vtxNrmTex.mem, NULL);
   logger(0, "destroyRenderMesh");
   delete renderMesh;
 }

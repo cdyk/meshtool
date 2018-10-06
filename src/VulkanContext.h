@@ -9,25 +9,42 @@ struct ShaderInputSpec {
   VkShaderStageFlagBits stage;
 };
 
-
-
-struct RenderShader
+struct DescriptorSet : ResourceBase
 {
-  Buffer<VkPipelineShaderStageCreateInfo> stageCreateInfo;
+  VkDescriptorSet descSet = VK_NULL_HANDLE;
 };
+typedef ResourceHandle<DescriptorSet> DescriptorSetHandle;
 
-struct RenderBuffer
+struct Shader : ResourceBase
+{
+  Vector<VkPipelineShaderStageCreateInfo> stageCreateInfo;
+};
+typedef ResourceHandle<Shader> ShaderHandle;
+
+
+struct RenderBuffer : ResourceBase
 {
   VkBuffer buffer = VK_NULL_HANDLE;
   VkDeviceMemory mem = VK_NULL_HANDLE;
-  size_t size = 0;
+  size_t requestedSize = 0;
+  size_t alignedSize = 0;
 };
+typedef ResourceHandle<RenderBuffer> RenderBufferHandle;
 
 struct RenderPass : ResourceBase
 {
   VkRenderPass pass = VK_NULL_HANDLE;
 };
 typedef ResourceHandle<RenderPass> RenderPassHandle;
+
+struct Pipeline : ResourceBase
+{
+  VkPipeline pipe = VK_NULL_HANDLE;
+  VkPipelineLayout pipeLayout = VK_NULL_HANDLE;
+  VkDescriptorSetLayout descLayout = VK_NULL_HANDLE;
+  RenderPassHandle pass;
+};
+typedef ResourceHandle<Pipeline> PipelineHandle;
 
 
 struct RenderImage : ResourceBase
@@ -58,25 +75,28 @@ struct VulkanContext
 
   void houseKeep();
 
-  void buildShader(RenderShader& shader, ShaderInputSpec* spec, unsigned N);
-  void destroyShader(RenderShader& shader);
 
-  void buildPipeline(VkPipeline& pipeline,
-                     VkDevice device,
-                     Buffer<VkPipelineShaderStageCreateInfo>& shaders,
-                     Buffer<VkVertexInputBindingDescription>& inputBind,
-                     Buffer<VkVertexInputAttributeDescription>& inputAttrib,
-                     VkPipelineLayout pipelineLayout,
-                     VkRenderPass renderPass,
-                     VkPrimitiveTopology primitiveTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-                     VkCullModeFlags cullMode = VK_CULL_MODE_BACK_BIT,
-                     VkPolygonMode polygonMode = VK_POLYGON_MODE_FILL);
+  PipelineHandle createPipeline(Vector<VkVertexInputBindingDescription>& inputBind,
+                                Vector<VkVertexInputAttributeDescription>& inputAttrib,
+                                VkPipelineLayoutCreateInfo& pipelineLayoutInfo,
+                                VkDescriptorSetLayoutCreateInfo& descLayoutInfo,
+                                RenderPassHandle renderPass,
+                                ShaderHandle shader,
+                                VkPrimitiveTopology primitiveTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+                                VkCullModeFlags cullMode = VK_CULL_MODE_BACK_BIT,
+                                VkPolygonMode polygonMode = VK_POLYGON_MODE_FILL);
 
-  RenderBuffer createBuffer(size_t initialSize, VkImageUsageFlags usageFlags);
-  RenderBuffer createVertexBuffer(size_t initialSize) { return createBuffer(initialSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT); }
 
   bool getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements);
 
+  RenderBufferHandle createBuffer(size_t initialSize, VkImageUsageFlags usageFlags);
+  RenderBufferHandle createVertexBuffer(size_t initialSize) { return createBuffer(initialSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT); }
+  RenderBufferHandle createUniformBuffer(size_t initialSize) { return createBuffer(initialSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT); }
+
+  DescriptorSetHandle createDescriptorSet(VkDescriptorSetLayout descLayout);
+  void updateDescriptorSet(DescriptorSetHandle descriptorSet, RenderBufferHandle buffer);
+
+  ShaderHandle createShader(Vector<ShaderInputSpec>& spec);
   RenderPassHandle createRenderPass(VkAttachmentDescription* attachments, uint32_t attachmentCount,
                                     VkSubpassDescription* subpasses, uint32_t subpassCount);
   RenderImageHandle wrapRenderImageView(VkImageView view);
@@ -91,17 +111,45 @@ struct VulkanContext
   VkQueue queue = VK_NULL_HANDLE;
   uint32_t queueFamilyIndex = 0;
   VkDescriptorPool descPool = VK_NULL_HANDLE;
-  VkCommandPool cmdPool = VK_NULL_HANDLE;
-  VkCommandBuffer cmdBuf = VK_NULL_HANDLE;
+  //VkCommandPool cmdPool = VK_NULL_HANDLE;
+  //VkCommandBuffer cmdBuf = VK_NULL_HANDLE;
 
   VkPhysicalDeviceProperties physicalDeviceProperties;
   VkPhysicalDeviceMemoryProperties memoryProperties;
 
+  PFN_vkCmdDebugMarkerBeginEXT vkCmdDebugMarkerBeginEXT;
+  PFN_vkCmdDebugMarkerEndEXT vkCmdDebugMarkerEndEXT;
+
 private:
   void destroyRenderPass(RenderPass*);
   void destroyRenderImage(RenderImage*);
+  void destroyShader(Shader* shader);
 
+  ResourceManager<RenderBuffer> bufferResources;
+  ResourceManager<DescriptorSet> descriptorSetResources;
+  ResourceManager<Shader> shaderResources;
+  ResourceManager<Pipeline> pipelineResources;
   ResourceManager<RenderPass> renderPassResources;
   ResourceManager<FrameBuffer> frameBufferResources;
   ResourceManager<RenderImage> renderImageResources;
+};
+
+struct MappedBufferBase
+{
+  MappedBufferBase() = delete;
+  MappedBufferBase(const MappedBufferBase&) = delete;
+
+  VulkanContext* vCtx;
+  RenderBufferHandle h;
+  MappedBufferBase(void** ptr, VulkanContext* vCtx, RenderBufferHandle h);
+  ~MappedBufferBase();
+
+};
+
+template<typename T>
+struct MappedBuffer : MappedBufferBase
+{
+  MappedBuffer(VulkanContext* vCtx, RenderBufferHandle h) : MappedBufferBase((void**)&mem, vCtx, h) {}
+
+  T* mem;
 };

@@ -65,12 +65,17 @@ VulkanContext::VulkanContext(Logger logger,
     assert(rv == 0 && "vkCreateInstance");
 
 
+
+
     VkDebugReportCallbackCreateInfoEXT debugCallbackCI;
     debugCallbackCI.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT;
     debugCallbackCI.pNext = nullptr;
     debugCallbackCI.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
     debugCallbackCI.pfnCallback = &MyDebugReportCallback;
     debugCallbackCI.pUserData = logger;
+
+    vkCmdDebugMarkerBeginEXT = (PFN_vkCmdDebugMarkerBeginEXT)vkGetInstanceProcAddr(instance, "vkCmdDebugMarkerBeginEXT");
+    vkCmdDebugMarkerEndEXT = (PFN_vkCmdDebugMarkerEndEXT)vkGetInstanceProcAddr(instance, "vkCmdDebugMarkerEndEXT");
 
     auto vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
     VkResult result = vkCreateDebugReportCallbackEXT(instance, &debugCallbackCI, nullptr, &debugCallback);
@@ -179,6 +184,7 @@ VulkanContext::VulkanContext(Logger logger,
     auto rv = vkCreateDescriptorPool(device, &pool_info, nullptr, &descPool);
     assert(rv == VK_SUCCESS);
   }
+#if 0
   // create command pool
   {
     VkCommandPoolCreateInfo cmdPoolCI = {};
@@ -200,15 +206,15 @@ VulkanContext::VulkanContext(Logger logger,
     auto rv = vkAllocateCommandBuffers(device, &cmdBufAllocCI, &cmdBuf);
     assert(rv == VK_SUCCESS);
   }
-
+#endif
   vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
   vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
 }
 
 VulkanContext::~VulkanContext()
 {
-  vkFreeCommandBuffers(device, cmdPool, 1, &cmdBuf);
-  vkDestroyCommandPool(device, cmdPool, nullptr);
+  //vkFreeCommandBuffers(device, cmdPool, 1, &cmdBuf);
+  //vkDestroyCommandPool(device, cmdPool, nullptr);
   vkDestroyDevice(device, nullptr);
   if (debugCallback) {
     auto vkDestroyDebugReportCallbackEXT = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
@@ -219,6 +225,14 @@ VulkanContext::~VulkanContext()
 
 void VulkanContext::houseKeep()
 {
+  {
+    uint32_t d = 0;
+    shaderResources.purge();
+    for (auto * r = shaderResources.getPurged(); r; r = shaderResources.getPurged()) {
+      delete r; d++;
+    }
+    if (d) logger(0, "Deleted %d shaderResources", d);
+  }
   {
     uint32_t d = 0;
     renderPassResources.purge();
@@ -247,54 +261,35 @@ void VulkanContext::houseKeep()
 }
 
 
-//(/void VulkanContext::buildShaders(Buffer<VkPipelineShaderStageCreateInfo>& stageCreateInfo,
-//                                 ShaderInputSpec* spec, unsigned N)
 
-void VulkanContext::buildShader(RenderShader& shader, ShaderInputSpec* spec, unsigned N)
+
+PipelineHandle VulkanContext::createPipeline(Vector<VkVertexInputBindingDescription>& inputBind,
+                                             Vector<VkVertexInputAttributeDescription>& inputAttrib,
+                                             VkPipelineLayoutCreateInfo& pipelineLayoutInfo,
+                                             VkDescriptorSetLayoutCreateInfo& descLayoutInfo,
+                                             RenderPassHandle renderPass,
+                                             ShaderHandle shader,
+                                             VkPrimitiveTopology primitiveTopology,
+                                             VkCullModeFlags cullMode,
+                                             VkPolygonMode polygonMode)
 {
-  shader.stageCreateInfo.accommodate(N);
-  for (unsigned i = 0; i < 2; i++) {
-    shader.stageCreateInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    shader.stageCreateInfo[i].pNext = nullptr;
-    shader.stageCreateInfo[i].pSpecializationInfo = nullptr;
-    shader.stageCreateInfo[i].flags = 0;
-    shader.stageCreateInfo[i].pName = "main";
-    shader.stageCreateInfo[i].stage = spec[i].stage;
+  auto pipeHandle = pipelineResources.createResource();
+  auto * pipe = pipeHandle.resource;
 
-    VkShaderModuleCreateInfo moduleCreateInfo;
-    moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    moduleCreateInfo.pNext = nullptr;
-    moduleCreateInfo.flags = 0;
-    moduleCreateInfo.codeSize = spec[i].siz;
-    moduleCreateInfo.pCode = spec[i].spv;
-    auto rv = vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &shader.stageCreateInfo[i].module);
-    assert(rv == VK_SUCCESS);
-  }
-}
+  pipe->pass = renderPass;
 
-void VulkanContext::destroyShader(RenderShader& shader)
-{
-  for (size_t i = 0; i < shader.stageCreateInfo.getCount(); i++) {
-    vkDestroyShaderModule(device, shader.stageCreateInfo[i].module, nullptr);
-  }
-}
-
-
-void VulkanContext::buildPipeline(VkPipeline& pipeline,
-                                  VkDevice device,
-                                  Buffer<VkPipelineShaderStageCreateInfo>& shaders,
-                                  Buffer<VkVertexInputBindingDescription>& inputBind,
-                                  Buffer<VkVertexInputAttributeDescription>& inputAttrib,
-                                  VkPipelineLayout pipelineLayout,
-                                  VkRenderPass renderPass,
-                                  VkPrimitiveTopology primitiveTopology,
-                                  VkCullModeFlags cullMode,
-                                  VkPolygonMode polygonMode)
-{
   VkDynamicState dynamicStateEnables[] = {
     VK_DYNAMIC_STATE_VIEWPORT,
     VK_DYNAMIC_STATE_SCISSOR
   };
+
+  auto rv = vkCreateDescriptorSetLayout(device, &descLayoutInfo, nullptr, &pipe->descLayout);
+  assert(rv == VK_SUCCESS);
+
+  pipelineLayoutInfo.setLayoutCount = 1;// uint32_t(descSetLayout.getCount());
+  pipelineLayoutInfo.pSetLayouts = &pipe->descLayout;
+  rv = vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipe->pipeLayout);
+  assert(rv == VK_SUCCESS);
 
   VkPipelineDynamicStateCreateInfo dynamicState = {};
   dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
@@ -399,7 +394,7 @@ void VulkanContext::buildPipeline(VkPipeline& pipeline,
   VkGraphicsPipelineCreateInfo pipelineCI;
   pipelineCI.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
   pipelineCI.pNext = nullptr;
-  pipelineCI.layout = pipelineLayout;
+  pipelineCI.layout =  pipe->pipeLayout;
   pipelineCI.basePipelineHandle = VK_NULL_HANDLE;
   pipelineCI.basePipelineIndex = 0;
   pipelineCI.flags = 0;
@@ -412,35 +407,41 @@ void VulkanContext::buildPipeline(VkPipeline& pipeline,
   pipelineCI.pDynamicState = &dynamicState;
   pipelineCI.pViewportState = &viewportCI;
   pipelineCI.pDepthStencilState = &depthStencilCI;
-  pipelineCI.pStages = shaders.data();
-  pipelineCI.stageCount = uint32_t(shaders.getCount());
-  pipelineCI.renderPass = renderPass;
+  pipelineCI.pStages = shader.resource->stageCreateInfo.data();
+  pipelineCI.stageCount = uint32_t(shader.resource->stageCreateInfo.size());
+  pipelineCI.renderPass = renderPass.resource->pass;
   pipelineCI.subpass = 0;
 
-  auto rv = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &pipeline);
+  rv = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &pipe->pipe);
   assert(rv == VK_SUCCESS);
+
+  logger(0, "Built pipeline");
+  return pipeHandle;
 }
 
-RenderBuffer VulkanContext::createBuffer(size_t initialSize, VkImageUsageFlags usageFlags)
+RenderBufferHandle VulkanContext::createBuffer(size_t requestedSize, VkImageUsageFlags usageFlags)
 {
-  RenderBuffer buf;
+  auto bufHandle = bufferResources.createResource();
+  auto * buf = bufHandle.resource;
+  buf->requestedSize = requestedSize;
+
   //VkBuffer& buffer, VkDeviceMemory& bufferMem, size_t& actualSize,
 
   VkBufferCreateInfo bufferCI = {};
   bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   bufferCI.pNext = nullptr;
-  bufferCI.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
-  bufferCI.size = initialSize;
+  bufferCI.usage = usageFlags;
+  bufferCI.size = requestedSize;
   bufferCI.queueFamilyIndexCount = 0;
   bufferCI.pQueueFamilyIndices = nullptr;
   bufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   bufferCI.flags = 0;
-  auto rv = vkCreateBuffer(device, &bufferCI, nullptr, &buf.buffer);
+  auto rv = vkCreateBuffer(device, &bufferCI, nullptr, &buf->buffer);
   assert(rv == VK_SUCCESS);
 
   VkMemoryRequirements memReqs;
-  vkGetBufferMemoryRequirements(device, buf.buffer, &memReqs);
-  buf.size = memReqs.size;
+  vkGetBufferMemoryRequirements(device, buf->buffer, &memReqs);
+  buf->alignedSize = memReqs.size;
 
   VkMemoryAllocateInfo allocInfo = {};
   allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -451,16 +452,90 @@ RenderBuffer VulkanContext::createBuffer(size_t initialSize, VkImageUsageFlags u
                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
   assert(rvb);
 
-  rv = vkAllocateMemory(device, &allocInfo, NULL, &buf.mem);
+  rv = vkAllocateMemory(device, &allocInfo, NULL, &buf->mem);
   assert(rv == VK_SUCCESS);
 
-  rv = vkBindBufferMemory(device, buf.buffer, buf.mem, 0);
+  rv = vkBindBufferMemory(device, buf->buffer, buf->mem, 0);
   assert(rv == VK_SUCCESS);
 
-  return buf;
+  return bufHandle;
 }
 
-//void VulkanContext::createImage(RenderImage& renderImage, uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format)
+DescriptorSetHandle VulkanContext::createDescriptorSet(VkDescriptorSetLayout descLayout)
+{
+  auto descSetHandle = descriptorSetResources.createResource();
+  auto * descSet = descSetHandle.resource;
+
+  VkDescriptorSetAllocateInfo alloc_info[1];
+  alloc_info[0].sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+  alloc_info[0].pNext = nullptr;
+  alloc_info[0].descriptorPool = descPool;
+  alloc_info[0].descriptorSetCount = 1;
+  alloc_info[0].pSetLayouts = &descLayout;
+
+  auto rv = vkAllocateDescriptorSets(device, alloc_info, &descSet->descSet);
+  assert(rv == VK_SUCCESS);
+
+  return descSetHandle;
+}
+
+void VulkanContext::updateDescriptorSet(DescriptorSetHandle descriptorSet, RenderBufferHandle buffer)
+{
+  VkDescriptorBufferInfo descBufInfo;
+  descBufInfo.buffer = buffer.resource->buffer;
+  descBufInfo.offset = 0;
+  descBufInfo.range = VK_WHOLE_SIZE;
+
+  VkWriteDescriptorSet writes[1];
+  writes[0] = {};
+  writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  writes[0].pNext = nullptr;
+  writes[0].dstSet = descriptorSet.resource->descSet;
+  writes[0].descriptorCount = 1;
+  writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  writes[0].pBufferInfo = &descBufInfo;
+  writes[0].dstArrayElement = 0;
+  writes[0].dstBinding = 0;
+  vkUpdateDescriptorSets(device, 1, writes, 0, NULL);
+}
+
+
+ShaderHandle VulkanContext::createShader(Vector<ShaderInputSpec>& spec)
+{
+  auto shaderHandle = shaderResources.createResource();
+  auto * shader = shaderHandle.resource;
+
+  shader->stageCreateInfo.resize(spec.size());
+  for (size_t i = 0; i < spec.size(); i++) {
+    shader->stageCreateInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shader->stageCreateInfo[i].pNext = nullptr;
+    shader->stageCreateInfo[i].pSpecializationInfo = nullptr;
+    shader->stageCreateInfo[i].flags = 0;
+    shader->stageCreateInfo[i].pName = "main";
+    shader->stageCreateInfo[i].stage = spec[i].stage;
+
+    VkShaderModuleCreateInfo moduleCreateInfo;
+    moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    moduleCreateInfo.pNext = nullptr;
+    moduleCreateInfo.flags = 0;
+    moduleCreateInfo.codeSize = spec[i].siz;
+    moduleCreateInfo.pCode = spec[i].spv;
+    auto rv = vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &shader->stageCreateInfo[i].module);
+    assert(rv == VK_SUCCESS);
+  }
+  return shaderHandle;
+}
+
+void VulkanContext::destroyShader(Shader* shader)
+{
+  if (!shader->hasFlag(ResourceBase::Flags::External)) {
+    for (size_t i = 0; i < shader->stageCreateInfo.size(); i++) {
+      vkDestroyShaderModule(device, shader->stageCreateInfo[i].module, nullptr);
+    }
+    shader->stageCreateInfo.resize(0);
+  }
+}
+
 
 RenderImageHandle VulkanContext::wrapRenderImageView(VkImageView view)
 {
@@ -642,4 +717,17 @@ bool VulkanContext::getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint3
     }
   }
   return false;
+}
+
+MappedBufferBase::MappedBufferBase(void** ptr, VulkanContext* vCtx, RenderBufferHandle h)
+  : vCtx(vCtx), h(h)
+{
+  auto rv = vkMapMemory(vCtx->device, h.resource->mem, 0, h.resource->alignedSize, 0, ptr);
+  assert(rv == VK_SUCCESS);
+
+}
+
+MappedBufferBase::~MappedBufferBase()
+{
+  vkUnmapMemory(vCtx->device, h.resource->mem);
 }

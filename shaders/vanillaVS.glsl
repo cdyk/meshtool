@@ -4,7 +4,7 @@
 #extension GL_ARB_shading_language_420pack : enable
 layout(std140, binding = 0) uniform ObjBuf{
   mat4 mp;
-  mat4 m;
+  mat3 m;
 } objBuf;
 
 layout(location = 0) in vec3 pos;

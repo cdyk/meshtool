@@ -1,12 +1,11 @@
 #pragma once
 #include <vulkan/vulkan.h>
 #include "Common.h"
+#include "VulkanContext.h"
 
-struct VulkanContext;
+
 struct RenderMesh;
-struct RenderPipeline;
-struct RenderPass;
-struct RenderImage;
+struct Mat4f;
 
 class Renderer
 {
@@ -16,17 +15,15 @@ public:
 
   RenderMesh* createRenderMesh(Mesh* mesh);
 
-  void drawRenderMesh(RenderMesh* renderMesh);
+  void drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMesh* renderMesh, const Mat4f& MVP);
   void destroyRenderMesh(RenderMesh* renderMesh);
 
 private:
   Logger logger;
   VulkanContext* vCtx = nullptr;
-  RenderPipeline* vanillaPipeline = nullptr;
 
-  RenderImage* depthImage = nullptr;
-
-  //VkImage depthImage;
-  //VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
-
+  PipelineHandle vanillaPipeline;
+  ShaderHandle vanillaShader;
+  DescriptorSetHandle vanillaDescSet;
+  RenderBufferHandle objectBuffer;
 };

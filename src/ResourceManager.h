@@ -28,7 +28,8 @@ struct ResourceHandle
   ~ResourceHandle() { release(); }
 
   explicit operator bool() const { return resource; }
-
+  bool operator!=(const ResourceHandle& rhs) const { return resource != rhs.resource; }
+     
   ResourceHandle(T* resource)
     : resource(resource)
   {

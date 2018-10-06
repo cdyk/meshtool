@@ -166,6 +166,14 @@ namespace {
     clearValues[1].depthStencil.depth = 0.f;
 
     {
+      {
+        //VkDebugMarkerMarkerInfoEXT info = {};
+        //info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
+        //info.pNext = nullptr;
+        //info.pMarkerName = "foo";
+        //vCtx->vkCmdDebugMarkerBeginEXT(frameData->CommandBuffer, &info);
+      }
+
       VkRenderPassBeginInfo beginInfo = {};
       beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
       beginInfo.renderPass = mainPass.resource->pass;
@@ -175,10 +183,18 @@ namespace {
       beginInfo.clearValueCount = 2;
       beginInfo.pClearValues = clearValues;
 
-      vkCmdBeginRenderPass(frameData->CommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
-      //ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), frameData->CommandBuffer);
 
+      auto MVP = mul(viewer.getProjectionMatrix(), viewer.getViewMatrix());
+
+      vkCmdBeginRenderPass(frameData->CommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+      for (auto & item : meshItems) {
+        renderer->drawRenderMesh(frameData->CommandBuffer, mainPass, item.renderMesh, MVP);
+      }
       vkCmdEndRenderPass(frameData->CommandBuffer);
+
+      {
+        //vCtx->vkCmdDebugMarkerEndEXT(frameData->CommandBuffer);
+      }
     }
 
     VkRenderPassBeginInfo beginInfo = {};
