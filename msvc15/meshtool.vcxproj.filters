@@ -67,6 +67,9 @@
     <ClCompile Include="..\src\VulkanInfos.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\VulkanMain.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\LinAlg.h">
@@ -118,6 +121,9 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\src\VulkanInfos.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\VulkanMain.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
