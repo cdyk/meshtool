@@ -52,6 +52,8 @@ class ResourceManagerBase
 public:
   void purge();
 
+  uint32_t getCount() { return trackedCount; }
+
 protected:
   void track(ResourceBase* resource);
 

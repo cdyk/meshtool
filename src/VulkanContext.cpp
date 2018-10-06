@@ -219,6 +219,17 @@ VulkanContext::VulkanContext(Logger logger,
 
 VulkanContext::~VulkanContext()
 {
+  houseKeep();
+  logger(0, "%d unreleased fences", fenceResources.getCount());
+  logger(0, "%d unreleased buffers", bufferResources.getCount());
+  logger(0, "%d unreleased descriptors", descriptorSetResources.getCount());
+  logger(0, "%d unreleased shaders", shaderResources.getCount());
+  logger(0, "%d unreleased pipelines", pipelineResources.getCount());
+  logger(0, "%d unreleased renderPasses", renderPassResources.getCount());
+  logger(0, "%d unreleased frameBuffers", frameBufferResources.getCount());
+  logger(0, "%d unreleased renderImages", renderImageResources.getCount());
+
+
   //vkFreeCommandBuffers(device, cmdPool, 1, &cmdBuf);
   //vkDestroyCommandPool(device, cmdPool, nullptr);
   vkDestroyDevice(device, nullptr);
