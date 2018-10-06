@@ -11,6 +11,9 @@
     <Filter Include="imgui\examples">
       <UniqueIdentifier>{135aa6d4-b902-4146-9cd0-30f1f15ced16}</UniqueIdentifier>
     </Filter>
+    <Filter Include="shaders">
+      <UniqueIdentifier>{9d1aa265-aba9-48c1-98b1-df45244f477a}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\src\main.cpp">
@@ -37,9 +40,6 @@
     <ClCompile Include="..\libs\imgui\imgui_widgets.cpp">
       <Filter>imgui</Filter>
     </ClCompile>
-    <ClCompile Include="..\libs\imgui\examples\imgui_impl_opengl2.cpp">
-      <Filter>imgui\examples</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\ObjReader.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -50,6 +50,24 @@
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="..\src\Mesh.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libs\imgui\examples\imgui_impl_vulkan.cpp">
+      <Filter>imgui\examples</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\Renderer.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\VulkanContext.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\ResourceManager.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\VulkanInfos.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\VulkanMain.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
@@ -84,14 +102,42 @@
     <ClInclude Include="..\libs\imgui\imstb_truetype.h">
       <Filter>imgui</Filter>
     </ClInclude>
-    <ClInclude Include="..\libs\imgui\examples\imgui_impl_opengl2.h">
-      <Filter>imgui\examples</Filter>
-    </ClInclude>
     <ClInclude Include="..\src\Common.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\src\Mesh.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="..\libs\imgui\examples\imgui_impl_vulkan.h">
+      <Filter>imgui\examples</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\Renderer.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\VulkanContext.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\ResourceManager.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\VulkanInfos.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\VulkanMain.h">
+      <Filter>src</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\shaders\vanillaVS.glsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\shaders\vanillaPS.glsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\shaders\flatVS.glsl">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

@@ -1,46 +1,78 @@
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <Windows.h>
+#define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
 //#include <GL/gl3w.h>
 #include <imgui.h>
 #include <imgui_internal.h>
 #include <list>
+#include <vector>
 #include <cctype>
 #include <chrono>
 #include <mutex>
 #include <examples/imgui_impl_glfw.h>
-#include <examples/imgui_impl_opengl2.h>
 
-#include <GLFW/glfw3.h>
 #include <cstdio>
 #include "Viewer.h"
 #include "Common.h"
 #include "Mesh.h"
 #include "LinAlgOps.h"
+#include "Renderer.h"
+#include "VulkanMain.h"
 
 
 namespace {
 
   Viewer viewer;
   Tasks tasks;
+  bool wasResized = false;
   int width, height;
   float leftSplit = 100;
   float thickness = 8;
+  float menuHeight = 0.f;
 
   bool solid = true;
+  Renderer* renderer = nullptr;
 
   std::mutex incomingMeshLock;
   std::list<Mesh*> incomingMeshes;
 
-  std::list<Mesh*> meshes;
+  Vector<RenderMesh*> renderMeshes;
+
+  struct MeshItem
+  {
+    Mesh* mesh;
+    RenderMesh* renderMesh;
+  };
+
+  std::list<MeshItem> meshItems;
+
+  void logger(unsigned level, const char* msg, ...)
+  {
+    switch (level) {
+    case 0: fprintf(stderr, "[I] "); break;
+    case 1: fprintf(stderr, "[W] "); break;
+    case 2: fprintf(stderr, "[E] "); break;
+    }
+
+    va_list argptr;
+    va_start(argptr, msg);
+    vfprintf(stderr, msg, argptr);
+    va_end(argptr);
+    fprintf(stderr, "\n");
+  }
 
   void glfw_error_callback(int error, const char* description)
   {
-    fprintf(stderr, "Glfw Error %d: %s\n", error, description);
+    logger(2, "GLFV error %d: %s", error, description);
   }
 
   void resizeFunc(GLFWwindow* window, int w, int h)
   {
+    wasResized = true;
+    width = w;
+    height = h;
   }
 
   void moveFunc(GLFWwindow* window, double x, double y)
@@ -82,21 +114,6 @@ namespace {
     bool distance = glfwGetKey(window, GLFW_KEY_LEFT_ALT) == GLFW_PRESS;
 
     viewer.dolly(float(x), float(y), speed, distance);
-  }
-
-  void logger(unsigned level, const char* msg, ...)
-  {
-    switch (level) {
-    case 0: fprintf(stderr, "[I] "); break;
-    case 1: fprintf(stderr, "[W] "); break;
-    case 2: fprintf(stderr, "[E] "); break;
-    }
-
-    va_list argptr;
-    va_start(argptr, msg);
-    vfprintf(stderr, msg, argptr);
-    va_end(argptr);
-    fprintf(stderr, "\n");
   }
 
   void runObjReader(Logger logger, std::string path)
@@ -143,106 +160,13 @@ namespace {
       incomingMeshes.push_back(mesh);
       logger(0, "Read %s in %lldms", path.c_str(), e);
     }
-    logger(0, "Failed to read %s", path.c_str());
-  }
-
-  
-
-}
-
-
-
-int main(int argc, char** argv)
-{
-  GLFWwindow* window;
-  tasks.init(logger);
-
-  glfwSetErrorCallback(glfw_error_callback);
-  if (!glfwInit()) return -1;
-
-  window = glfwCreateWindow(1280, 720, "Hello World", NULL, NULL);
-  if (!window) {
-    glfwTerminate();
-    return -1;
-  }
-  glfwSetWindowSizeCallback(window, resizeFunc);
-  glfwSetCursorPosCallback(window, moveFunc);
-  glfwSetMouseButtonCallback(window, buttonFunc);
-  glfwSetScrollCallback(window, scrollFunc);
-  glfwMakeContextCurrent(window);
-
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImGuiIO& io = ImGui::GetIO(); (void)io;
-  //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
-  //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable Gamepad Controls
-  ImGui_ImplGlfw_InitForOpenGL(window, false);
-  ImGui_ImplOpenGL2_Init();
-
-  ImGui::StyleColorsDark();
-  //ImGui::StyleColorsClassic();
-
-  BBox3f viewVolume(Vec3f(-2.f), Vec3f(2.f));
-  viewer.setViewVolume(viewVolume);
-  viewer.resize(1280, 720);
-
-
-
-  for (int i = 1; i < argc; i++) {
-    auto arg = std::string(argv[i]);
-    if (arg.substr(0, 2) == "--") {
-    }
     else {
-      auto argLower = arg;
-      for(auto & c :argLower) c = std::tolower(c);
-      auto l = argLower.rfind(".obj");
-      if (l != std::string::npos) {
-        TaskFunc taskFunc = [arg]() {runObjReader(logger, arg); };
-        tasks.enqueue(taskFunc);
-      }
+      logger(0, "Failed to read %s", path.c_str());
     }
-
   }
 
-
-  glfwGetFramebufferSize(window, &width, &height);
-  leftSplit = 0.25f*width;
-
-  while (!glfwWindowShouldClose(window))
+  void guiTraversal(GLFWwindow* window)
   {
-    tasks.update();
-
-    bool change = false;
-    {
-      std::lock_guard<std::mutex> guard(incomingMeshLock);
-      if (!incomingMeshes.empty()) {
-        for (auto &m : incomingMeshes) {
-          meshes.push_back(m);
-        }
-        incomingMeshes.clear();
-        change = true;
-      }
-    }
-    if (change) {
-      auto bbox = createEmptyBBox3f();
-      for (auto * m : meshes) {
-        if (isEmpty(m->bbox)) continue;
-        engulf(bbox, m->bbox);
-      }
-      if (isEmpty(bbox)) {
-        bbox = BBox3f(Vec3f(-1.f), Vec3f(1.f));
-      }
-      viewer.setViewVolume(bbox);
-      viewer.viewAll();
-    }
-
-    glfwGetFramebufferSize(window, &width, &height);
-
-    ImGui_ImplOpenGL2_NewFrame();
-    ImGui_ImplGlfw_NewFrame();
-    ImGui::NewFrame();
-
-    float menuHeight = 0.f;
     if (ImGui::BeginMainMenuBar())
     {
       if (ImGui::BeginMenu("File")) {
@@ -251,7 +175,7 @@ int main(int argc, char** argv)
       }
       if (ImGui::BeginMenu("View")) {
         if (ImGui::MenuItem("View all", nullptr, nullptr)) { viewer.viewAll(); }
-        if (ImGui::MenuItem("Solid", nullptr, &solid)) {  }
+        if (ImGui::MenuItem("Solid", nullptr, &solid)) {}
         ImGui::EndMenu();
       }
       menuHeight = ImGui::GetWindowSize().y;
@@ -285,7 +209,8 @@ int main(int argc, char** argv)
 
       ImGui::SetCursorPos(backup_pos);
       ImGui::BeginChild("Meshes", ImVec2(leftSplit - thickness - backup_pos.x, -1), false, ImGuiWindowFlags_AlwaysHorizontalScrollbar);
-      for (auto &m : meshes) {
+      for(auto & item : meshItems) {
+        auto * m = item.mesh;
         if (ImGui::TreeNodeEx(m, ImGuiTreeNodeFlags_DefaultOpen, "%s Vn=%d Tn=%d", m->name ? m->name : "unnamed", m->vtx_n, m->tri_n)) {
           for (unsigned o = 0; o < m->obj_n; o++) {
             if (ImGui::Button(m->obj[o])) {
@@ -299,67 +224,147 @@ int main(int argc, char** argv)
       ImGui::End();
     }
     //ImGui::ShowDemoWindow();
+  }
 
-    ImGui::Render();
+  void checkQueues()
+  {
+    std::list<Mesh*> newMeshes;
+    {
+      std::lock_guard<std::mutex> guard(incomingMeshLock);
+      if (!incomingMeshes.empty()) {
+        newMeshes = std::move(incomingMeshes);
+        incomingMeshes.clear();
+      }
+    }
+    if (!newMeshes.empty()) {
+      for (auto & m : newMeshes) {
+        meshItems.push_back({ m, renderer->createRenderMesh(m) });
+      }
+      auto bbox = createEmptyBBox3f();
+      for (auto & item : meshItems) {
+        auto * m = item.mesh;
+        if (isEmpty(m->bbox)) continue;
+        engulf(bbox, m->bbox);
+      }
+      if (isEmpty(bbox)) {
+        bbox = BBox3f(Vec3f(-1.f), Vec3f(1.f));
+      }
+      viewer.setViewVolume(bbox);
+      viewer.viewAll();
+    }
+  }
+
+}
 
 
-    glViewport(0, 0, width, height);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+int main(int argc, char** argv)
+{
+  GLFWwindow* window;
+  tasks.init(logger);
+
+  glfwSetErrorCallback(glfw_error_callback);
+  if (!glfwInit()) return -1;
+
+  glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+  window = glfwCreateWindow(1280, 720, "Hello World", NULL, NULL);
+  if (!window) {
+    glfwTerminate();
+    return -1;
+  }
+  if (!glfwVulkanSupported()) {
+    logger(2, "GLFW: Vulkan not supported");
+    return -1;
+  }
+  glfwGetFramebufferSize(window, &width, &height);
+
+  IMGUI_CHECKVERSION();
+  ImGui::CreateContext();
+
+  renderer = main_VulkanInit(logger, window, width, height);
 
 
+  glfwSetWindowSizeCallback(window, resizeFunc);
+  glfwSetCursorPosCallback(window, moveFunc);
+  glfwSetMouseButtonCallback(window, buttonFunc);
+  glfwSetScrollCallback(window, scrollFunc);
+
+  ImGuiIO& io = ImGui::GetIO(); (void)io;
+  //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls
+  //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;   // Enable Gamepad Controls
+  ImGui_ImplGlfw_InitForOpenGL(window, false);
+  //ImGui_ImplOpenGL2_Init();
+
+  ImGui::StyleColorsDark();
+  //ImGui::StyleColorsClassic();
+
+  BBox3f viewVolume(Vec3f(-2.f), Vec3f(2.f));
+  viewer.setViewVolume(viewVolume);
+  viewer.resize(1280, 720);
+
+
+
+  for (int i = 1; i < argc; i++) {
+    auto arg = std::string(argv[i]);
+    if (arg.substr(0, 2) == "--") {
+    }
+    else {
+      auto argLower = arg;
+      for(auto & c :argLower) c = std::tolower(c);
+      auto l = argLower.rfind(".obj");
+      if (l != std::string::npos) {
+        TaskFunc taskFunc = [arg]() {runObjReader(logger, arg); };
+        tasks.enqueue(taskFunc);
+      }
+    }
+  }
+
+  leftSplit = 0.25f*width;
+  while (!glfwWindowShouldClose(window))
+  {
+    glfwPollEvents();
+    if (wasResized) {
+      wasResized = false;
+      main_VulkanResize(width, height);
+    }
     {
       Vec2f viewerPos(leftSplit, menuHeight);
       Vec2f viewerSize(width - viewerPos.x, height - viewerPos.y);
-      glViewport(int(viewerPos.x), int(viewerPos.y), int(viewerSize.x), int(viewerSize.y));
       viewer.resize(viewerPos, viewerSize);
-
-      glEnable(GL_DEPTH_TEST);
-
       viewer.update();
-
-      glMatrixMode(GL_PROJECTION);
-      glLoadMatrixf(viewer.getProjectionMatrix().data);
-
-
-      glMatrixMode(GL_MODELVIEW);
-      glLoadMatrixf(viewer.getViewMatrix().data);
-
-      if (solid) {
-        glPolygonOffset(1.f, 1.f);
-        glEnable(GL_POLYGON_OFFSET_FILL);
-        glColor3f(0.2f, 0.2f, 0.6f);
-        for (auto * m : meshes) {
-          glBegin(GL_TRIANGLES);
-          for (unsigned i = 0; i < 3 * m->tri_n; i++) {
-            glVertex3fv(m->vtx[m->tri[i]].data);
-          }
-          glEnd();
-        }
-        glDisable(GL_POLYGON_OFFSET_FILL);
-      }
-
-      glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-      glColor3f(1.f, 1.f, 1.f);
-      for (auto * m : meshes) {
-        glBegin(GL_TRIANGLES);
-        for (unsigned i = 0; i < 3 * m->tri_n; i++) {
-          glVertex3fv(m->vtx[m->tri[i]].data);
-        }
-        glEnd();
-      }
-      glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     }
 
+    tasks.update();
+    checkQueues();
 
-    ImGui_ImplOpenGL2_RenderDrawData(ImGui::GetDrawData());
+    main_VulkanStartFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+    guiTraversal(window);
+    ImGui::Render();
 
-    glfwSwapBuffers(window);
-    glfwPollEvents();
+    Vec4f viewport(leftSplit, menuHeight, width - leftSplit, height - menuHeight);
+
+    renderMeshes.resize(meshItems.size());
+    size_t i = 0; 
+    for (auto & it : meshItems) {
+      renderMeshes[i++] = it.renderMesh;
+    }
+
+    main_VulkanRender(width, height, renderMeshes, viewport, viewer.getProjectionMatrix(), viewer.getViewMatrix());
+    main_VulkanPresent();
   }
 
-  ImGui_ImplOpenGL2_Shutdown();
+  for (auto & item : meshItems) {
+    renderer->destroyRenderMesh(item.renderMesh);
+  }
+  meshItems.clear();
+
+  main_VulkanCleanup();
+
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
+
   glfwDestroyWindow(window);
 
   glfwTerminate();

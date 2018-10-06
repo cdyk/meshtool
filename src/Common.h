@@ -74,6 +74,13 @@ struct ListHeader
 
 struct BufferBase
 {
+public:
+  size_t getCount()
+  {
+    if (ptr) return ((size_t*)ptr)[-1];
+    else return 0;
+  }
+
 protected:
   char* ptr = nullptr;
 
@@ -81,14 +88,18 @@ protected:
 
   void free();
 
-  void _accommodate(size_t typeSize, size_t count)
+  void _accommodate(size_t typeSize, size_t count, bool keep)
   {
     if (count == 0) return;
     if (ptr && count <= ((size_t*)ptr)[-1]) return;
 
-    free();
-
-    ptr = (char*)xmalloc(typeSize * count + sizeof(size_t)) + sizeof(size_t);
+    if (keep && ptr) {
+      ptr = (char*)xrealloc(ptr - sizeof(size_t), typeSize * count + sizeof(size_t)) + sizeof(size_t);
+    }
+    else {
+      free();
+      ptr = (char*)xmalloc(typeSize * count + sizeof(size_t)) + sizeof(size_t);
+    }
     ((size_t*)ptr)[-1] = count;
   }
 
@@ -97,12 +108,47 @@ protected:
 template<typename T>
 struct Buffer : public BufferBase
 {
+  Buffer() = default;
+  Buffer(size_t size) { accommodate(size); }
+
   T* data() { return (T*)ptr; }
   T& operator[](size_t ix) { return data()[ix]; }
   const T* data() const { return (T*)ptr; }
   const T& operator[](size_t ix) const { return data()[ix]; }
-  void accommodate(size_t count) { _accommodate(sizeof(T), count); }
+  void accommodate(size_t count, bool keep = false) { _accommodate(sizeof(T), count, keep); }
 };
+
+// calls constructors/destructors
+template<typename T>
+class Vector : public BufferBase
+{
+public:
+  Vector() = default;
+  Vector(const Vector&) = delete;   // haven't bothered yet
+  Vector& operator=(const Vector&) = delete;  //  haven't bothered yet
+  ~Vector() { resize(0); }
+
+  Vector(size_t size) { resize(size); }
+
+  T* data() { return (T*)ptr; }
+  T& operator[](size_t ix) { return data()[ix]; }
+  const T* data() const { return (T*)ptr; }
+  const T& operator[](size_t ix) const { return data()[ix]; }
+
+  void resize(size_t newSize)
+  {
+    _accommodate(sizeof(T), newSize, true);
+    for (size_t i = newSize; i < fill; i++) (*this)[i].~T();
+    for (size_t i = fill; i < newSize; i++) new(&(*this)[i]) T();
+    fill = newSize;
+  }
+
+  size_t size() const { return fill; }
+
+private:
+  size_t fill = 0;
+};
+
 
 
 struct Map

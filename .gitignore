@@ -1,3 +1,5 @@
+*.glsl.h
+
 # Prerequisites
 *.d
 
