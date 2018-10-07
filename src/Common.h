@@ -75,7 +75,7 @@ struct ListHeader
 struct BufferBase
 {
 public:
-  size_t getCount()
+  size_t allocated()
   {
     if (ptr) return ((size_t*)ptr)[-1];
     else return 0;
@@ -120,7 +120,7 @@ struct Buffer : public BufferBase
 
 // calls constructors/destructors
 template<typename T>
-class Vector : public BufferBase
+class Vector : BufferBase
 {
 public:
   Vector() = default;
@@ -129,6 +129,11 @@ public:
   ~Vector() { resize(0); }
 
   Vector(size_t size) { resize(size); }
+
+  T* begin() { return data(); }
+  T* end() { return data() + fill; }
+  const T* begin() const { return data(); }
+  const T* end() const { return data() + fill; }
 
   T* data() { return (T*)ptr; }
   T& operator[](size_t ix) { return data()[ix]; }
@@ -143,7 +148,16 @@ public:
     fill = newSize;
   }
 
+  void pushBack(T t)
+  {
+    if (fill <= allocated()) {
+      _accommodate(sizeof(T), 2 * fill < 16 ? 16 : 2 * fill, true);
+    }
+    data()[fill++] = t;
+  }
+
   size_t size() const { return fill; }
+  uint32_t size32() const { return uint32_t(fill); }
 
 private:
   size_t fill = 0;

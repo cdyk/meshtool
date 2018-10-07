@@ -3,22 +3,17 @@
 
 namespace
 {
-
-  VKAPI_ATTR VkBool32 VKAPI_CALL MyDebugReportCallback(VkDebugReportFlagsEXT       flags,
-                                                       VkDebugReportObjectTypeEXT  objectType,
-                                                       uint64_t                    object,
-                                                       size_t                      location,
-                                                       int32_t                     messageCode,
-                                                       const char*                 pLayerPrefix,
-                                                       const char*                 pMessage,
-                                                       void*                       pUserData)
+  VKAPI_ATTR VkBool32 VKAPI_CALL myDebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                                                 VkDebugUtilsMessageTypeFlagsEXT messageType,
+                                                 const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+                                                 void* pUserData)
   {
     auto logger = (Logger)pUserData;
-    logger(0, "Vulkan@%s: %s", pLayerPrefix, pMessage);
-
-    //std::cerr << pMessage << std::endl;
+    logger(0, "Vulkans: %s", pCallbackData->pMessage);
     return VK_FALSE;
   }
+
+
 }
 
 
@@ -27,23 +22,40 @@ VulkanContext::VulkanContext(Logger logger,
                              int hasPresentationSupport(VkInstance, VkPhysicalDevice, uint32_t queueFamily)) :
   logger(logger)
 {
-
   // create instance
   { 
-    const char* enabledLayers[] = {
-      "VK_LAYER_LUNARG_standard_validation"
-    };
-    auto enabledLayerCount = uint32_t(sizeof(enabledLayers) / sizeof(const char*));
+    Vector<const char*> layers;
+    if (debugLayer) {
+      layers.pushBack("VK_LAYER_LUNARG_standard_validation");
+    }
+    {
+      uint32_t N;
+      vkEnumerateInstanceLayerProperties(&N, nullptr);
+      Vector<VkLayerProperties> layersPresent(N);
+      vkEnumerateInstanceLayerProperties(&N, layersPresent.data());
+      for (auto * layerName : layers) {
+        bool found = false;
+        for (auto & layer : layersPresent) {
+          if (strcmp(layerName, layer.layerName) == 0) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          logger(2, "Vulkan instance layer %s not supported", layerName);
+          assert(false);
+        }
+        logger(0, "Vulkan instance layer %s is supported", layerName);
+      }
+    }
 
-    const char* extraInstanceExts[] = {
-      "VK_EXT_debug_report"
-    };
-    uint32_t extraInstanceExtCont = uint32_t(sizeof(extraInstanceExts) / sizeof(const char*));
-
-    Vector<const char*> allInstanceExts(instanceExtCount);
-    for (uint32_t i = 0; i < instanceExtCount; i++) allInstanceExts[i] = instanceExts[i];
-    allInstanceExts.resize(instanceExtCount + extraInstanceExtCont);
-    for (uint32_t i = 0; i < extraInstanceExtCont; i++) allInstanceExts[instanceExtCount + i] = extraInstanceExts[i];
+    Vector<const char*> instanceExtensions;
+    for (uint32_t i = 0; i < instanceExtCount; i++) {
+      instanceExtensions.pushBack(instanceExts[i]);
+    }
+    if (debugLayer) {
+      instanceExtensions.pushBack(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+    }
 
     VkApplicationInfo app_info = {};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -59,28 +71,27 @@ VulkanContext::VulkanContext(Logger logger,
     instanceCI.pNext = nullptr;
     instanceCI.flags = 0;
     instanceCI.pApplicationInfo = &app_info;
-    instanceCI.enabledExtensionCount = uint32_t(allInstanceExts.size());
-    instanceCI.ppEnabledExtensionNames = allInstanceExts.data();
-#if 1
-    instanceCI.enabledLayerCount = enabledLayerCount;
-    instanceCI.ppEnabledLayerNames = enabledLayers;
-#else
-    instanceCI.enabledLayerCount = 0;// enabledLayerCount;
-    instanceCI.ppEnabledLayerNames = nullptr;// enabledLayers;
-#endif
+    instanceCI.enabledExtensionCount = instanceExtensions.size32();
+    instanceCI.ppEnabledExtensionNames = instanceExtensions.data();
+    instanceCI.enabledLayerCount = layers.size32();
+    instanceCI.ppEnabledLayerNames = layers.data();
     auto rv = vkCreateInstance(&instanceCI, nullptr, &instance);
     assert(rv == 0 && "vkCreateInstance");
 
-    VkDebugReportCallbackCreateInfoEXT debugCallbackCI;
-    debugCallbackCI.sType = VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT;
-    debugCallbackCI.pNext = nullptr;
-    debugCallbackCI.flags = VK_DEBUG_REPORT_ERROR_BIT_EXT | VK_DEBUG_REPORT_WARNING_BIT_EXT | VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
-    debugCallbackCI.pfnCallback = &MyDebugReportCallback;
-    debugCallbackCI.pUserData = logger;
+    if (debugLayer) {
+      VkDebugUtilsMessengerCreateInfoEXT info = {};
+      info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+      info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+      info.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+      info.pfnUserCallback = myDebugCallback;
+      info.pUserData = logger;
 
-    auto vkCreateDebugReportCallbackEXT = (PFN_vkCreateDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugReportCallbackEXT");
-    VkResult result = vkCreateDebugReportCallbackEXT(instance, &debugCallbackCI, nullptr, &debugCallback);
-    //auto vkDebugReportMessageEXT = (PFN_vkDebugReportMessageEXT)vkGetInstanceProcAddr(instance, "vkDebugReportMessageEXT");
+      auto createDebugUtilsMessenger = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
+      assert(createDebugUtilsMessenger);
+
+      auto rv = createDebugUtilsMessenger(instance, &info, nullptr, &debugCallbackHandle);
+      assert(rv == VK_SUCCESS);
+    }
   }
   // choose physical device
   {
@@ -233,9 +244,11 @@ VulkanContext::~VulkanContext()
   //vkFreeCommandBuffers(device, cmdPool, 1, &cmdBuf);
   //vkDestroyCommandPool(device, cmdPool, nullptr);
   vkDestroyDevice(device, nullptr);
-  if (debugCallback) {
-    auto vkDestroyDebugReportCallbackEXT = (PFN_vkDestroyDebugReportCallbackEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT");
-    vkDestroyDebugReportCallbackEXT(instance, debugCallback, nullptr);
+
+  if (debugLayer) {
+    auto destroyDebugMessenger = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+    assert(destroyDebugMessenger);
+    destroyDebugMessenger(instance, debugCallbackHandle, nullptr);
   }
   vkDestroyInstance(instance, nullptr);
 }
@@ -340,9 +353,9 @@ PipelineHandle VulkanContext::createPipeline(Vector<VkVertexInputBindingDescript
   vtxInputCI.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
   vtxInputCI.pNext = nullptr;
   vtxInputCI.flags = 0;
-  vtxInputCI.vertexBindingDescriptionCount = uint32_t(inputBind.getCount());
+  vtxInputCI.vertexBindingDescriptionCount = uint32_t(inputBind.size());
   vtxInputCI.pVertexBindingDescriptions = inputBind.data();
-  vtxInputCI.vertexAttributeDescriptionCount = uint32_t(inputAttrib.getCount());
+  vtxInputCI.vertexAttributeDescriptionCount = uint32_t(inputAttrib.size());
   vtxInputCI.pVertexAttributeDescriptions = inputAttrib.data();
 
   VkPipelineInputAssemblyStateCreateInfo inputAssemblyCI;

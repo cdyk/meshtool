@@ -136,6 +136,9 @@ struct VulkanContext
   PFN_vkDebugMarkerSetObjectNameEXT vkDebugMarkerSetObjectNameEXT;
 
 private:
+  bool debugLayer = true;
+  VkDebugUtilsMessengerEXT debugCallbackHandle;
+
   void annotate(VkDebugReportObjectTypeEXT type, uint64_t object, const char* name);
 
   void destroyFence(RenderFence*);
