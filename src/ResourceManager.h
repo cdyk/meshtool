@@ -1,18 +1,32 @@
 #pragma once
 #include <cassert>
 #include <cstdint>
+#include <atomic>
+#include <mutex>
+#include "Common.h"
 
-struct ResourceBase
+class ResourceManagerBase;
+
+class ResourceBase : NonCopyable
 {
+public:
+  ResourceBase(ResourceManagerBase& manager);
+
   enum struct Flags : uint32_t {
     None = 0,
     External = 1
   };
-  uint32_t refs = 0;
-  Flags flags = Flags::None;
 
   bool hasFlag(Flags flag) const { return (uint32_t)flags & (uint32_t)flag; }
-  void setFlag(Flags flag) { (Flags)((uint32_t)flags | (uint32_t)flag); }
+  void setFlag(Flags flag) { flags = (Flags)((uint32_t)flags | (uint32_t)flag); }
+
+  void increment();
+  void decrement();
+
+private:
+  ResourceManagerBase& manager;
+  std::atomic<uint32_t> refs = 0;
+  Flags flags = Flags::None;
 };
 
 template<typename T>
@@ -21,26 +35,21 @@ struct ResourceHandle
   T* resource = nullptr;
 
   ResourceHandle() = default;
-  ResourceHandle(ResourceHandle& rhs) { resource = rhs.resource; resource->refs++; }
+  ResourceHandle(ResourceHandle& rhs) { resource = rhs.resource; resource->increment(); }
   ResourceHandle(ResourceHandle&& rhs) { resource = rhs.resource; rhs.resource = nullptr; }
-  ResourceHandle& operator=(ResourceHandle& rhs) { release(); resource = rhs.resource;  resource->refs++; return *this; }
+  ResourceHandle& operator=(ResourceHandle& rhs) { release(); resource = rhs.resource;  resource->increment(); return *this; }
   ResourceHandle& operator=(ResourceHandle&& rhs) { release(); resource = rhs.resource; rhs.resource = nullptr; return *this; }
   ~ResourceHandle() { release(); }
 
   explicit operator bool() const { return resource; }
   bool operator!=(const ResourceHandle& rhs) const { return resource != rhs.resource; }
      
-  ResourceHandle(T* resource)
-    : resource(resource)
-  {
-    resource->refs++;
-  }
+  ResourceHandle(T* resource) : resource(resource) { resource->increment(); }
 
   void release()
   {
     if (resource) {
-      assert(resource->refs);
-      resource->refs--;
+      resource->decrement();
       resource = nullptr;
     }
   }
@@ -49,21 +58,22 @@ struct ResourceHandle
 
 class ResourceManagerBase
 {
+  friend class ResourceBase;
 public:
-  void purge();
 
-  uint32_t getCount() { return trackedCount; }
+  uint32_t getCount();
+  uint32_t getOrphanCount();
 
 protected:
   void track(ResourceBase* resource);
-
-  ResourceBase* getPurgedBase();
+  void orphan(ResourceBase* resource);
+  void getOrphansBase(Vector<ResourceBase*>* o);
 
 private:
-  ResourceBase** tracked = nullptr;
-  uint32_t trackedCount = 0;
-  uint32_t trackedReserved = 0;
-
+  std::mutex lock;
+  // FIXME: replace with double-linked lists.
+  Vector<ResourceBase*> tracked;
+  Vector<ResourceBase*> orphaned;
 };
 
 template<typename T>
@@ -72,14 +82,12 @@ class ResourceManager : public ResourceManagerBase
 public:
   ResourceHandle<T> createResource()
   {
-    auto * r = new T();
-    track(r);
-    return ResourceHandle<T>(r);
+    return ResourceHandle<T>(new T(*this));
   }
 
-  T* getPurged() { return (T*)getPurgedBase(); }
-
-
-
-
+  void getOrphans(Vector<T*>& o) { getOrphansBase((Vector<ResourceBase*>*)&o); }
 };
+
+inline ResourceBase::ResourceBase(ResourceManagerBase& manager) : manager(manager) { manager.track(this); }
+inline void ResourceBase::increment() { refs.fetch_add(1); }
+inline void ResourceBase::decrement() { assert(refs); refs.fetch_sub(1); if (refs == 0) manager.orphan(this); }

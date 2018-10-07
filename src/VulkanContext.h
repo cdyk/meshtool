@@ -12,12 +12,15 @@ struct ShaderInputSpec {
 
 struct DescriptorSet : ResourceBase
 {
+  DescriptorSet(ResourceManagerBase& manager): ResourceBase(manager) {}
   VkDescriptorSet descSet = VK_NULL_HANDLE;
 };
 typedef ResourceHandle<DescriptorSet> DescriptorSetHandle;
 
+
 struct RenderFence : ResourceBase
 {
+  RenderFence(ResourceManagerBase& manager) : ResourceBase(manager) {}
   VkFence fence = VK_NULL_HANDLE;
 };
 typedef ResourceHandle<RenderFence> RenderFenceHandle;
@@ -25,6 +28,7 @@ typedef ResourceHandle<RenderFence> RenderFenceHandle;
 
 struct Shader : ResourceBase
 {
+  Shader(ResourceManagerBase& manager) : ResourceBase(manager) {}
   Vector<VkPipelineShaderStageCreateInfo> stageCreateInfo;
 };
 typedef ResourceHandle<Shader> ShaderHandle;
@@ -32,6 +36,7 @@ typedef ResourceHandle<Shader> ShaderHandle;
 
 struct RenderBuffer : ResourceBase
 {
+  RenderBuffer(ResourceManagerBase& manager) : ResourceBase(manager) {}
   VkBuffer buffer = VK_NULL_HANDLE;
   VkDeviceMemory mem = VK_NULL_HANDLE;
   size_t requestedSize = 0;
@@ -41,12 +46,14 @@ typedef ResourceHandle<RenderBuffer> RenderBufferHandle;
 
 struct RenderPass : ResourceBase
 {
+  RenderPass(ResourceManagerBase& manager) : ResourceBase(manager) {}
   VkRenderPass pass = VK_NULL_HANDLE;
 };
 typedef ResourceHandle<RenderPass> RenderPassHandle;
 
 struct Pipeline : ResourceBase
 {
+  Pipeline(ResourceManagerBase& manager) : ResourceBase(manager) {}
   VkPipeline pipe = VK_NULL_HANDLE;
   VkPipelineLayout pipeLayout = VK_NULL_HANDLE;
   VkDescriptorSetLayout descLayout = VK_NULL_HANDLE;
@@ -57,6 +64,7 @@ typedef ResourceHandle<Pipeline> PipelineHandle;
 
 struct RenderImage : ResourceBase
 {
+  RenderImage(ResourceManagerBase& manager) : ResourceBase(manager) {}
   VkImage image = VK_NULL_HANDLE;
   VkDeviceMemory mem = VK_NULL_HANDLE;
   VkImageView view;
@@ -66,6 +74,7 @@ typedef ResourceHandle<RenderImage> RenderImageHandle;
 
 struct FrameBuffer : ResourceBase
 {
+  FrameBuffer(ResourceManagerBase& manager) : ResourceBase(manager) {}
   VkFramebuffer fb = VK_NULL_HANDLE;
   RenderPassHandle pass;
   Vector<RenderImageHandle> attachments;
@@ -180,13 +189,11 @@ struct MappedBuffer : MappedBufferBase
   T* mem;
 };
 
-struct DebugScope
+struct DebugScope : NonCopyable
 {
   VulkanContext* vCtx;
   VkCommandBuffer cmdBuf;
 
-  DebugScope() = delete;
-  DebugScope(const DebugScope&) = delete;
   DebugScope(VulkanContext* vCtx, VkCommandBuffer cmdBuf, const char* name);
   ~DebugScope();
 };

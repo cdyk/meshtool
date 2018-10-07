@@ -255,53 +255,78 @@ VulkanContext::~VulkanContext()
 
 void VulkanContext::houseKeep()
 {
-  fenceResources.purge();
-  for (auto * r = fenceResources.getPurged(); r; r = fenceResources.getPurged()) {
-    if (!r->hasFlag(ResourceBase::Flags::External)) destroyFence(r);
-    delete r;
+  {
+    Vector<RenderFence*> orphans;
+    fenceResources.getOrphans(orphans);
+    for (auto * r : orphans) {
+      if (!r->hasFlag(ResourceBase::Flags::External)) destroyFence(r);
+      delete r;
+    }
   }
 
-  bufferResources.purge();
-  for (auto * r = bufferResources.getPurged(); r; r = bufferResources.getPurged()) {
-    if (!r->hasFlag(ResourceBase::Flags::External)) destroyBuffer(r);
-    delete r;
+  {
+    Vector<RenderBuffer*> orphans;
+    bufferResources.getOrphans(orphans);
+    for (auto * r : orphans) {
+      if (!r->hasFlag(ResourceBase::Flags::External)) destroyBuffer(r);
+      delete r;
+    }
   }
 
-  descriptorSetResources.purge();
-  for (auto * r = descriptorSetResources.getPurged(); r; r = descriptorSetResources.getPurged()) {
-    if (!r->hasFlag(ResourceBase::Flags::External)) destroyDescriptorSet(r);
-    delete r;
+  {
+    Vector<DescriptorSet*> orphans;
+    descriptorSetResources.getOrphans(orphans);
+    for (auto * r : orphans) {
+      if (!r->hasFlag(ResourceBase::Flags::External)) destroyDescriptorSet(r);
+      delete r;
+    }
   }
 
-  shaderResources.purge();
-  for (auto * r = shaderResources.getPurged(); r; r = shaderResources.getPurged()) {
-    if (!r->hasFlag(ResourceBase::Flags::External)) destroyShader(r);
-    delete r;
+  {
+    Vector<Shader*> orphans;
+    shaderResources.getOrphans(orphans);
+    for (auto * r : orphans) {
+      if (!r->hasFlag(ResourceBase::Flags::External)) destroyShader(r);
+      delete r;
+    }
   }
 
-  pipelineResources.purge();
-  for (auto * r = pipelineResources.getPurged(); r; r = pipelineResources.getPurged()) {
-    if (!r->hasFlag(ResourceBase::Flags::External)) destroyPipeline(r);
-    delete r;
+  {
+    Vector<Pipeline*> orphans;
+    pipelineResources.getOrphans(orphans);
+    for (auto * r : orphans) {
+      if (!r->hasFlag(ResourceBase::Flags::External)) destroyPipeline(r);
+      delete r;
+    }
   }
 
-  renderPassResources.purge();
-  for (auto * r = renderPassResources.getPurged(); r; r = renderPassResources.getPurged()) {
-    if (!r->hasFlag(ResourceBase::Flags::External)) destroyRenderPass(r);
-    delete r;
+  {
+    Vector<RenderPass*> orphans;
+    renderPassResources.getOrphans(orphans);
+    for (auto * r : orphans) {
+      if (!r->hasFlag(ResourceBase::Flags::External)) destroyRenderPass(r);
+      delete r;
+    }
   }
 
-  frameBufferResources.purge();
-  for (auto * r = frameBufferResources.getPurged(); r; r = frameBufferResources.getPurged()) {
-    if (!r->hasFlag(ResourceBase::Flags::External)) destroyFrameBuffer(r);
-    delete r;
+  {
+    Vector<FrameBuffer*> orphans;
+    frameBufferResources.getOrphans(orphans);
+    for (auto * r : orphans) {
+      if (!r->hasFlag(ResourceBase::Flags::External)) destroyFrameBuffer(r);
+      delete r;
+    }
   }
- 
-  renderImageResources.purge();
-  for (auto * r = renderImageResources.getPurged(); r; r = renderImageResources.getPurged()) {
-    if (!r->hasFlag(ResourceBase::Flags::External)) destroyRenderImage(r);
-    delete r;
+
+  {
+    Vector<RenderImage*> orphans;
+    renderImageResources.getOrphans(orphans);
+    for (auto * r : orphans) {
+      if (!r->hasFlag(ResourceBase::Flags::External)) destroyRenderImage(r);
+      delete r;
+    }
   }
+
 }
 
 void VulkanContext::annotate(VkDebugReportObjectTypeEXT type, uint64_t object, const char* name)
@@ -820,13 +845,14 @@ DebugScope::DebugScope(VulkanContext* vCtx, VkCommandBuffer cmdBuf, const char* 
   vCtx(vCtx),
   cmdBuf(cmdBuf)
 {
-  VkDebugMarkerMarkerInfoEXT info = {};
-  info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
-  info.pMarkerName = name;
-  vCtx->vkCmdDebugMarkerBeginEXT(cmdBuf, &info);
+  // dependes on VK_EXT_debug_report
+  //VkDebugMarkerMarkerInfoEXT info = {};
+  //info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
+  //info.pMarkerName = name;
+  //vCtx->vkCmdDebugMarkerBeginEXT(cmdBuf, &info);
 }
 
 DebugScope::~DebugScope()
 {
-  vCtx->vkCmdDebugMarkerEndEXT(cmdBuf);
+  //vCtx->vkCmdDebugMarkerEndEXT(cmdBuf);
 }

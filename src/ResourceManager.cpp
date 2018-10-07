@@ -1,35 +1,48 @@
 #include "ResourceManager.h"
 #include "Common.h"
 
-
-void ResourceManagerBase::purge()
-{
-  if (trackedCount == 0) return;
-
-  auto inUse = trackedCount;
-  for (uint32_t i = 0; i < inUse; i++) {
-    if (tracked[i]->refs == 0) {
-      std::swap(tracked[i], tracked[inUse - 1]);
-      inUse--;
-    }
-  }
-}
-
-
 void ResourceManagerBase::track(ResourceBase* resource)
 {
-  if (trackedReserved < trackedCount + 1) {
-    trackedReserved = 2 * trackedReserved;
-    if (trackedReserved < 16) trackedReserved = 16;
-    tracked = (ResourceBase**)xrealloc(tracked, sizeof(ResourceBase*)*trackedReserved);
-  }
-  tracked[trackedCount++] = resource;
+  std::lock_guard<std::mutex> guard(lock);
+  tracked.pushBack(resource);
 }
 
-ResourceBase* ResourceManagerBase::getPurgedBase()
+void ResourceManagerBase::orphan(ResourceBase* resource)
 {
-  if (trackedCount && tracked[trackedCount - 1]->refs == 0) {
-    return tracked[--trackedCount];
+  std::lock_guard<std::mutex> guard(lock);
+  auto N = tracked.size();
+  for (size_t i = 0; i < N; i++) {
+    if (resource == tracked[i]) {
+      orphaned.pushBack(resource);
+      tracked[i] = tracked[N - 1];
+      tracked.resize(N - 1);
+      return;
+    }
   }
-  return nullptr;
+  assert(false && "Resource was not tracked");
+}
+
+
+uint32_t ResourceManagerBase::getCount()
+{
+  std::lock_guard<std::mutex> guard(lock);
+  return tracked.size32();
+}
+
+uint32_t ResourceManagerBase::getOrphanCount()
+{
+  std::lock_guard<std::mutex> guard(lock);
+  return orphaned.size32();
+}
+
+
+void ResourceManagerBase::getOrphansBase(Vector<ResourceBase*>* o)
+{
+  std::lock_guard<std::mutex> guard(lock);
+  auto N = orphaned.size();
+  o->resize(N);
+  for (size_t i = 0; i < N; i++) {
+    (*o)[i] = orphaned[i];
+  }
+  orphaned.resize(0);
 }

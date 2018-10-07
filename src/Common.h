@@ -12,6 +12,15 @@ void* xrealloc(void* ptr, size_t size);
 
 struct Mesh;
 
+class NonCopyable
+{
+public:
+  NonCopyable() = default;
+  ~NonCopyable() = default;
+  NonCopyable(const NonCopyable&) = delete;
+  NonCopyable& operator=(const NonCopyable&) = delete;
+};
+
 struct Arena
 {
   Arena() = default;
