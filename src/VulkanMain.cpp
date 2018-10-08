@@ -19,8 +19,15 @@ namespace
   Renderer* renderer = nullptr;
   VulkanContext* vCtx = nullptr;
   ImGui_ImplVulkanH_WindowData imguiWindowData;
-  RenderPassHandle mainPass;
-  Vector<FrameBufferHandle> frameBuffers;
+
+  RenderPassHandle rendererPass;
+  RenderPassHandle imguiRenderPass;
+
+  Vector<RenderImageHandle> backBufferViews;
+
+  Vector<FrameBufferHandle> rendererFrameBuffers;
+  Vector<FrameBufferHandle> imguiFrameBuffers;
+
 
   void check_vk_result(VkResult err)
   {
@@ -89,12 +96,6 @@ namespace
     ImGui_ImplVulkan_InvalidateFontUploadObjects();
   }
 
-  
-
-  
-
-  
-
 }
 
 Renderer* main_VulkanInit(Logger l, GLFWwindow* window, uint32_t w, uint32_t h)
@@ -146,7 +147,113 @@ void main_VulkanResize(uint32_t w, uint32_t h)
   auto depthFormat = VK_FORMAT_D32_SFLOAT;
 
   wd->ClearEnable = false;
-  ImGui_ImplVulkanH_CreateWindowDataSwapChainAndFramebuffer(vCtx->physicalDevice, vCtx->device, wd, nullptr, w, h);
+
+  uint32_t min_image_count = 2;
+
+  VkResult err;
+  VkSwapchainKHR old_swapchain = wd->Swapchain;
+  err = vkDeviceWaitIdle(vCtx->device);
+  check_vk_result(err);
+
+  wd->BackBufferCount = 0;
+
+  // If min image count was not specified, request different count of images dependent on selected present mode
+  if (min_image_count == 0)
+    min_image_count = ImGui_ImplVulkanH_GetMinImageCountFromPresentMode(wd->PresentMode);
+
+  // Create Swapchain
+  {
+    VkSwapchainCreateInfoKHR info = {};
+    info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    info.surface = wd->Surface;
+    info.minImageCount = min_image_count;
+    info.imageFormat = wd->SurfaceFormat.format;
+    info.imageColorSpace = wd->SurfaceFormat.colorSpace;
+    info.imageArrayLayers = 1;
+    info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    info.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;           // Assume that graphics family == present family
+    info.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+    info.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    info.presentMode = wd->PresentMode;
+    info.clipped = VK_TRUE;
+    info.oldSwapchain = old_swapchain;
+    VkSurfaceCapabilitiesKHR cap;
+    err = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vCtx->physicalDevice, wd->Surface, &cap);
+    check_vk_result(err);
+    if (info.minImageCount < cap.minImageCount)
+      info.minImageCount = cap.minImageCount;
+    else if (cap.maxImageCount != 0 && info.minImageCount > cap.maxImageCount)
+      info.minImageCount = cap.maxImageCount;
+
+    if (cap.currentExtent.width == 0xffffffff)
+    {
+      info.imageExtent.width = wd->Width = w;
+      info.imageExtent.height = wd->Height = h;
+    }
+    else
+    {
+      info.imageExtent.width = wd->Width = cap.currentExtent.width;
+      info.imageExtent.height = wd->Height = cap.currentExtent.height;
+    }
+    err = vkCreateSwapchainKHR(vCtx->device, &info, nullptr, &wd->Swapchain);
+    check_vk_result(err);
+    err = vkGetSwapchainImagesKHR(vCtx->device, wd->Swapchain, &wd->BackBufferCount, NULL);
+    check_vk_result(err);
+    err = vkGetSwapchainImagesKHR(vCtx->device, wd->Swapchain, &wd->BackBufferCount, wd->BackBuffer);
+    check_vk_result(err);
+  }
+  if (old_swapchain)
+    vkDestroySwapchainKHR(vCtx->device, old_swapchain, nullptr);
+
+
+  {
+    VkAttachmentDescription attachment = {};
+    attachment.format = wd->SurfaceFormat.format;
+    attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    attachment.loadOp = wd->ClearEnable ? VK_ATTACHMENT_LOAD_OP_CLEAR : VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentReference color_attachment = {};
+    color_attachment.attachment = 0;
+    color_attachment.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass = {};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &color_attachment;
+
+    VkSubpassDependency dependency = {};
+    dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
+    dependency.dstSubpass = 0;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcAccessMask = 0;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+
+    imguiRenderPass = vCtx->createRenderPass(&attachment, 1, &subpass, 1, &dependency);
+    wd->RenderPass = imguiRenderPass.resource->pass;
+  }
+
+  {
+    backBufferViews.resize(wd->BackBufferCount);
+    for (uint32_t i = 0; i < wd->BackBufferCount; i++) {
+      backBufferViews[i] = vCtx->createRenderImage(wd->BackBuffer[i], wd->SurfaceFormat.format, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
+      wd->BackBufferView[i] = backBufferViews[i].resource->view;
+    }
+
+    Vector<RenderImageHandle> attachments(1);
+    imguiFrameBuffers.resize(wd->BackBufferCount);
+    for (uint32_t i = 0; i < wd->BackBufferCount; i++) {
+      attachments[0] = backBufferViews[i];
+      imguiFrameBuffers[i] = vCtx->createFrameBuffer(imguiRenderPass, w, h, attachments);
+      wd->Framebuffer[i] = imguiFrameBuffers[i].resource->fb;
+    }
+  }
+
 
   {
     VkAttachmentDescription attachments[2];
@@ -189,16 +296,16 @@ void main_VulkanResize(uint32_t w, uint32_t h)
     subpass.pDepthStencilAttachment = &depth_reference;
     subpass.preserveAttachmentCount = 0;
     subpass.pPreserveAttachments = NULL;
-    mainPass = vCtx->createRenderPass(attachments, 2, &subpass, 1);
+    rendererPass = vCtx->createRenderPass(attachments, 2, &subpass, 1, nullptr);
   }
 
   Vector<RenderImageHandle> attachments(2);
   attachments[1] = vCtx->createRenderImage(w, h, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_FORMAT_D32_SFLOAT);
 
-  frameBuffers.resize(wd->BackBufferCount);
+  rendererFrameBuffers.resize(wd->BackBufferCount);
   for (uint32_t i = 0; i < wd->BackBufferCount; i++) {
-    attachments[0] = vCtx->wrapRenderImageView(wd->BackBufferView[i]);
-    frameBuffers[i] = vCtx->createFrameBuffer(mainPass, w, h, attachments);
+    attachments[0] = backBufferViews[i];
+    rendererFrameBuffers[i] = vCtx->createFrameBuffer(rendererPass, w, h, attachments);
   }
 
 }
@@ -234,8 +341,8 @@ void main_VulkanRender(uint32_t w, uint32_t h, Vector<RenderMesh*>& renderMeshes
 
     VkRenderPassBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    beginInfo.renderPass = mainPass.resource->pass;
-    beginInfo.framebuffer = frameBuffers[imguiWindowData.FrameIndex].resource->fb;
+    beginInfo.renderPass = rendererPass.resource->pass;
+    beginInfo.framebuffer = rendererFrameBuffers[imguiWindowData.FrameIndex].resource->fb;
     beginInfo.renderArea.extent.width = w;
     beginInfo.renderArea.extent.height = h;
     beginInfo.clearValueCount = 2;
@@ -252,7 +359,7 @@ void main_VulkanRender(uint32_t w, uint32_t h, Vector<RenderMesh*>& renderMeshes
 
     vkCmdBeginRenderPass(frameData->CommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
     for (size_t i = 0; i < renderMeshes.size(); i++) {
-      renderer->drawRenderMesh(frameData->CommandBuffer, mainPass, renderMeshes[i], viewerViewport, Mat3f(M), MVP);
+      renderer->drawRenderMesh(frameData->CommandBuffer, rendererPass, renderMeshes[i], viewerViewport, Mat3f(M), MVP);
     }
     vkCmdEndRenderPass(frameData->CommandBuffer);
   }
@@ -306,8 +413,8 @@ void main_VulkanPresent()
 void main_VulkanCleanup()
 {
 
-  mainPass.release();
-  frameBuffers.resize(0);
+  rendererPass.release();
+  rendererFrameBuffers.resize(0);
 
   delete renderer;
 

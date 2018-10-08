@@ -120,8 +120,12 @@ struct VulkanContext
 
   ShaderHandle createShader(Vector<ShaderInputSpec>& spec, const char* name = nullptr);
   RenderPassHandle createRenderPass(VkAttachmentDescription* attachments, uint32_t attachmentCount,
-                                    VkSubpassDescription* subpasses, uint32_t subpassCount);
+                                    VkSubpassDescription* subpasses, uint32_t subpassCount,
+                                    VkSubpassDependency* dependency);
   RenderImageHandle wrapRenderImageView(VkImageView view);
+
+  RenderImageHandle createRenderImage(VkImage image, VkFormat format, VkImageSubresourceRange subResRange);
+
   RenderImageHandle createRenderImage(uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format);
   FrameBufferHandle createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<RenderImageHandle>& attachments);
 

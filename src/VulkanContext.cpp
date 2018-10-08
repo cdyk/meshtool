@@ -717,6 +717,28 @@ RenderImageHandle VulkanContext::createRenderImage(uint32_t w, uint32_t h, VkIma
   return renderImageHandle;
 }
 
+RenderImageHandle VulkanContext::createRenderImage(VkImage image, VkFormat format, VkImageSubresourceRange imageRange)
+{
+  auto renderImageHandle = renderImageResources.createResource();
+  auto * renderImage = renderImageHandle.resource;
+
+  VkImageViewCreateInfo info = {};
+  info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+  info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+  info.format = format;
+  info.components.r = VK_COMPONENT_SWIZZLE_R;
+  info.components.g = VK_COMPONENT_SWIZZLE_G;
+  info.components.b = VK_COMPONENT_SWIZZLE_B;
+  info.components.a = VK_COMPONENT_SWIZZLE_A;
+  info.image = image;
+  info.subresourceRange = imageRange;
+
+  auto rv = vkCreateImageView(device, &info, nullptr, &renderImage->view);
+  assert(rv == VK_SUCCESS);
+  
+  return renderImageHandle;
+}
+
 
 void VulkanContext::destroyRenderImage(RenderImage* renderImage)
 {
@@ -727,7 +749,8 @@ void VulkanContext::destroyRenderImage(RenderImage* renderImage)
 
 
 RenderPassHandle VulkanContext::createRenderPass(VkAttachmentDescription* attachments, uint32_t attachmentCount,
-                                                 VkSubpassDescription* subpasses, uint32_t subpassCount)
+                                                 VkSubpassDescription* subpasses, uint32_t subpassCount,
+                                                 VkSubpassDependency* dependency)
 {
   auto passHandle = renderPassResources.createResource();
   auto * pass = passHandle.resource;
@@ -737,12 +760,12 @@ RenderPassHandle VulkanContext::createRenderPass(VkAttachmentDescription* attach
 
     rp_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     rp_info.pNext = NULL;
-    rp_info.attachmentCount = 2;
+    rp_info.attachmentCount = attachmentCount;
     rp_info.pAttachments = attachments;
     rp_info.subpassCount = subpassCount;
     rp_info.pSubpasses = subpasses;
     rp_info.dependencyCount = 0;
-    rp_info.pDependencies = NULL;
+    rp_info.pDependencies = dependency;
 
     auto rv = vkCreateRenderPass(device, &rp_info, NULL, &pass->pass);
     assert(rv == VK_SUCCESS);

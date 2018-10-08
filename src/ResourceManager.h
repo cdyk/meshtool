@@ -35,9 +35,9 @@ struct ResourceHandle
   T* resource = nullptr;
 
   ResourceHandle() = default;
-  ResourceHandle(ResourceHandle& rhs) { resource = rhs.resource; resource->increment(); }
+  ResourceHandle(ResourceHandle& rhs) { resource = rhs.resource; if(resource) resource->increment(); }
   ResourceHandle(ResourceHandle&& rhs) { resource = rhs.resource; rhs.resource = nullptr; }
-  ResourceHandle& operator=(ResourceHandle& rhs) { release(); resource = rhs.resource;  resource->increment(); return *this; }
+  ResourceHandle& operator=(ResourceHandle& rhs) { release(); resource = rhs.resource; if(resource) resource->increment(); return *this; }
   ResourceHandle& operator=(ResourceHandle&& rhs) { release(); resource = rhs.resource; rhs.resource = nullptr; return *this; }
   ~ResourceHandle() { release(); }
 
