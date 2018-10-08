@@ -134,10 +134,8 @@
     <CustomBuild Include="..\shaders\vanillaPS.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\shaders\flatVS.glsl">
+    <CustomBuild Include="..\shaders\flatVS.glsl">
       <Filter>shaders</Filter>
-    </None>
+    </CustomBuild>
   </ItemGroup>
 </Project>

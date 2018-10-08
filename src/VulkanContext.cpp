@@ -154,7 +154,7 @@ VulkanContext::VulkanContext(Logger logger,
 
     const char* deviceExt[] = {
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-      VK_EXT_DEBUG_MARKER_EXTENSION_NAME
+      //VK_EXT_DEBUG_MARKER_EXTENSION_NAME
     };
     VkDeviceCreateInfo deviceInfo = {};
     deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -170,9 +170,9 @@ VulkanContext::VulkanContext(Logger logger,
     auto rv = vkCreateDevice(physicalDevice, &deviceInfo, NULL, &device);
     assert(rv == VK_SUCCESS);
 
-    vkCmdDebugMarkerBeginEXT = (PFN_vkCmdDebugMarkerBeginEXT)vkGetInstanceProcAddr(instance, "vkCmdDebugMarkerBeginEXT");
-    vkCmdDebugMarkerEndEXT = (PFN_vkCmdDebugMarkerEndEXT)vkGetInstanceProcAddr(instance, "vkCmdDebugMarkerEndEXT");
-    vkDebugMarkerSetObjectNameEXT = (PFN_vkDebugMarkerSetObjectNameEXT)vkGetInstanceProcAddr(instance, "vkDebugMarkerSetObjectNameEXT");
+    //vkCmdDebugMarkerBeginEXT = (PFN_vkCmdDebugMarkerBeginEXT)vkGetInstanceProcAddr(instance, "vkCmdDebugMarkerBeginEXT");
+    //vkCmdDebugMarkerEndEXT = (PFN_vkCmdDebugMarkerEndEXT)vkGetInstanceProcAddr(instance, "vkCmdDebugMarkerEndEXT");
+    //vkDebugMarkerSetObjectNameEXT = (PFN_vkDebugMarkerSetObjectNameEXT)vkGetInstanceProcAddr(instance, "vkDebugMarkerSetObjectNameEXT");
 
     vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
   }
@@ -331,12 +331,12 @@ void VulkanContext::houseKeep()
 
 void VulkanContext::annotate(VkDebugReportObjectTypeEXT type, uint64_t object, const char* name)
 {
-  VkDebugMarkerObjectNameInfoEXT info{};
-  info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT;
-  info.objectType = type;
-  info.object = object;
-  info.pObjectName = name;
-  vkDebugMarkerSetObjectNameEXT(device, &info);
+  //VkDebugMarkerObjectNameInfoEXT info{};
+  //info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_OBJECT_NAME_INFO_EXT;
+  //info.objectType = type;
+  //info.object = object;
+  //info.pObjectName = name;
+  //vkDebugMarkerSetObjectNameEXT(device, &info);
 }
 
 
