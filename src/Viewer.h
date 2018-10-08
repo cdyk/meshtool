@@ -9,6 +9,7 @@ public:
   void setViewVolume(const BBox3f& viewVolume);
   void viewAll();
 
+  void view(const BBox3f& box);
 
   void update();
 

@@ -226,6 +226,7 @@ namespace {
   {
     int ix;
     Triangle t;
+    t.object = context->currentObject;
 
     unsigned k = 0;
     for (; a < b && k < 3; k++) {
@@ -423,16 +424,19 @@ Mesh*  readObj(Logger logger, const void * ptr, size_t size)
     unsigned o = 0;
     mesh->triCount = context.triangles_n;
     mesh->triVtxIx = (uint32_t*)mesh->arena.alloc(sizeof(uint32_t) * 3 * mesh->triCount);
+    mesh->TriObjIx = (uint32_t*)mesh->arena.alloc(sizeof(uint32_t) * mesh->triCount);
     for (auto * block = context.triangles.first; block; block = block->next) {
       for (unsigned i = 0; i < block->fill; i++) {
         for (unsigned k = 0; k < 3; k++) {
           auto ix = block->data[i].vtx[k];
           assert(0 <= ix && ix < context.vertices_n);
-          mesh->triVtxIx[o++] = ix;
+          mesh->triVtxIx[3 * o + k] = ix;
         }
+        mesh->TriObjIx[o] = block->data[i].object;
+        o++;
       }
     }
-    assert(o == 3*mesh->triCount);
+    assert(o == mesh->triCount);
   }
 
   {
@@ -471,6 +475,7 @@ Mesh*  readObj(Logger logger, const void * ptr, size_t size)
     }
     assert(o == 3 * mesh->triCount);
   }
+
 
 
   logger(0, "readObj parsed %d lines, Vn=%d, Nn=%d, Tn=%d, tris=%d",

@@ -17,13 +17,17 @@ struct Mesh
 
   uint32_t* triVtxIx = nullptr;
   uint32_t* triNrmIx = nullptr;
+  uint32_t* TriObjIx = nullptr;   // Triangle object index, one uint32_t per triangle.
   uint32_t triCount = 0;
-
-
 
 
   const char** obj = nullptr;
   uint32_t obj_n = 0;
+
+
+  // move to mesh app state or something.
+  uint32_t* currentColor = nullptr;  // Current triangle color, one uint32_t per triangle;
+  bool * selected = nullptr;
 
   const char* name = nullptr;
 };

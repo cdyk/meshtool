@@ -208,14 +208,13 @@ void Renderer::updateRenderMeshColor(RenderMesh* renderMesh)
   {
     MappedBuffer<uint32_t> map(vCtx, renderMesh->color);
     for (unsigned i = 0; i < renderMesh->mesh->triCount; i++) {
-
-      auto color = i & 1 ? 0xff88888ff : 0x8888ffff;
+      auto color = renderMesh->mesh->currentColor[i];
       map.mem[3 * i + 0] = color;
       map.mem[3 * i + 1] = color;
       map.mem[3 * i + 2] = color;
     }
   }
-
+  logger(0, "Updated mesh color");
 }
 
 

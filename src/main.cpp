@@ -32,6 +32,15 @@ namespace {
   float thickness = 8;
   float menuHeight = 0.f;
 
+  bool updateColor = true;
+  bool selectAll = false;
+  bool selectNone = false;
+  bool viewAll = false;
+  bool moveToSelection = false;
+  bool picking = false;
+
+
+
   Renderer* renderer = nullptr;
 
   std::mutex incomingMeshLock;
@@ -84,12 +93,23 @@ namespace {
 
   void buttonFunc(GLFWwindow* window, int button, int action, int mods)
   {
+    ImGuiIO& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) return;
+
     double x, y;
     glfwGetCursorPos(window, &x, &y);
+
     switch (action) {
     case GLFW_PRESS:
       switch (button) {
-      case 0: viewer.startRotation(float(x), float(y)); break;
+      case 0:
+        if (mods == GLFW_MOD_CONTROL) {
+          picking = true;
+        }
+        else {
+          viewer.startRotation(float(x), float(y));
+        }
+        break;
       case 1: viewer.startZoom(float(x), float(y)); break;
       case 2: viewer.startPan(float(x), float(y)); break;
       }
@@ -102,8 +122,19 @@ namespace {
 
   void keyFunc(GLFWwindow* window, int key, int scancode, int action, int mods)
   {
-    if (key == GLFW_KEY_W && action == GLFW_PRESS)  renderer->outlines = !renderer->outlines;
-    if (key == GLFW_KEY_S && action == GLFW_PRESS)  renderer->solid = !renderer->solid;
+    if (mods == GLFW_MOD_CONTROL) {
+      if (key == GLFW_KEY_A && action == GLFW_PRESS) selectAll = true;
+      if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) selectNone = true;
+    }
+    else if (mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT)) {
+      if (key == GLFW_KEY_A && action == GLFW_PRESS) viewAll = true;
+      if (key == GLFW_KEY_S && action == GLFW_PRESS) moveToSelection = true;
+    }
+    else if (mods == 0) {
+      if (key == GLFW_KEY_W && action == GLFW_PRESS)  renderer->outlines = !renderer->outlines;
+      if (key == GLFW_KEY_S && action == GLFW_PRESS)  renderer->solid = !renderer->solid;
+    }
+
   }
 
   void scrollFunc(GLFWwindow* window, double x, double y)
@@ -178,10 +209,22 @@ namespace {
         if (ImGui::MenuItem("Quit", nullptr, nullptr)) { glfwSetWindowShouldClose(window, true); }
         ImGui::EndMenu();
       }
+      if (ImGui::BeginMenu("Select")) {
+        if (ImGui::MenuItem("All", "CTRL+A" )) {
+          selectAll = true;
+        }
+        if (ImGui::MenuItem("None", "CTRL+ ")) {
+          selectNone = true;
+        }
+        ImGui::EndMenu();
+      }
+
       if (ImGui::BeginMenu("View")) {
-        if (ImGui::MenuItem("View all", nullptr, nullptr)) { viewer.viewAll(); }
-        if (ImGui::MenuItem("Solid", nullptr, &renderer->solid)) {}
-        if (ImGui::MenuItem("Outlines", nullptr, &renderer->outlines)) {}
+        if (ImGui::MenuItem("View all", "CTRL+SHIFT+A", nullptr)) { viewAll = true; }
+        if (ImGui::MenuItem("View selection", "CTRL+SHIFT+S")) { moveToSelection = true; }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Solid", "S", &renderer->solid)) {}
+        if (ImGui::MenuItem("Outlines", "W", &renderer->outlines)) {}
         ImGui::EndMenu();
       }
       menuHeight = ImGui::GetWindowSize().y;
@@ -219,8 +262,9 @@ namespace {
         auto * m = item.mesh;
         if (ImGui::TreeNodeEx(m, ImGuiTreeNodeFlags_DefaultOpen, "%s Vn=%d Tn=%d", m->name ? m->name : "unnamed", m->vtxCount, m->triCount)) {
           for (unsigned o = 0; o < m->obj_n; o++) {
-            if (ImGui::Button(m->obj[o])) {
-
+            if (ImGui::Selectable(m->obj[o], &m->selected[o], ImGuiSelectableFlags_PressedOnClick)) {
+              updateColor = true;
+              //moveToSelection = true;
             }
           }
           ImGui::TreePop();
@@ -244,6 +288,12 @@ namespace {
     }
     if (!newMeshes.empty()) {
       for (auto & m : newMeshes) {
+
+        m->currentColor = (uint32_t*)m->arena.alloc(sizeof(uint32_t) * m->triCount);
+        m->selected = (bool*)m->arena.alloc(sizeof(bool)*m->obj_n);
+        std::memset(m->selected, 0, sizeof(bool)*m->obj_n);
+        updateColor = true;
+
         meshItems.push_back({ m, renderer->createRenderMesh(m) });
       }
       auto bbox = createEmptyBBox3f();
@@ -353,11 +403,73 @@ int main(int argc, char** argv)
 
     Vec4f viewport(leftSplit, menuHeight, width - leftSplit, height - menuHeight);
 
+    if (picking) {
+      picking = false;
+      double x, y;
+      glfwGetCursorPos(window, &x, &y);
+
+      logger(0, "picking at %f %f", x, y);
+    }
+
+    if (selectAll | selectNone) {
+      selectAll = selectNone = false;
+      for (auto & m : meshItems) {
+        for (uint32_t i = 0; i < m.mesh->obj_n; i++) {
+          m.mesh->selected[i] = selectAll;
+          updateColor = true;
+        }
+      }
+    }
+
+    if (viewAll) {
+      viewAll = false;
+      viewer.viewAll();
+    }
+
+    if (moveToSelection) {
+      moveToSelection = false;
+      BBox3f bbox = createEmptyBBox3f();
+      for (auto & it : meshItems) {
+        auto * m = it.mesh;
+        for (uint32_t i = 0; i < m->triCount; i++) {
+          if (m->selected[m->TriObjIx[i]]) {
+            for (unsigned k = 0; k < 3; k++) {
+              engulf(bbox, m->vtx[m->triVtxIx[3 * i + k]]);
+            }
+          }
+        }
+      }
+      if (isNotEmpty(bbox)) {
+        viewer.view(bbox);
+      }
+    }
+
+    if (updateColor) {
+      unsigned k = 0;
+      for (auto & it : meshItems) {
+        auto * m = it.mesh;
+        for (uint32_t i = 0; i < m->triCount; i++) {
+          if (m->selected[m->TriObjIx[i]]) {
+            m->currentColor[i] = 0xffddffff;
+            k++;
+          }
+          else {
+            m->currentColor[i] = 0xffff8888;
+          }
+        }
+      }
+      logger(0, "Highlighted %d triangles", k);
+    }
+
     renderMeshes.resize(meshItems.size());
     size_t i = 0; 
     for (auto & it : meshItems) {
       renderMeshes[i++] = it.renderMesh;
+      if (updateColor) {
+        renderer->updateRenderMeshColor(it.renderMesh);
+      }
     }
+    updateColor = false;
 
     main_VulkanRender(width, height, renderMeshes, viewport, viewer.getProjectionMatrix(), viewer.getViewMatrix());
     main_VulkanPresent();

@@ -84,6 +84,18 @@ void Viewer::viewAll()
   needsUpdate = true;
 }
 
+void Viewer::view(const BBox3f& box)
+{
+  stopAction();
+  needsUpdate = true;
+  curr.coi = 0.5f*(box.min + box.max);
+  auto radius = 2.f * distance(box.min, box.max);
+  if (radius < 0.01f*viewVolumeRadius) radius = 0.01f*viewVolumeRadius;
+  if (viewVolumeRadius < radius) radius = viewVolumeRadius;
+  curr.dist = 0.5f*radius / std::tan(0.5f*fov);
+  needsUpdate = true;
+}
+
 
 void Viewer::update()
 {
