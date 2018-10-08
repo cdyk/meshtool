@@ -150,6 +150,15 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
     </CustomBuild>
   </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\shaders\flatPS.glsl">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslc.exe -c -mfmt=c %(FullPath) -o %(FullPath).h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslc.exe -c -mfmt=c %(FullPath) -o %(FullPath).h</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
+    </CustomBuild>
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

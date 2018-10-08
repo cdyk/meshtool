@@ -137,5 +137,8 @@
     <CustomBuild Include="..\shaders\flatVS.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
+    <CustomBuild Include="..\shaders\flatPS.glsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>
