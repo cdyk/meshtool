@@ -14,7 +14,9 @@ struct ObjectBuffer
 
 struct RenderMesh
 {
+  Mesh* mesh = nullptr;
   RenderBufferHandle vtxNrmTex;
+  RenderBufferHandle color;
   uint32_t tri_n = 0;
 };
 
@@ -45,13 +47,22 @@ namespace {
                            VkDescriptorSetLayoutCreateInfo& descLayoutCI)
   {
     {
-      inputBind.resize(1);
+      inputBind.resize(2);
       inputBind[0] = vCtx->infos.vertexInput.v32b;
+      inputBind[0].binding = 0;
+      inputBind[1] = vCtx->infos.vertexInput.v4b;
+      inputBind[1].binding = 1;
 
-      inputAttrib.resize(3);
+      inputAttrib.resize(4);
       inputAttrib[0] = vCtx->infos.vertexInput.v3f_0_0b;
+      inputAttrib[0].location = 0;
       inputAttrib[1] = vCtx->infos.vertexInput.v3f_1_12b;
+      inputAttrib[1].location = 1;
       inputAttrib[2] = vCtx->infos.vertexInput.v2f_2_24b;
+      inputAttrib[2].location = 2;
+      inputAttrib[3] = vCtx->infos.vertexInput.v4u8_0b;
+      inputAttrib[3].location = 3;
+      inputAttrib[3].binding = 1;
     }
     {
       descSetLayoutBind = {};
@@ -88,7 +99,7 @@ namespace {
       inputBind[0] = vCtx->infos.vertexInput.v32b;
 
       inputAttrib.resize(1);
-      inputAttrib[0] = vCtx->infos.vertexInput.v3f_0_0b;
+      inputAttrib[1] = vCtx->infos.vertexInput.v3f_0_0b;
     }
     {
       descSetLayoutBind = {};
@@ -157,6 +168,7 @@ RenderMesh* Renderer::createRenderMesh(Mesh* mesh)
   };
 
   auto * renderMesh = new RenderMesh();
+  renderMesh->mesh = mesh;
   renderMesh->tri_n = mesh->triCount;
   
   renderMesh->vtxNrmTex = vCtx->createVertexBuffer(sizeof(VtxNrmTex) * 3 * renderMesh->tri_n);
@@ -184,8 +196,26 @@ RenderMesh* Renderer::createRenderMesh(Mesh* mesh)
     }
   }
 
+  renderMesh->color = vCtx->createVertexBuffer(sizeof(uint32_t) * 3 * renderMesh->tri_n);
+  updateRenderMeshColor(renderMesh);
+
   logger(0, "CreateRenderMesh");
   return renderMesh;
+}
+
+void Renderer::updateRenderMeshColor(RenderMesh* renderMesh)
+{
+  {
+    MappedBuffer<uint32_t> map(vCtx, renderMesh->color);
+    for (unsigned i = 0; i < renderMesh->mesh->triCount; i++) {
+
+      auto color = i & 1 ? 0xff88888ff : 0x8888ffff;
+      map.mem[3 * i + 0] = color;
+      map.mem[3 * i + 1] = color;
+      map.mem[3 * i + 2] = color;
+    }
+  }
+
 }
 
 
@@ -250,8 +280,11 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
   }
 
-  const VkDeviceSize offsets[1] = { 0 };
-  vkCmdBindVertexBuffers(cmdBuf, 0, 1, &renderMesh->vtxNrmTex.resource->buffer, offsets);
+  {
+    VkBuffer buffers[2] = { renderMesh->vtxNrmTex.resource->buffer, renderMesh->color.resource->buffer };
+    VkDeviceSize offsets[2] = { 0, 0 };
+    vkCmdBindVertexBuffers(cmdBuf, 0, 2, buffers, offsets);
+  }
 
   if(solid) {
     vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipe);

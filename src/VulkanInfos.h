@@ -7,10 +7,12 @@ struct VulkanInfos
   VulkanInfos();
 
   struct {   
+    VkVertexInputBindingDescription v4b;
     VkVertexInputBindingDescription v32b;
     VkVertexInputAttributeDescription v3f_0_0b;
     VkVertexInputAttributeDescription v3f_1_12b;
     VkVertexInputAttributeDescription v2f_2_24b;
+    VkVertexInputAttributeDescription v4u8_0b;
   } vertexInput;
 
   struct {

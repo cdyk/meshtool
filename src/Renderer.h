@@ -20,6 +20,8 @@ public:
 
   RenderMesh* createRenderMesh(Mesh* mesh);
 
+  void updateRenderMeshColor(RenderMesh* renderMesh);
+
   void drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMesh* renderMesh, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP);
   void destroyRenderMesh(RenderMesh* renderMesh);
 
