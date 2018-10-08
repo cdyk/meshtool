@@ -32,7 +32,6 @@ namespace {
   float thickness = 8;
   float menuHeight = 0.f;
 
-  bool solid = true;
   Renderer* renderer = nullptr;
 
   std::mutex incomingMeshLock;
@@ -100,7 +99,13 @@ namespace {
       break;
     }
   }
- 
+
+  void keyFunc(GLFWwindow* window, int key, int scancode, int action, int mods)
+  {
+    if (key == GLFW_KEY_W && action == GLFW_PRESS)  renderer->outlines = !renderer->outlines;
+    if (key == GLFW_KEY_S && action == GLFW_PRESS)  renderer->solid = !renderer->solid;
+  }
+
   void scrollFunc(GLFWwindow* window, double x, double y)
   {
     float speed = 1.f;
@@ -175,7 +180,8 @@ namespace {
       }
       if (ImGui::BeginMenu("View")) {
         if (ImGui::MenuItem("View all", nullptr, nullptr)) { viewer.viewAll(); }
-        if (ImGui::MenuItem("Solid", nullptr, &solid)) {}
+        if (ImGui::MenuItem("Solid", nullptr, &renderer->solid)) {}
+        if (ImGui::MenuItem("Outlines", nullptr, &renderer->outlines)) {}
         ImGui::EndMenu();
       }
       menuHeight = ImGui::GetWindowSize().y;
@@ -211,7 +217,7 @@ namespace {
       ImGui::BeginChild("Meshes", ImVec2(leftSplit - thickness - backup_pos.x, -1), false, ImGuiWindowFlags_AlwaysHorizontalScrollbar);
       for(auto & item : meshItems) {
         auto * m = item.mesh;
-        if (ImGui::TreeNodeEx(m, ImGuiTreeNodeFlags_DefaultOpen, "%s Vn=%d Tn=%d", m->name ? m->name : "unnamed", m->vtx_n, m->tri_n)) {
+        if (ImGui::TreeNodeEx(m, ImGuiTreeNodeFlags_DefaultOpen, "%s Vn=%d Tn=%d", m->name ? m->name : "unnamed", m->vtxCount, m->triCount)) {
           for (unsigned o = 0; o < m->obj_n; o++) {
             if (ImGui::Button(m->obj[o])) {
 
@@ -288,6 +294,8 @@ int main(int argc, char** argv)
   glfwSetCursorPosCallback(window, moveFunc);
   glfwSetMouseButtonCallback(window, buttonFunc);
   glfwSetScrollCallback(window, scrollFunc);
+  glfwSetKeyCallback(window, keyFunc);
+
 
   ImGuiIO& io = ImGui::GetIO(); (void)io;
   //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;  // Enable Keyboard Controls

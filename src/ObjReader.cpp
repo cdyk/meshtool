@@ -405,8 +405,8 @@ Mesh*  readObj(Logger logger, const void * ptr, size_t size)
   {
     BBox3f bbox = createEmptyBBox3f();
     unsigned o = 0;
-    mesh->vtx_n = context.vertices_n;
-    mesh->vtx = (Vec3f*)mesh->arena.alloc(sizeof(Vec3f)*mesh->vtx_n);
+    mesh->vtxCount = context.vertices_n;
+    mesh->vtx = (Vec3f*)mesh->arena.alloc(sizeof(Vec3f)*mesh->vtxCount);
 
     for (auto * block = context.vertices.first; block; block = block->next) {
 
@@ -415,24 +415,24 @@ Mesh*  readObj(Logger logger, const void * ptr, size_t size)
         mesh->vtx[o++] = block->data[i];
       }
     }
-    assert(o == mesh->vtx_n);
+    assert(o == mesh->vtxCount);
     mesh->bbox = bbox;
   }
 
   {
     unsigned o = 0;
-    mesh->tri_n = context.triangles_n;
-    mesh->tri = (uint32_t*)mesh->arena.alloc(sizeof(uint32_t) * 3 * mesh->tri_n);
+    mesh->triCount = context.triangles_n;
+    mesh->triVtxIx = (uint32_t*)mesh->arena.alloc(sizeof(uint32_t) * 3 * mesh->triCount);
     for (auto * block = context.triangles.first; block; block = block->next) {
       for (unsigned i = 0; i < block->fill; i++) {
         for (unsigned k = 0; k < 3; k++) {
           auto ix = block->data[i].vtx[k];
           assert(0 <= ix && ix < context.vertices_n);
-          mesh->tri[o++] = ix;
+          mesh->triVtxIx[o++] = ix;
         }
       }
     }
-    assert(o == 3*mesh->tri_n);
+    assert(o == 3*mesh->triCount);
   }
 
   {
@@ -444,6 +444,34 @@ Mesh*  readObj(Logger logger, const void * ptr, size_t size)
     }
     assert(o == mesh->obj_n);
   }
+
+  if (context.useNormals) {
+    unsigned o;
+
+    o = 0;
+    mesh->nrmCount = context.normals_n;
+    mesh->nrm = (Vec3f*)mesh->arena.alloc(sizeof(Vec3f)*mesh->nrmCount);
+    for (auto * block = context.normals.first; block; block = block->next) {
+      for (unsigned i = 0; i < block->fill; i++) {
+        mesh->nrm[o++] = block->data[i];
+      }
+    }
+    assert(o == mesh->nrmCount);
+
+    o = 0;
+    mesh->triNrmIx = (uint32_t*)mesh->arena.alloc(sizeof(uint32_t) * 3 * mesh->triCount);
+    for (auto * block = context.triangles.first; block; block = block->next) {
+      for (unsigned i = 0; i < block->fill; i++) {
+        for (unsigned k = 0; k < 3; k++) {
+          auto ix = block->data[i].nrm[k];
+          assert(0 <= ix && ix < context.normals_n);
+          mesh->triNrmIx[o++] = ix;
+        }
+      }
+    }
+    assert(o == 3 * mesh->triCount);
+  }
+
 
   logger(0, "readObj parsed %d lines, Vn=%d, Nn=%d, Tn=%d, tris=%d",
          context.line, context.vertices_n, context.normals_n, context.texcoords_n, context.triangles_n);

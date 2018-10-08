@@ -24,6 +24,10 @@ namespace {
 #include "flatVS.glsl.h"
     ;
 
+  uint32_t flatPS[]
+#include "flatPS.glsl.h"
+    ;
+
   uint32_t vanillaVS[]
 #include "vanillaVS.glsl.h"
     ;
@@ -127,7 +131,7 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
   {
     Vector<ShaderInputSpec> stages(2);
     stages[0] = { flatVS, sizeof(vanillaVS), VK_SHADER_STAGE_VERTEX_BIT };
-    stages[1] = { vanillaPS, sizeof(vanillaPS), VK_SHADER_STAGE_FRAGMENT_BIT };
+    stages[1] = { flatPS, sizeof(vanillaPS), VK_SHADER_STAGE_FRAGMENT_BIT };
     flatShader = vCtx->createShader(stages);
   }
 
@@ -153,20 +157,29 @@ RenderMesh* Renderer::createRenderMesh(Mesh* mesh)
   };
 
   auto * renderMesh = new RenderMesh();
-  renderMesh->tri_n = mesh->tri_n;
+  renderMesh->tri_n = mesh->triCount;
   
   renderMesh->vtxNrmTex = vCtx->createVertexBuffer(sizeof(VtxNrmTex) * 3 * renderMesh->tri_n);
 
   {
     MappedBuffer<VtxNrmTex> map(vCtx, renderMesh->vtxNrmTex);
-    for (unsigned i = 0; i < mesh->tri_n; i++) {
-      Vec3f p[3];
-      for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->tri[3 * i + k]];
-      auto n = cross(p[1] - p[0], p[2] - p[0]);
-      for (unsigned k = 0; k < 3; k++) {
-        map.mem[3 * i + k].vtx = p[k];
-        map.mem[3 * i + k].nrm = n;
-        map.mem[3 * i + k].tex = Vec2f(0.f);
+    if (mesh->nrmCount) {
+      for (unsigned i = 0; i < 3*mesh->triCount; i++) {
+        map.mem[i].vtx = mesh->vtx[mesh->triVtxIx[i]];
+        map.mem[i].nrm = mesh->nrm[mesh->triNrmIx[i]];
+        map.mem[i].tex = Vec2f(0.f);
+      }
+    }
+    else {
+      for (unsigned i = 0; i < mesh->triCount; i++) {
+        Vec3f p[3];
+        for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
+        auto n = cross(p[1] - p[0], p[2] - p[0]);
+        for (unsigned k = 0; k < 3; k++) {
+          map.mem[3 * i + k].vtx = p[k];
+          map.mem[3 * i + k].nrm = n;
+          map.mem[3 * i + k].tex = Vec2f(0.f);
+        }
       }
     }
   }
@@ -240,7 +253,7 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
   const VkDeviceSize offsets[1] = { 0 };
   vkCmdBindVertexBuffers(cmdBuf, 0, 1, &renderMesh->vtxNrmTex.resource->buffer, offsets);
 
-  {
+  if(solid) {
     vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipe);
 
     VkDescriptorSet desc_set[1] = { rename.vanillaDescSet.resource->descSet };
@@ -248,7 +261,7 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     vkCmdDraw(cmdBuf, 3 * renderMesh->tri_n, 1, 0, 0);
   }
 
-  {
+  if(outlines) {
     vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, wirePipeline.resource->pipe);
 
     VkDescriptorSet desc_set[1] = { rename.wireDescSet.resource->descSet };

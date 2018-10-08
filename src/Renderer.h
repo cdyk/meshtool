@@ -12,6 +12,9 @@ struct Mat3f;
 class Renderer
 {
 public:
+  bool outlines = true;
+  bool solid = true;
+
   Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h);
   ~Renderer();
 
