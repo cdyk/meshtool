@@ -126,15 +126,15 @@
   <ItemGroup>
     <CustomBuild Include="..\shaders\vanillaPS.glsl">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslc.exe -c -mfmt=c %(FullPath) -o %(FullPath).h</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslc.exe -c -mfmt=c %(FullPath) -o %(FullPath).h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslc.exe -c --target-env=vulkan1.1 -mfmt=c %(FullPath) -o %(FullPath).h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslc.exe -c --target-env=vulkan1.1 -mfmt=c %(FullPath) -o %(FullPath).h</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
     </CustomBuild>
     <CustomBuild Include="..\shaders\vanillaVS.glsl">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslc.exe -c -mfmt=c %(FullPath) -o %(FullPath).h</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslc.exe -c -mfmt=c %(FullPath) -o %(FullPath).h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslc.exe -c --target-env=vulkan1.1 -mfmt=c %(FullPath) -o %(FullPath).h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslc.exe -c --target-env=vulkan1.1 -mfmt=c %(FullPath) -o %(FullPath).h</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
       <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
@@ -144,8 +144,8 @@
   <ItemGroup>
     <CustomBuild Include="..\shaders\flatVS.glsl">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslc.exe -c -mfmt=c %(FullPath) -o %(FullPath).h</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslc.exe -c -mfmt=c %(FullPath) -o %(FullPath).h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslc.exe -c --target-env=vulkan1.1 -mfmt=c %(FullPath) -o %(FullPath).h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslc.exe -c --target-env=vulkan1.1 -mfmt=c %(FullPath) -o %(FullPath).h</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
     </CustomBuild>
@@ -153,8 +153,8 @@
   <ItemGroup>
     <CustomBuild Include="..\shaders\flatPS.glsl">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslc.exe -c -mfmt=c %(FullPath) -o %(FullPath).h</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslc.exe -c -mfmt=c %(FullPath) -o %(FullPath).h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslc.exe -c --target-env=vulkan1.1 -mfmt=c %(FullPath) -o %(FullPath).h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslc.exe -c --target-env=vulkan1.1 -mfmt=c %(FullPath) -o %(FullPath).h</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
     </CustomBuild>

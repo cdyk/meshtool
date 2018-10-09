@@ -8,7 +8,9 @@
 struct ObjectBuffer
 {
   Mat4f MVP;
-  Mat3f N;
+  Vec4f Ncol0;
+  Vec4f Ncol1;
+  Vec4f Ncol2;
 };
 
 
@@ -255,7 +257,9 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
   {
     MappedBuffer<ObjectBuffer> map(vCtx, rename.objectBuffer);
     map.mem->MVP = MVP;
-    map.mem->N = N;
+    map.mem->Ncol0 = Vec4f(N.cols[0], 0.f);
+    map.mem->Ncol1 = Vec4f(N.cols[1], 0.f);
+    map.mem->Ncol2 = Vec4f(N.cols[2], 0.f);
   }
   vCtx->updateDescriptorSet(rename.vanillaDescSet, rename.objectBuffer);
   vCtx->updateDescriptorSet(rename.wireDescSet, rename.objectBuffer);

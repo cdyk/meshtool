@@ -289,9 +289,12 @@ namespace {
     if (!newMeshes.empty()) {
       for (auto & m : newMeshes) {
 
+        auto obj_n = m->obj_n;
+        if (obj_n == 0) obj_n = 1;
+
         m->currentColor = (uint32_t*)m->arena.alloc(sizeof(uint32_t) * m->triCount);
-        m->selected = (bool*)m->arena.alloc(sizeof(bool)*m->obj_n);
-        std::memset(m->selected, 0, sizeof(bool)*m->obj_n);
+        m->selected = (bool*)m->arena.alloc(sizeof(bool)*(obj_n));
+        std::memset(m->selected, 0, sizeof(bool)*obj_n);
         updateColor = true;
 
         meshItems.push_back({ m, renderer->createRenderMesh(m) });
