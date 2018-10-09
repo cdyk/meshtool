@@ -39,6 +39,8 @@ namespace {
   bool moveToSelection = false;
   bool picking = false;
 
+  bool colorFromSmoothingGroup = true;
+  bool colorFromObjectId = false;
 
 
   Renderer* renderer = nullptr;
@@ -225,6 +227,15 @@ namespace {
         ImGui::Separator();
         if (ImGui::MenuItem("Solid", "S", &renderer->solid)) {}
         if (ImGui::MenuItem("Outlines", "W", &renderer->outlines)) {}
+        ImGui::Separator();
+        if (ImGui::MenuItem("Color from smoothing group", nullptr, &colorFromSmoothingGroup)) {
+          colorFromObjectId = false;
+          updateColor = true;
+        }
+        if (ImGui::MenuItem("Color from object id", nullptr, &colorFromObjectId)) {
+          colorFromSmoothingGroup = false;
+          updateColor = true;
+        }
         ImGui::EndMenu();
       }
       menuHeight = ImGui::GetWindowSize().y;
@@ -315,7 +326,23 @@ namespace {
 
 }
 
+namespace {
 
+  uint32_t colors[] = {
+    0xffcc0000,0xff9e91cc,0xff5ea5f4,0xff8c8c51,
+    0xffff7547,0xff2b2bcc,0xffe0eded,0xff2d4f2d,
+    0xff707ff9,0xff00a5ff,0xff2175ed,0xff0000ff,
+    0xff8c668c,0xff238e23,0xffaae8ed,0xff445bcc,
+    0xff660033,0xff937c68,0xff33c9ed,0xffd1eded,
+    0xffe5e0af,0xffbfbfbf,0xff00cccc,0xff14448c,
+    0xff8911ed,0xff990066,0xffdd00dd,0xff4763ff,
+    0xff4f2d2d,0xff0099ed,0xff33cc99,0xffc6ed75,
+    0xff4f4f2d,0xff0000cc,0xff5e9e9e,0xffb2ddf4,
+    0xffeded00,0xffccbf00,0xff7fff00,0xffa8a8a8,
+    0xff00cc00,0xffdbf4f4,0xff007fff,0xff7093db,
+    0xfff4f4f4,0xff6b238e,0xff7f0000,0xffed82ed
+  };
+}
 
 int main(int argc, char** argv)
 {
@@ -448,20 +475,40 @@ int main(int argc, char** argv)
     }
 
     if (updateColor) {
-      unsigned k = 0;
       for (auto & it : meshItems) {
         auto * m = it.mesh;
-        for (uint32_t i = 0; i < m->triCount; i++) {
-          if (m->selected[m->TriObjIx[i]]) {
-            m->currentColor[i] = 0xffddffff;
-            k++;
+
+        if (colorFromSmoothingGroup && m->triSmoothGroupIx) {
+          for (uint32_t i = 0; i < m->triCount; i++) {
+            if (m->selected[m->TriObjIx[i]]) {
+              m->currentColor[i] = 0xffddffff;
+            }
+            else {
+              m->currentColor[i] = colors[m->triSmoothGroupIx[i] % (sizeof(colors) / sizeof(uint32_t))];
+            }
           }
-          else {
-            m->currentColor[i] = 0xffff8888;
+        }
+        else if (colorFromObjectId && m->TriObjIx) {
+          for (uint32_t i = 0; i < m->triCount; i++) {
+            if (m->selected[m->TriObjIx[i]]) {
+              m->currentColor[i] = 0xffddffff;
+            }
+            else {
+              m->currentColor[i] = colors[m->TriObjIx[i] % (sizeof(colors) / sizeof(uint32_t))];
+            }
+          }
+        }
+        else {
+          for (uint32_t i = 0; i < m->triCount; i++) {
+            if (m->selected[m->TriObjIx[i]]) {
+              m->currentColor[i] = 0xffddffff;
+            }
+            else {
+              m->currentColor[i] = 0xffff8888;
+            }
           }
         }
       }
-      logger(0, "Highlighted %d triangles", k);
     }
 
     renderMeshes.resize(meshItems.size());
