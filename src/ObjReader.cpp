@@ -20,6 +20,7 @@ namespace {
     uint32_t vtx[3];
     uint32_t nrm[3];
     uint32_t tex[3];
+    uint32_t smoothingGroup;
     uint32_t object;
     uint32_t color;
   };
@@ -42,6 +43,7 @@ namespace {
     Logger logger = nullptr;
     uint32_t line = 1;
     uint32_t currentObject = 0;
+    uint32_t currentSmoothingGroup = 0;
     uint32_t currentColor = 0x888888;
     Arena arena;
     StringInterning strings;
@@ -64,6 +66,7 @@ namespace {
 
     bool useNormals = false;
     bool useTexcoords = false;
+    bool useSmoothingGroups = false;
   };
 
 
@@ -150,6 +153,23 @@ namespace {
     return p;
   }
 
+  const char* parseUInt(Context* context, uint32_t& value, const char* p, const char* end)
+  {
+    p = skipSpacing(p, end);
+
+    uint64_t t = 0;
+    for (; p < end && '0' <= *p && *p <= '9'; p++) {
+      if (t < 0x100000000) {
+        t = 10 * t + (*p - '0');
+      }
+    }
+
+    if (std::numeric_limits<uint32_t>::max() < t) value = std::numeric_limits<int>::max();
+    else value = uint32_t(t);
+
+    return p;
+  }
+
   const char* parseFloat(Context* context, float& value, const char* p, const char* end)
   {
     auto *s = p;
@@ -226,6 +246,7 @@ namespace {
   {
     int ix;
     Triangle t;
+    t.smoothingGroup = context->currentSmoothingGroup;
     t.object = context->currentObject;
 
     unsigned k = 0;
@@ -281,6 +302,25 @@ namespace {
     else {
       context->logger(2, "Skipped malformed triangle at line %d", context->line);
     }
+  }
+
+  void parseS(Context* context, const char* a, const char* b)
+  {
+    a = skipSpacing(a, b);
+    auto * m = skipNonSpacing(a, b);
+    if (m - a == 3) {
+      char t[3] = { a[0], a[1], a[2] };
+      if (t[0] == 'o' && t[1] == 'f' && t[2] == 'f') {
+        context->currentSmoothingGroup = 0;
+        return;
+      }
+    }
+    a = parseUInt(context, context->currentSmoothingGroup, a, b);
+    if (a != m) {
+      context->logger(2, "Malformed smoothing group id at line %d", context->line);
+      context->currentSmoothingGroup = 0;
+    }
+    if (context->currentSmoothingGroup) context->useSmoothingGroups = true;
   }
 
   void parseO(Context* context, const char* a, const char* b)
@@ -352,11 +392,14 @@ Mesh*  readObj(Logger logger, const void * ptr, size_t size)
           parseO(&context, r, q);
           recognized = true;
           break;
+        case key('s'):        // s group_number
+          parseS(&context, r, q);
+          recognized = true;
+          break;
 
         case key('p'):        // point primitive
         case key('l'):        // line primitive
         case key('g'):        // g group_name1 group_name2
-        case key('s'):        // s group_number
 
         case key('m', 'g'):
         case key('v', 'p'):
@@ -421,10 +464,11 @@ Mesh*  readObj(Logger logger, const void * ptr, size_t size)
   }
 
   {
-    unsigned o = 0;
     mesh->triCount = context.triangles_n;
     mesh->triVtxIx = (uint32_t*)mesh->arena.alloc(sizeof(uint32_t) * 3 * mesh->triCount);
     mesh->TriObjIx = (uint32_t*)mesh->arena.alloc(sizeof(uint32_t) * mesh->triCount);
+
+    unsigned o = 0;
     for (auto * block = context.triangles.first; block; block = block->next) {
       for (unsigned i = 0; i < block->fill; i++) {
         for (unsigned k = 0; k < 3; k++) {
@@ -437,6 +481,20 @@ Mesh*  readObj(Logger logger, const void * ptr, size_t size)
       }
     }
     assert(o == mesh->triCount);
+  }
+
+  if (context.useSmoothingGroups) {
+    mesh->triSmoothGroupIx = (uint32_t*)mesh->arena.alloc(sizeof(uint32_t)*mesh->triCount);
+
+    unsigned o = 0;
+    for (auto * block = context.triangles.first; block; block = block->next) {
+      for (unsigned i = 0; i < block->fill; i++) {
+        mesh->triSmoothGroupIx[o] = block->data[i].smoothingGroup;
+        o++;
+      }
+    }
+    assert(o == mesh->triCount);
+
   }
 
   {
