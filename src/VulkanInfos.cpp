@@ -107,7 +107,12 @@ VulkanInfos::VulkanInfos()
     info.depthBiasSlopeFactor = 1;
     info.lineWidth = 1.0f;
   }
-
+  {
+    auto & info = commandBuffer.singleShot;
+    info = {};
+    info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  }
 
 
 }

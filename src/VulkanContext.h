@@ -65,6 +65,7 @@ typedef ResourceHandle<Pipeline> PipelineHandle;
 struct RenderImage : ResourceBase
 {
   RenderImage(ResourceManagerBase& manager) : ResourceBase(manager) {}
+  VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
   VkImage image = VK_NULL_HANDLE;
   VkDeviceMemory mem = VK_NULL_HANDLE;
   VkImageView view;
@@ -81,6 +82,12 @@ struct FrameBuffer : ResourceBase
 };
 typedef ResourceHandle<FrameBuffer> FrameBufferHandle;
 
+struct CommandBuffer : ResourceBase
+{
+  CommandBuffer(ResourceManagerBase& manager) : ResourceBase(manager) {}
+  VkCommandBuffer cb = VK_NULL_HANDLE;
+};
+typedef ResourceHandle<CommandBuffer> CommandBufferHandle;
 
 
 struct VulkanContext
@@ -104,6 +111,10 @@ struct VulkanContext
                                 const VkPipelineRasterizationStateCreateInfo& rasterizationInfo,
                                 VkPrimitiveTopology primitiveTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
+  void copyBuffer(RenderBufferHandle dst, RenderBufferHandle src, VkDeviceSize size);
+  void submitGraphics(CommandBufferHandle cmdBuf, bool wait=false);
+  void transitionImageLayout(RenderImageHandle image, VkImageLayout layout);
+  void copyBufferToImage(RenderImageHandle dst, RenderBufferHandle src, uint32_t w, uint32_t h);
 
   bool getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements);
 
@@ -130,6 +141,7 @@ struct VulkanContext
 
   RenderImageHandle createRenderImage(uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format);
   FrameBufferHandle createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<RenderImageHandle>& attachments);
+  CommandBufferHandle createCommandBuffer();
 
   VulkanInfos infos;
   Logger logger = nullptr;
@@ -140,7 +152,8 @@ struct VulkanContext
   VkQueue queue = VK_NULL_HANDLE;
   uint32_t queueFamilyIndex = 0;
   VkDescriptorPool descPool = VK_NULL_HANDLE;
-  //VkCommandPool cmdPool = VK_NULL_HANDLE;
+  
+  VkCommandPool cmdPool = VK_NULL_HANDLE;
   //VkCommandBuffer cmdBuf = VK_NULL_HANDLE;
 
   VkPhysicalDeviceProperties physicalDeviceProperties;
@@ -164,6 +177,7 @@ private:
   void destroyRenderPass(RenderPass*);
   void destroyFrameBuffer(FrameBuffer*);
   void destroyRenderImage(RenderImage*);
+  void destroyCommandBuffer(CommandBuffer*);
 
   ResourceManager<RenderFence> fenceResources;
   ResourceManager<RenderBuffer> bufferResources;
@@ -173,6 +187,7 @@ private:
   ResourceManager<RenderPass> renderPassResources;
   ResourceManager<FrameBuffer> frameBufferResources;
   ResourceManager<RenderImage> renderImageResources;
+  ResourceManager<CommandBuffer> commandBufferResources;
 };
 
 struct MappedBufferBase

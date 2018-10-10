@@ -246,6 +246,7 @@ VulkanContext::~VulkanContext()
   logger(0, "%d unreleased renderPasses", renderPassResources.getCount());
   logger(0, "%d unreleased frameBuffers", frameBufferResources.getCount());
   logger(0, "%d unreleased renderImages", renderImageResources.getCount());
+  logger(0, "%d unreleased command buffers", commandBufferResources.getCount());
 
 
   //vkFreeCommandBuffers(device, cmdPool, 1, &cmdBuf);
@@ -333,6 +334,14 @@ void VulkanContext::houseKeep()
       delete r;
     }
   }
+  {
+    Vector<CommandBuffer*> orphans;
+    commandBufferResources.getOrphans(orphans);
+    for (auto * r : orphans) {
+      if (!r->hasFlag(ResourceBase::Flags::External)) destroyCommandBuffer(r);
+      delete r;
+    }
+  }
 
 }
 
@@ -344,6 +353,85 @@ void VulkanContext::annotate(VkDebugReportObjectTypeEXT type, uint64_t object, c
   //info.object = object;
   //info.pObjectName = name;
   //vkDebugMarkerSetObjectNameEXT(device, &info);
+}
+
+void VulkanContext::copyBuffer(RenderBufferHandle dst, RenderBufferHandle src, VkDeviceSize size)
+{
+  auto cmdBuf = createCommandBuffer();
+  vkBeginCommandBuffer(cmdBuf.resource->cb, &infos.commandBuffer.singleShot);
+  VkBufferCopy copyRegion{};
+  copyRegion.size = size;
+  vkCmdCopyBuffer(cmdBuf.resource->cb, src.resource->buffer, dst.resource->buffer, 1, &copyRegion);
+  vkEndCommandBuffer(cmdBuf.resource->cb);
+  submitGraphics(cmdBuf, true);
+}
+
+void VulkanContext::transitionImageLayout(RenderImageHandle image, VkImageLayout layout)
+{
+  auto cmdBuf = createCommandBuffer();
+  vkBeginCommandBuffer(cmdBuf.resource->cb, &infos.commandBuffer.singleShot);
+
+  VkImageMemoryBarrier barrier = {};
+  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  barrier.oldLayout = image.resource->layout;
+  barrier.newLayout = layout;
+
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+  barrier.image = image.resource->image;
+  barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  barrier.subresourceRange.baseMipLevel = 0;
+  barrier.subresourceRange.levelCount = 1;
+  barrier.subresourceRange.baseArrayLayer = 0;
+  barrier.subresourceRange.layerCount = 1;
+
+  barrier.srcAccessMask = 0;
+  barrier.dstAccessMask = 0;
+
+  vkCmdPipelineBarrier(cmdBuf.resource->cb, 
+                       0, 0,
+                       0,
+                       0, nullptr,
+                       0, nullptr,
+                       1, &barrier
+  );
+
+  vkEndCommandBuffer(cmdBuf.resource->cb);
+  submitGraphics(cmdBuf, true);
+  image.resource->layout = layout;
+}
+
+void VulkanContext::copyBufferToImage(RenderImageHandle dst, RenderBufferHandle src, uint32_t w, uint32_t h)
+{
+  auto cmdBuf = createCommandBuffer();
+  vkBeginCommandBuffer(cmdBuf.resource->cb, &infos.commandBuffer.singleShot);
+
+  VkBufferImageCopy region{};
+  region.bufferOffset = 0;
+  region.bufferRowLength = 0;
+  region.bufferImageHeight = 0;
+  region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  region.imageSubresource.mipLevel = 0;
+  region.imageSubresource.baseArrayLayer = 0;
+  region.imageSubresource.layerCount = 1;
+  region.imageOffset = { 0, 0, 0 };
+  region.imageExtent = { w, h, 1 };
+  vkCmdCopyBufferToImage(cmdBuf.resource->cb, src.resource->buffer, dst.resource->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+  vkEndCommandBuffer(cmdBuf.resource->cb);
+  submitGraphics(cmdBuf, true);
+}
+
+
+
+void VulkanContext::submitGraphics(CommandBufferHandle cmdBuf, bool wait)
+{
+  VkSubmitInfo submitInfo{};
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &cmdBuf.resource->cb;
+  vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+  if (wait) vkQueueWaitIdle(queue);
 }
 
 
@@ -854,6 +942,26 @@ void VulkanContext::destroyFrameBuffer(FrameBuffer* fb)
   if (fb->fb) vkDestroyFramebuffer(device, fb->fb, nullptr);
 }
 
+CommandBufferHandle VulkanContext::createCommandBuffer()
+{
+  auto commandBuffer = commandBufferResources.createResource();
+
+  VkCommandBufferAllocateInfo allocInfo = {};
+  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocInfo.commandPool = cmdPool;
+  allocInfo.commandBufferCount = 1;
+
+  vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer.resource->cb);
+
+  return commandBuffer;
+}
+
+void VulkanContext::destroyCommandBuffer(CommandBuffer* cb)
+{
+  if (cb->cb) vkFreeCommandBuffers(device, cmdPool, 1, &cb->cb);
+  cb->cb = VK_NULL_HANDLE;
+}
 
 bool VulkanContext::getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements)
 {

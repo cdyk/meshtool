@@ -22,6 +22,11 @@ struct VulkanInfos
     VkPipelineRasterizationStateCreateInfo cullBackDepthBias;
   } pipelineRasterization;
 
+  struct {
+    VkCommandBufferBeginInfo singleShot;
+
+  } commandBuffer;
+
 
 };
 

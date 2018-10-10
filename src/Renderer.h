@@ -39,6 +39,7 @@ private:
   uint32_t viewport[4];
   uint32_t frameCount;
 
+  RenderImageHandle texImage;
 
   struct Rename {
     RenderFenceHandle ready;

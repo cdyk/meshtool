@@ -164,10 +164,14 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
     info.samples = VK_SAMPLE_COUNT_1_BIT;
     info.flags = 0;
 
-    auto texImage = vCtx->createRenderImage(info);
+    texImage = vCtx->createRenderImage(info);
   }
 
-  //auto texImage = vCtx->createRenderImage(texW, texH, VK_FORMAT_R8G8B8A8_UNORM)
+  // FIXME: need queue
+
+  //vCtx->transitionImageLayout(texImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  //vCtx->copyBufferToImage(texImage, stagingBuffer, texW, texH);
+  //vCtx->transitionImageLayout(texImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 }
 
