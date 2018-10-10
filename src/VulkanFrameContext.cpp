@@ -2,22 +2,20 @@
 
 
 VulkanFrameContext::VulkanFrameContext(Logger logger, uint32_t framesInFlight,
-                                       const char**instanceExts, uint32_t instanceExtCount,
-                                       int hasPresentationSupport(VkInstance, VkPhysicalDevice, uint32_t queueFamily)) :
-  VulkanContext(logger, instanceExts, instanceExtCount, hasPresentationSupport),
+                                       const char**instanceExts, uint32_t instanceExtCount) :
+  VulkanResourceContext(logger, instanceExts, instanceExtCount),
   framesInFlight(framesInFlight)
 {
 }
 
 VulkanFrameContext::~VulkanFrameContext()
 {
-  logger(0, "%d unreleased fences", fenceResources.getCount());
 }
 
 
 void VulkanFrameContext::init()
 {
-  VulkanContext::init();
+  VulkanResourceContext::init();
 
   surface = createSurface();
 
@@ -36,50 +34,14 @@ void VulkanFrameContext::init()
   requestedPresentModes.pushBack(VK_PRESENT_MODE_FIFO_KHR);
   presentMode = choosePresentMode(requestedPresentModes);
 
-#if 0
-
-  M_ASSERT(physical_device != VK_NULL_HANDLE && device != VK_NULL_HANDLE);
-  (void)allocator;
-
-  // Create Command Buffers
-  VkResult err;
-  for (int i = 0; i < IMGUI_VK_QUEUED_FRAMES; i++)
-  {
-    ImGui_ImplVulkanH_FrameData* fd = &wd->Frames[i];
-    {
-      VkCommandPoolCreateInfo info = {};
-      info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-      info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-      info.queueFamilyIndex = queue_family;
-      err = vkCreateCommandPool(device, &info, allocator, &fd->CommandPool);
-      check_vk_result(err);
-    }
-    {
-      VkCommandBufferAllocateInfo info = {};
-      info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-      info.commandPool = fd->CommandPool;
-      info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-      info.commandBufferCount = 1;
-      err = vkAllocateCommandBuffers(device, &info, &fd->CommandBuffer);
-      check_vk_result(err);
-    }
-    {
-      VkFenceCreateInfo info = {};
-      info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-      info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-      err = vkCreateFence(device, &info, allocator, &fd->Fence);
-      check_vk_result(err);
-    }
-    {
-      VkSemaphoreCreateInfo info = {};
-      info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-      err = vkCreateSemaphore(device, &info, allocator, &fd->ImageAcquiredSemaphore);
-      check_vk_result(err);
-      err = vkCreateSemaphore(device, &info, allocator, &fd->RenderCompleteSemaphore);
-      check_vk_result(err);
-    }
+  frameData.resize(framesInFlight);
+  for (auto & frame : frameData) {
+    frame.commandPool = createCommandPool(queueFamilyIndex);
+    frame.commandBuffer = createPrimaryCommandBuffer(frame.commandPool);
+    frame.imageAcquiredSemaphore = createSemaphore();
+    frame.renderCompleteSemaphore = createSemaphore();
+    frame.fence = createFence(true);
   }
-#endif
 }
 
 VkSurfaceFormatKHR VulkanFrameContext::chooseFormat(Vector<VkFormat>& requestedFormats, VkColorSpaceKHR requestedColorSpace)
@@ -141,55 +103,106 @@ void VulkanFrameContext::resize(uint32_t w, uint32_t h)
 
 void VulkanFrameContext::houseKeep()
 {
-  VulkanContext::houseKeep();
-
-  {
-    Vector<RenderFence*> orphans;
-    fenceResources.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroyFence(r);
-      delete r;
-    }
-  }
-  {
-    Vector<SwapChain*> orphans;
-    swapChainResources.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroySwapChain(r);
-      delete r;
-    }
-  }
-
-
+  VulkanResourceContext::houseKeep();
+  
 }
 
-RenderFenceHandle VulkanFrameContext::createFence(bool signalled)
+void VulkanFrameContext::copyBuffer(RenderBufferHandle dst, RenderBufferHandle src, VkDeviceSize size)
 {
-  VkFenceCreateInfo info = {};
-  info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-  info.flags = signalled ? VK_FENCE_CREATE_SIGNALED_BIT : 0;
-
-  auto fenceHandle = fenceResources.createResource();
-  auto rv = vkCreateFence(device, &info, nullptr, &fenceHandle.resource->fence);
-  assert(rv == VK_SUCCESS);
-  return fenceHandle;
+  auto cmdBuf = createPrimaryCommandBuffer(currentFrameData().commandPool);
+  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &infos.commandBuffer.singleShot);
+  VkBufferCopy copyRegion{};
+  copyRegion.size = size;
+  vkCmdCopyBuffer(cmdBuf.resource->cmdBuf, src.resource->buffer, dst.resource->buffer, 1, &copyRegion);
+  vkEndCommandBuffer(cmdBuf.resource->cmdBuf);
+  submitGraphics(cmdBuf, true);
 }
 
-void VulkanFrameContext::destroyFence(RenderFence* fence)
+void VulkanFrameContext::transitionImageLayout(RenderImageHandle image, VkImageLayout layout)
 {
-  if (fence->fence) vkDestroyFence(device, fence->fence, nullptr);
-  fence->fence = nullptr;
+  auto cmdBuf = createPrimaryCommandBuffer(currentFrameData().commandPool);
+  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &infos.commandBuffer.singleShot);
+
+  VkImageMemoryBarrier barrier = {};
+  barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+  barrier.oldLayout = image.resource->layout;
+  barrier.newLayout = layout;
+
+  barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+  barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+
+  barrier.image = image.resource->image;
+  barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  barrier.subresourceRange.baseMipLevel = 0;
+  barrier.subresourceRange.levelCount = 1;
+  barrier.subresourceRange.baseArrayLayer = 0;
+  barrier.subresourceRange.layerCount = 1;
+
+  barrier.srcAccessMask = 0;
+  barrier.dstAccessMask = 0;
+
+  vkCmdPipelineBarrier(cmdBuf.resource->cmdBuf,
+                       0, 0,
+                       0,
+                       0, nullptr,
+                       0, nullptr,
+                       1, &barrier
+  );
+
+  vkEndCommandBuffer(cmdBuf.resource->cmdBuf);
+  submitGraphics(cmdBuf, true);
+  image.resource->layout = layout;
+}
+
+void VulkanFrameContext::copyBufferToImage(RenderImageHandle dst, RenderBufferHandle src, uint32_t w, uint32_t h)
+{
+  auto cmdBuf = createPrimaryCommandBuffer(currentFrameData().commandPool);
+  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &infos.commandBuffer.singleShot);
+
+  VkBufferImageCopy region{};
+  region.bufferOffset = 0;
+  region.bufferRowLength = 0;
+  region.bufferImageHeight = 0;
+  region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  region.imageSubresource.mipLevel = 0;
+  region.imageSubresource.baseArrayLayer = 0;
+  region.imageSubresource.layerCount = 1;
+  region.imageOffset = { 0, 0, 0 };
+  region.imageExtent = { w, h, 1 };
+  vkCmdCopyBufferToImage(cmdBuf.resource->cmdBuf, src.resource->buffer, dst.resource->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+  vkEndCommandBuffer(cmdBuf.resource->cmdBuf);
+  submitGraphics(cmdBuf, true);
 }
 
 
 
-SwapChainHandle VulkanFrameContext::createSwapChain(SwapChainHandle oldSwapChain, VkSwapchainCreateInfoKHR& swapChainInfo)
+void VulkanFrameContext::submitGraphics(CommandBufferHandle cmdBuf, bool wait)
 {
-  return SwapChainHandle();
+  VkSubmitInfo submitInfo{};
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &cmdBuf.resource->cmdBuf;
+  vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
+  if (wait) vkQueueWaitIdle(queue);
 }
 
 
-void VulkanFrameContext::destroySwapChain(SwapChain* swapChain)
+void VulkanFrameContext::updateDescriptorSet(DescriptorSetHandle descriptorSet, RenderBufferHandle buffer)
 {
+  VkDescriptorBufferInfo descBufInfo;
+  descBufInfo.buffer = buffer.resource->buffer;
+  descBufInfo.offset = 0;
+  descBufInfo.range = VK_WHOLE_SIZE;
 
+  VkWriteDescriptorSet writes[1];
+  writes[0] = {};
+  writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+  writes[0].pNext = nullptr;
+  writes[0].dstSet = descriptorSet.resource->descSet;
+  writes[0].descriptorCount = 1;
+  writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  writes[0].pBufferInfo = &descBufInfo;
+  writes[0].dstArrayElement = 0;
+  writes[0].dstBinding = 0;
+  vkUpdateDescriptorSets(device, 1, writes, 0, NULL);
 }

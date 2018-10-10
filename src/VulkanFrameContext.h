@@ -1,29 +1,17 @@
 #pragma once
 #include "Common.h"
-#include "VulkanContext.h"
-
-struct RenderFence : ResourceBase
-{
-  RenderFence(ResourceManagerBase& manager) : ResourceBase(manager) {}
-  VkFence fence = VK_NULL_HANDLE;
-};
-typedef ResourceHandle<RenderFence> RenderFenceHandle;
-
-struct SwapChain : public ResourceBase
-{
-  VkSwapchainKHR swapChain = VK_NULL_HANDLE;
-};
-typedef ResourceHandle<SwapChain> SwapChainHandle;
+#include "VulkanResourceContext.h"
 
 
-class VulkanFrameContext : public VulkanContext
+
+
+class VulkanFrameContext : public VulkanResourceContext
 {
 public:
   VulkanFrameContext(Logger logger, uint32_t framesInFlight,
-                     const char**instanceExts, uint32_t instanceExtCount,
-                     int hasPresentationSupport(VkInstance, VkPhysicalDevice, uint32_t queueFamily));
+                     const char**instanceExts, uint32_t instanceExtCount);
 
-  ~VulkanFrameContext();
+  virtual ~VulkanFrameContext();
 
   virtual void init() override;
 
@@ -33,9 +21,14 @@ public:
 
   void resize(uint32_t w, uint32_t h);
 
-  RenderFenceHandle createFence(bool signalled);
+  void updateDescriptorSet(DescriptorSetHandle descriptorSet, RenderBufferHandle buffer);
 
-  SwapChainHandle createSwapChain(SwapChainHandle oldSwapChain, VkSwapchainCreateInfoKHR& swapChainInfo);
+  void copyBuffer(RenderBufferHandle dst, RenderBufferHandle src, VkDeviceSize size);
+  void transitionImageLayout(RenderImageHandle image, VkImageLayout layout);
+  void copyBufferToImage(RenderImageHandle dst, RenderBufferHandle src, uint32_t w, uint32_t h);
+  void submitGraphics(CommandBufferHandle cmdBuf, bool wait = false);
+
+
 
   uint32_t framesInFlight;
   VkSurfaceKHR surface = VK_NULL_HANDLE;
@@ -44,23 +37,24 @@ public:
 
   struct FrameData
   {
-    VkCommandPool commandPool = VK_NULL_HANDLE;
-    VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
-    VkFence fence = VK_NULL_HANDLE;
-    VkSemaphore semaphore = VK_NULL_HANDLE;
+    CommandPoolHandle commandPool;
+    CommandBufferHandle commandBuffer;
+    FenceHandle fence;
+    SemaphoreHandle imageAcquiredSemaphore;
+    SemaphoreHandle renderCompleteSemaphore;
   };
   Vector<FrameData> frameData;
+
+  uint32_t frameIndex = 0;
+  FrameData& currentFrameData() { return frameData[frameIndex]; }
+
 
   SwapChainHandle swapChain;
   VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
 
 private:
 
-  ResourceManager<RenderFence> fenceResources;
-  ResourceManager<SwapChain> swapChainResources;
 
-  void destroyFence(RenderFence*);
-  void destroySwapChain(SwapChain* swapChain);
 
   VkSurfaceFormatKHR chooseFormat(Vector<VkFormat>& requestedFormats, VkColorSpaceKHR requestedColorSpace);
   VkPresentModeKHR choosePresentMode(Vector<VkPresentModeKHR>& requestedModes);

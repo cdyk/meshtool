@@ -22,9 +22,8 @@ namespace
   {
   public:
     VulkanGLWFContext(Logger logger, GLFWwindow* window, uint32_t framesInFlight,
-                      const char**instanceExts, uint32_t instanceExtCount,
-                      int hasPresentationSupport(VkInstance, VkPhysicalDevice, uint32_t queueFamily)) :
-      VulkanFrameContext(logger, framesInFlight, instanceExts, instanceExtCount, hasPresentationSupport),
+                      const char**instanceExts, uint32_t instanceExtCount) :
+      VulkanFrameContext(logger, framesInFlight, instanceExts, instanceExtCount),
       window(window)
     {}
 
@@ -35,6 +34,11 @@ namespace
       assert(rv == VK_SUCCESS);
       return surface;
     };
+
+    bool hasPresentationSupport(uint32_t queueFamily) override
+    {
+      return glfwGetPhysicalDevicePresentationSupport(instance, physicalDevice, queueFamily);
+    }
 
   protected:
     GLFWwindow* window;
@@ -130,17 +134,22 @@ Renderer* main_VulkanInit(Logger l, GLFWwindow* window, uint32_t w, uint32_t h)
 
   uint32_t extensions_count = 0;
   const char** extensions = glfwGetRequiredInstanceExtensions(&extensions_count);
-  vCtx = new VulkanGLWFContext(logger, window, IMGUI_VK_QUEUED_FRAMES, extensions, extensions_count, glfwGetPhysicalDevicePresentationSupport);
+  vCtx = new VulkanGLWFContext(logger, window, IMGUI_VK_QUEUED_FRAMES, extensions, extensions_count);
   vCtx->init();
 
   imguiWindowData.Surface = vCtx->surface;
   imguiWindowData.SurfaceFormat = vCtx->surfaceFormat;
   imguiWindowData.PresentMode = vCtx->presentMode;
-
+  for (int i = 0; i < IMGUI_VK_QUEUED_FRAMES; i++) {
+    auto& fd = imguiWindowData.Frames[i];
+    fd.CommandPool = vCtx->frameData[i].commandPool.resource->cmdPool;
+    fd.CommandBuffer = vCtx->frameData[i].commandBuffer.resource->cmdBuf;
+    fd.Fence = vCtx->frameData[i].fence.resource->fence;
+    fd.ImageAcquiredSemaphore = vCtx->frameData[i].imageAcquiredSemaphore.resource->semaphore;
+    fd.RenderCompleteSemaphore = vCtx->frameData[i].renderCompleteSemaphore.resource->semaphore;
+  }
   ImGui_ImplGlfw_InitForVulkan(window, true);
 
-
-  ImGui_ImplVulkanH_CreateWindowDataCommandBuffers(vCtx->physicalDevice, vCtx->device, vCtx->queueFamilyIndex, &imguiWindowData, nullptr);
 
   main_VulkanResize(w, h);
 

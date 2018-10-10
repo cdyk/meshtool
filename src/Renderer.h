@@ -42,7 +42,7 @@ private:
   RenderImageHandle texImage;
 
   struct Rename {
-    RenderFenceHandle ready;
+    FenceHandle ready;
     DescriptorSetHandle sharedDescSet;
     RenderBufferHandle objectBuffer;
   };

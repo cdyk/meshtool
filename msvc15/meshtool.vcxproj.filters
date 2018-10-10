@@ -73,6 +73,9 @@
     <ClCompile Include="..\src\VulkanFrameContext.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\VulkanResourceContext.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\LinAlg.h">
@@ -130,6 +133,9 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\src\VulkanFrameContext.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\VulkanResourceContext.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
