@@ -111,6 +111,9 @@ VulkanContext::VulkanContext(Logger logger,
       VkPhysicalDeviceProperties props = { 0 };
       vkGetPhysicalDeviceProperties(devices[i], &props);
 
+      VkPhysicalDeviceFeatures features{};
+      vkGetPhysicalDeviceFeatures(devices[i], &features);
+
       uint64_t vmem = 0;
       VkPhysicalDeviceMemoryProperties memProps = { 0 };
       vkGetPhysicalDeviceMemoryProperties(devices[i], &memProps);
@@ -119,7 +122,7 @@ VulkanContext::VulkanContext(Logger logger,
           vmem = memProps.memoryHeaps[k].size;
         }
       }
-      logger(0, "Device %d: name='%s', type=%d, mem=%lld", i, props.deviceName, props.deviceType, vmem);
+      logger(0, "Device %d: name='%s', type=%d, mem=%lld, fillModeNonSolid=%d", i, props.deviceName, props.deviceType, vmem, features.fillModeNonSolid);
     }
     physicalDevice = devices[chosenDevice];
   }
@@ -156,6 +159,10 @@ VulkanContext::VulkanContext(Logger logger,
       VK_KHR_SWAPCHAIN_EXTENSION_NAME,
       //VK_EXT_DEBUG_MARKER_EXTENSION_NAME
     };
+
+    VkPhysicalDeviceFeatures enabledFeatures{};
+    enabledFeatures.fillModeNonSolid = 1;
+
     VkDeviceCreateInfo deviceInfo = {};
     deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     deviceInfo.pNext = nullptr;
@@ -165,7 +172,7 @@ VulkanContext::VulkanContext(Logger logger,
     deviceInfo.ppEnabledExtensionNames = deviceExt;
     deviceInfo.enabledLayerCount = 0;
     deviceInfo.ppEnabledLayerNames = nullptr;
-    deviceInfo.pEnabledFeatures = nullptr;
+    deviceInfo.pEnabledFeatures = &enabledFeatures;
 
     auto rv = vkCreateDevice(physicalDevice, &deviceInfo, NULL, &device);
     assert(rv == VK_SUCCESS);

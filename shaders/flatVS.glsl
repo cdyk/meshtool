@@ -8,9 +8,10 @@ layout(std140, binding = 0) uniform ObjBuf{
 } objBuf;
 
 layout(location = 0) in vec3 pos;
+layout(location = 1) in vec4 inColor;
 layout(location = 0) out vec4 color;
 
 void main() {
-  color = vec4(1, 1, 1, 0);
+  color = vec4(0.5*inColor.rgb + vec3(0.5), inColor.a);
   gl_Position = objBuf.MP * vec4(pos, 1);
 }

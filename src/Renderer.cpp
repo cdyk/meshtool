@@ -97,11 +97,18 @@ namespace {
                         VkDescriptorSetLayoutCreateInfo& descLayoutCI)
   {
     {
-      inputBind.resize(1);
+      inputBind.resize(2);
       inputBind[0] = vCtx->infos.vertexInput.v32b;
+      inputBind[0].binding = 0;
+      inputBind[1] = vCtx->infos.vertexInput.v4b;
+      inputBind[1].binding = 1;
 
-      inputAttrib.resize(1);
-      inputAttrib[1] = vCtx->infos.vertexInput.v3f_0_0b;
+      inputAttrib.resize(2);
+      inputAttrib[0] = vCtx->infos.vertexInput.v3f_0_0b;
+      inputAttrib[0].location = 0;
+      inputAttrib[1] = vCtx->infos.vertexInput.v4u8_0b;
+      inputAttrib[1].location = 1;
+      inputAttrib[1].binding = 1;
     }
     {
       descSetLayoutBind = {};
@@ -143,8 +150,8 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
   }
   {
     Vector<ShaderInputSpec> stages(2);
-    stages[0] = { flatVS, sizeof(vanillaVS), VK_SHADER_STAGE_VERTEX_BIT };
-    stages[1] = { flatPS, sizeof(vanillaPS), VK_SHADER_STAGE_FRAGMENT_BIT };
+    stages[0] = { flatVS, sizeof(flatVS), VK_SHADER_STAGE_VERTEX_BIT };
+    stages[1] = { flatPS, sizeof(flatPS), VK_SHADER_STAGE_FRAGMENT_BIT };
     flatShader = vCtx->createShader(stages);
   }
 
