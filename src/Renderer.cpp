@@ -44,9 +44,7 @@ namespace {
   void vanillaPipelineInfo(VulkanContext* vCtx,
                            Vector<VkVertexInputBindingDescription>& inputBind,
                            Vector<VkVertexInputAttributeDescription>& inputAttrib,
-                           VkPipelineLayoutCreateInfo& pipeLayoutCI,
-                           VkDescriptorSetLayoutBinding& descSetLayoutBind,
-                           VkDescriptorSetLayoutCreateInfo& descLayoutCI)
+                           VkPipelineLayoutCreateInfo& pipeLayoutCI)
   {
     {
       inputBind.resize(2);
@@ -67,20 +65,6 @@ namespace {
       inputAttrib[3].binding = 1;
     }
     {
-      descSetLayoutBind = {};
-      descSetLayoutBind.binding = 0;
-      descSetLayoutBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-      descSetLayoutBind.descriptorCount = 1;
-      descSetLayoutBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-      descSetLayoutBind.pImmutableSamplers = NULL;
-
-      descLayoutCI = {};
-      descLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-      descLayoutCI.pNext = NULL;
-      descLayoutCI.bindingCount = 1;
-      descLayoutCI.pBindings = &descSetLayoutBind;
-    }
-    {
       pipeLayoutCI = {};
       pipeLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
       pipeLayoutCI.pNext = NULL;
@@ -92,9 +76,7 @@ namespace {
   void wirePipelineInfo(VulkanContext* vCtx, 
                         Vector<VkVertexInputBindingDescription>& inputBind,
                         Vector<VkVertexInputAttributeDescription>& inputAttrib,
-                        VkPipelineLayoutCreateInfo& pipeLayoutCI,
-                        VkDescriptorSetLayoutBinding& descSetLayoutBind,
-                        VkDescriptorSetLayoutCreateInfo& descLayoutCI)
+                        VkPipelineLayoutCreateInfo& pipeLayoutCI)
   {
     {
       inputBind.resize(2);
@@ -110,20 +92,7 @@ namespace {
       inputAttrib[1].location = 1;
       inputAttrib[1].binding = 1;
     }
-    {
-      descSetLayoutBind = {};
-      descSetLayoutBind.binding = 0;
-      descSetLayoutBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-      descSetLayoutBind.descriptorCount = 1;
-      descSetLayoutBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-      descSetLayoutBind.pImmutableSamplers = NULL;
-
-      descLayoutCI = {};
-      descLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-      descLayoutCI.pNext = NULL;
-      descLayoutCI.bindingCount = 1;
-      descLayoutCI.pBindings = &descSetLayoutBind;
-    }
+    
     {
       pipeLayoutCI = {};
       pipeLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -231,12 +200,24 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
 {
   if(!vanillaPipeline || vanillaPipeline.resource->pass != pass)
   {
+    VkDescriptorSetLayoutBinding descSetLayoutBind{};
+    descSetLayoutBind = {};
+    descSetLayoutBind.binding = 0;
+    descSetLayoutBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descSetLayoutBind.descriptorCount = 1;
+    descSetLayoutBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    descSetLayoutBind.pImmutableSamplers = NULL;
+
+    VkDescriptorSetLayoutCreateInfo descLayoutCI{};
+    descLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descLayoutCI.pNext = NULL;
+    descLayoutCI.bindingCount = 1;
+    descLayoutCI.pBindings = &descSetLayoutBind;
+
     Vector<VkVertexInputBindingDescription> inputBind;
     Vector<VkVertexInputAttributeDescription> inputAttrib;
     VkPipelineLayoutCreateInfo pipeLayoutCI;
-    VkDescriptorSetLayoutBinding descSetLayoutBind;
-    VkDescriptorSetLayoutCreateInfo descLayoutCI;
-    vanillaPipelineInfo(vCtx, inputBind, inputAttrib, pipeLayoutCI, descSetLayoutBind, descLayoutCI);
+    vanillaPipelineInfo(vCtx, inputBind, inputAttrib, pipeLayoutCI);
 
     vanillaPipeline = vCtx->createPipeline(inputBind,
                                            inputAttrib,
@@ -246,17 +227,26 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
                                            vanillaShader,
                                            vCtx->infos.pipelineRasterization.cullBackDepthBias);
 
-    wirePipelineInfo(vCtx, inputBind, inputAttrib, pipeLayoutCI, descSetLayoutBind, descLayoutCI);
-    wirePipeline = vCtx->createPipeline(inputBind,
-                                        inputAttrib,
-                                        pipeLayoutCI,
-                                        descLayoutCI,
-                                        pass,
-                                        flatShader,
-                                        vCtx->infos.pipelineRasterization.cullBackLine);
+    wirePipelineInfo(vCtx, inputBind, inputAttrib, pipeLayoutCI);
+    wireFrontFacePipeline = vCtx->createPipeline(inputBind,
+                                                 inputAttrib,
+                                                 pipeLayoutCI,
+                                                 descLayoutCI,
+                                                 pass,
+                                                 flatShader,
+                                                 vCtx->infos.pipelineRasterization.cullBackLine);
+
+    wireBothFacesPipeline = vCtx->createPipeline(inputBind,
+                                                 inputAttrib,
+                                                 pipeLayoutCI,
+                                                 descLayoutCI,
+                                                 pass,
+                                                 flatShader,
+                                                 vCtx->infos.pipelineRasterization.cullNoneLine);
+
+
     for (size_t i = 0; i < renaming.size(); i++) {
-      renaming[i].vanillaDescSet = vCtx->createDescriptorSet(vanillaPipeline.resource->descLayout);
-      renaming[i].wireDescSet = vCtx->createDescriptorSet(wirePipeline.resource->descLayout);
+      renaming[i].sharedDescSet = vCtx->createDescriptorSet(vanillaPipeline.resource->descLayout);
     }
   }
   auto & rename = renaming[renamingCurr];
@@ -268,8 +258,7 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     map.mem->Ncol1 = Vec4f(N.cols[1], 0.f);
     map.mem->Ncol2 = Vec4f(N.cols[2], 0.f);
   }
-  vCtx->updateDescriptorSet(rename.vanillaDescSet, rename.objectBuffer);
-  vCtx->updateDescriptorSet(rename.wireDescSet, rename.objectBuffer);
+  vCtx->updateDescriptorSet(rename.sharedDescSet, rename.objectBuffer);
 
   {
     VkViewport vp = {};
@@ -296,19 +285,22 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     vkCmdBindVertexBuffers(cmdBuf, 0, 2, buffers, offsets);
   }
 
+  VkDescriptorSet desc_set[1] = { rename.sharedDescSet.resource->descSet };
   if(solid) {
     vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipe);
-
-    VkDescriptorSet desc_set[1] = { rename.vanillaDescSet.resource->descSet };
     vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, desc_set, 0, NULL);
     vkCmdDraw(cmdBuf, 3 * renderMesh->tri_n, 1, 0, 0);
   }
 
   if(outlines) {
-    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, wirePipeline.resource->pipe);
-
-    VkDescriptorSet desc_set[1] = { rename.wireDescSet.resource->descSet };
-    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, desc_set, 0, NULL);
+    if (solid) {
+      vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, wireFrontFacePipeline.resource->pipe);
+      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, desc_set, 0, NULL);
+    }
+    else {
+      vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, wireBothFacesPipeline.resource->pipe);
+      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, desc_set, 0, NULL);
+    }
     vkCmdDraw(cmdBuf, 3 * renderMesh->tri_n, 1, 0, 0);
   }
 

@@ -18,6 +18,7 @@ struct VulkanInfos
   struct {
     VkPipelineRasterizationStateCreateInfo cullBack;
     VkPipelineRasterizationStateCreateInfo cullBackLine;
+    VkPipelineRasterizationStateCreateInfo cullNoneLine;
     VkPipelineRasterizationStateCreateInfo cullBackDepthBias;
   } pipelineRasterization;
 

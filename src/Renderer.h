@@ -30,8 +30,8 @@ private:
   VulkanContext* vCtx = nullptr;
 
   PipelineHandle vanillaPipeline;
-
-  PipelineHandle wirePipeline;
+  PipelineHandle wireFrontFacePipeline;
+  PipelineHandle wireBothFacesPipeline;
 
   ShaderHandle vanillaShader;
   ShaderHandle flatShader;
@@ -42,8 +42,7 @@ private:
 
   struct Rename {
     RenderFenceHandle ready;
-    DescriptorSetHandle vanillaDescSet;
-    DescriptorSetHandle wireDescSet;
+    DescriptorSetHandle sharedDescSet;
     RenderBufferHandle objectBuffer;
   };
   Vector<Rename> renaming;
