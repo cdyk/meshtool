@@ -106,7 +106,7 @@ namespace {
 }
 
 
-Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h) :
+Renderer::Renderer(Logger logger, VulkanFrameContext* vCtx, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h) :
   logger(logger),
   vCtx(vCtx)
 {

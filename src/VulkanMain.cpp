@@ -4,7 +4,7 @@
 #include <cassert>
 #include "VulkanMain.h"
 #include "Common.h"
-#include "VulkanContext.h"
+#include "VulkanFrameContext.h"
 #include "Renderer.h"
 #include "LinAlgOps.h"
 
@@ -17,7 +17,33 @@ namespace
 {
   Logger logger;
   Renderer* renderer = nullptr;
-  VulkanContext* vCtx = nullptr;
+
+  class VulkanGLWFContext : public VulkanFrameContext
+  {
+  public:
+    VulkanGLWFContext(Logger logger, GLFWwindow* window, uint32_t framesInFlight,
+                      const char**instanceExts, uint32_t instanceExtCount,
+                      int hasPresentationSupport(VkInstance, VkPhysicalDevice, uint32_t queueFamily)) :
+      VulkanFrameContext(logger, framesInFlight, instanceExts, instanceExtCount, hasPresentationSupport),
+      window(window)
+    {}
+
+    VkSurfaceKHR createSurface() override
+    {
+      VkSurfaceKHR surface;
+      auto rv = glfwCreateWindowSurface(instance, window, nullptr, &surface);
+      assert(rv == VK_SUCCESS);
+      return surface;
+    };
+
+  protected:
+    GLFWwindow* window;
+
+  };
+
+
+
+  VulkanFrameContext* vCtx = nullptr;
   ImGui_ImplVulkanH_WindowData imguiWindowData;
 
   RenderPassHandle rendererPass;
@@ -104,10 +130,15 @@ Renderer* main_VulkanInit(Logger l, GLFWwindow* window, uint32_t w, uint32_t h)
 
   uint32_t extensions_count = 0;
   const char** extensions = glfwGetRequiredInstanceExtensions(&extensions_count);
-  vCtx = new VulkanContext(logger, extensions, extensions_count, glfwGetPhysicalDevicePresentationSupport);
-  initSwapChain(window, vCtx->instance, vCtx->physicalDevice, vCtx->queueFamilyIndex);
+  vCtx = new VulkanGLWFContext(logger, window, IMGUI_VK_QUEUED_FRAMES, extensions, extensions_count, glfwGetPhysicalDevicePresentationSupport);
+  vCtx->init();
+
+  imguiWindowData.Surface = vCtx->surface;
+  imguiWindowData.SurfaceFormat = vCtx->surfaceFormat;
+  imguiWindowData.PresentMode = vCtx->presentMode;
 
   ImGui_ImplGlfw_InitForVulkan(window, true);
+
 
   ImGui_ImplVulkanH_CreateWindowDataCommandBuffers(vCtx->physicalDevice, vCtx->device, vCtx->queueFamilyIndex, &imguiWindowData, nullptr);
 

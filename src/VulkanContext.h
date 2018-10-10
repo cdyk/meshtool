@@ -17,15 +17,6 @@ struct DescriptorSet : ResourceBase
 };
 typedef ResourceHandle<DescriptorSet> DescriptorSetHandle;
 
-
-struct RenderFence : ResourceBase
-{
-  RenderFence(ResourceManagerBase& manager) : ResourceBase(manager) {}
-  VkFence fence = VK_NULL_HANDLE;
-};
-typedef ResourceHandle<RenderFence> RenderFenceHandle;
-
-
 struct Shader : ResourceBase
 {
   Shader(ResourceManagerBase& manager) : ResourceBase(manager) {}
@@ -90,8 +81,9 @@ struct CommandBuffer : ResourceBase
 typedef ResourceHandle<CommandBuffer> CommandBufferHandle;
 
 
-struct VulkanContext
+class VulkanContext
 {
+public:
   VulkanContext() = delete;
 
   VulkanContext(Logger logger,
@@ -99,7 +91,9 @@ struct VulkanContext
                 int hasPresentationSupport(VkInstance, VkPhysicalDevice, uint32_t queueFamily));
   ~VulkanContext();
 
-  void houseKeep();
+  virtual void init();
+
+  virtual void houseKeep();
 
 
   PipelineHandle createPipeline(Vector<VkVertexInputBindingDescription>& inputBind,
@@ -118,7 +112,7 @@ struct VulkanContext
 
   bool getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements);
 
-  RenderFenceHandle createFence(bool signalled);
+  
 
 
 
@@ -144,7 +138,6 @@ struct VulkanContext
   CommandBufferHandle createCommandBuffer();
 
   VulkanInfos infos;
-  Logger logger = nullptr;
   VkInstance instance = VK_NULL_HANDLE;
   VkDebugReportCallbackEXT debugCallback = VK_NULL_HANDLE;
   VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
@@ -163,13 +156,15 @@ struct VulkanContext
   PFN_vkCmdDebugMarkerEndEXT vkCmdDebugMarkerEndEXT;
   PFN_vkDebugMarkerSetObjectNameEXT vkDebugMarkerSetObjectNameEXT;
 
+protected:
+  Logger logger = nullptr;
+
 private:
   bool debugLayer = true;
   VkDebugUtilsMessengerEXT debugCallbackHandle;
 
   void annotate(VkDebugReportObjectTypeEXT type, uint64_t object, const char* name);
 
-  void destroyFence(RenderFence*);
   void destroyBuffer(RenderBuffer*);
   void destroyDescriptorSet(DescriptorSet*);
   void destroyShader(Shader* shader);
@@ -179,7 +174,6 @@ private:
   void destroyRenderImage(RenderImage*);
   void destroyCommandBuffer(CommandBuffer*);
 
-  ResourceManager<RenderFence> fenceResources;
   ResourceManager<RenderBuffer> bufferResources;
   ResourceManager<DescriptorSet> descriptorSetResources;
   ResourceManager<Shader> shaderResources;

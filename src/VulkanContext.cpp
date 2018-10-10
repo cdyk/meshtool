@@ -22,6 +22,7 @@ VulkanContext::VulkanContext(Logger logger,
                              int hasPresentationSupport(VkInstance, VkPhysicalDevice, uint32_t queueFamily)) :
   logger(logger)
 {
+
   // create instance
   { 
     Vector<const char*> layers;
@@ -235,10 +236,16 @@ VulkanContext::VulkanContext(Logger logger,
   vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
 }
 
+
+void VulkanContext::init()
+{
+
+}
+
+
 VulkanContext::~VulkanContext()
 {
   houseKeep();
-  logger(0, "%d unreleased fences", fenceResources.getCount());
   logger(0, "%d unreleased buffers", bufferResources.getCount());
   logger(0, "%d unreleased descriptors", descriptorSetResources.getCount());
   logger(0, "%d unreleased shaders", shaderResources.getCount());
@@ -263,14 +270,7 @@ VulkanContext::~VulkanContext()
 
 void VulkanContext::houseKeep()
 {
-  {
-    Vector<RenderFence*> orphans;
-    fenceResources.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroyFence(r);
-      delete r;
-    }
-  }
+  
 
   {
     Vector<RenderBuffer*> orphans;
@@ -881,31 +881,12 @@ RenderPassHandle VulkanContext::createRenderPass(VkAttachmentDescription* attach
 }
 
 
-RenderFenceHandle VulkanContext::createFence(bool signalled)
-{
-  VkFenceCreateInfo info = {};
-  info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-  info.flags = signalled ? VK_FENCE_CREATE_SIGNALED_BIT : 0;
-
-  auto fenceHandle = fenceResources.createResource();
-  auto rv = vkCreateFence(device, &info, nullptr, &fenceHandle.resource->fence);
-  assert(rv == VK_SUCCESS);
-  return fenceHandle;
-}
 
 void VulkanContext::destroyRenderPass(RenderPass* pass)
 {
   if (pass->pass) vkDestroyRenderPass(device, pass->pass, nullptr);
   pass->pass = nullptr;
 }
-
-
-void VulkanContext::destroyFence(RenderFence* fence)
-{
-  if (fence->fence) vkDestroyFence(device, fence->fence, nullptr);
-  fence->fence = nullptr;
-}
-
 
 FrameBufferHandle VulkanContext::createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<RenderImageHandle>& attachments)
 {

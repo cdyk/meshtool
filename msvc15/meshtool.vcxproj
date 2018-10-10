@@ -100,6 +100,7 @@
     <ClCompile Include="..\src\Tasks.cpp" />
     <ClCompile Include="..\src\Viewer.cpp" />
     <ClCompile Include="..\src\VulkanContext.cpp" />
+    <ClCompile Include="..\src\VulkanFrameContext.cpp" />
     <ClCompile Include="..\src\VulkanInfos.cpp" />
     <ClCompile Include="..\src\VulkanMain.cpp" />
   </ItemGroup>
@@ -120,6 +121,7 @@
     <ClInclude Include="..\src\ResourceManager.h" />
     <ClInclude Include="..\src\Viewer.h" />
     <ClInclude Include="..\src\VulkanContext.h" />
+    <ClInclude Include="..\src\VulkanFrameContext.h" />
     <ClInclude Include="..\src\VulkanInfos.h" />
     <ClInclude Include="..\src\VulkanMain.h" />
   </ItemGroup>
