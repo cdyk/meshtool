@@ -126,6 +126,8 @@ struct VulkanContext
 
   RenderImageHandle createRenderImage(VkImage image, VkFormat format, VkImageSubresourceRange subResRange);
 
+  RenderImageHandle createRenderImage(VkImageCreateInfo& imageCreateInfo);
+
   RenderImageHandle createRenderImage(uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format);
   FrameBufferHandle createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<RenderImageHandle>& attachments);
 

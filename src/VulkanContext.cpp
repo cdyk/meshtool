@@ -643,13 +643,40 @@ RenderImageHandle VulkanContext::wrapRenderImageView(VkImageView view)
 }
 
 
-RenderImageHandle VulkanContext::createRenderImage(uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format)
+RenderImageHandle VulkanContext::createRenderImage(VkImageCreateInfo& imageCreateInfo)
 {
   auto renderImageHandle = renderImageResources.createResource();
   auto * renderImage = renderImageHandle.resource;
+  renderImage->format = imageCreateInfo.format;
 
-  renderImage->format = format;
+  auto rv = vkCreateImage(device, &imageCreateInfo, nullptr, &renderImage->image);
+  assert(rv == VK_SUCCESS);
 
+  VkMemoryRequirements memReqs;
+  vkGetImageMemoryRequirements(device, renderImage->image, &memReqs);
+
+  VkMemoryAllocateInfo memAllocInfo = {};
+  memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  memAllocInfo.pNext = nullptr;
+  //memAllocInfo.allocationSize = 0;
+  //memAllocInfo.memoryTypeIndex = 0;
+  memAllocInfo.allocationSize = memReqs.size;
+
+  auto rvb = getMemoryTypeIndex(memAllocInfo.memoryTypeIndex, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  assert(rvb);
+
+  rv = vkAllocateMemory(device, &memAllocInfo, NULL, &renderImage->mem);
+  assert(rv == VK_SUCCESS);
+
+  rv = vkBindImageMemory(device, renderImage->image, renderImage->mem, 0);
+  assert(rv == VK_SUCCESS);
+
+  return renderImageHandle;
+}
+
+
+RenderImageHandle VulkanContext::createRenderImage(uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format)
+{
   VkImageCreateInfo imageCI = {};
   imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   imageCI.pNext = nullptr;
@@ -679,27 +706,11 @@ RenderImageHandle VulkanContext::createRenderImage(uint32_t w, uint32_t h, VkIma
   else {
     assert(false && "depth format unsupported");
   }
-  auto rv = vkCreateImage(device, &imageCI, nullptr, &renderImage->image);
-  assert(rv == VK_SUCCESS);
 
-  VkMemoryRequirements memReqs;
-  vkGetImageMemoryRequirements(device, renderImage->image, &memReqs);
+  auto renderImageHandle = createRenderImage(imageCI);
+  auto * renderImage = renderImageHandle.resource;
 
-  VkMemoryAllocateInfo memAllocInfo = {};
-  memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  memAllocInfo.pNext = nullptr;
-  memAllocInfo.allocationSize = 0;
-  memAllocInfo.memoryTypeIndex = 0;
-  memAllocInfo.allocationSize = memReqs.size;
-
-  auto rvb = getMemoryTypeIndex(memAllocInfo.memoryTypeIndex, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-  assert(rvb);
-
-  rv = vkAllocateMemory(device, &memAllocInfo, NULL, &renderImage->mem);
-  assert(rv == VK_SUCCESS);
-
-  rv = vkBindImageMemory(device, renderImage->image, renderImage->mem, 0);
-  assert(rv == VK_SUCCESS);
+  // create view
 
   VkImageViewCreateInfo imageViewCI = {};
   imageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -718,7 +729,7 @@ RenderImageHandle VulkanContext::createRenderImage(uint32_t w, uint32_t h, VkIma
   imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
   imageViewCI.flags = 0;
   imageViewCI.image = renderImage->image;
-  rv = vkCreateImageView(device, &imageViewCI, NULL, &renderImage->view);
+  auto rv = vkCreateImageView(device, &imageViewCI, NULL, &renderImage->view);
   assert(rv == VK_SUCCESS);
 
   return renderImageHandle;

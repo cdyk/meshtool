@@ -129,6 +129,45 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
     renaming[i].ready = vCtx->createFence(true);
     renaming[i].objectBuffer = vCtx->createUniformBuffer(sizeof(ObjectBuffer));
   }
+  
+
+  uint32_t texW = 8;
+  uint32_t texH = 8;
+
+  auto stagingBuffer = vCtx->createBuffer(texW*texH * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+  {
+    MappedBuffer<uint8_t> map(vCtx, stagingBuffer);
+    for (unsigned j = 0; j < texH; j++) {
+      for (unsigned i = 0; i < texW; i++) {
+        auto f = ((i / (w / 2) + j / (h / 2))) & 1 ? 170 : 255;
+        map.mem[4 * (w*j + i) + 0] = f;
+        map.mem[4 * (w*j + i) + 1] = f;
+        map.mem[4 * (w*j + i) + 2] = f;
+        map.mem[4 * (w*j + i) + 3] = 255;
+      }
+    }
+  }
+
+  {
+    VkImageCreateInfo info{};
+    info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    info.imageType = VK_IMAGE_TYPE_2D;
+    info.extent.width = static_cast<uint32_t>(texW);
+    info.extent.height = static_cast<uint32_t>(texH);
+    info.extent.depth = 1;
+    info.mipLevels = 1;
+    info.arrayLayers = 1;
+    info.format = VK_FORMAT_R8G8B8A8_UNORM;
+    info.tiling = VK_IMAGE_TILING_OPTIMAL;
+    info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+    info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    info.samples = VK_SAMPLE_COUNT_1_BIT;
+    info.flags = 0;
+
+    auto texImage = vCtx->createRenderImage(info);
+  }
+
+  //auto texImage = vCtx->createRenderImage(texW, texH, VK_FORMAT_R8G8B8A8_UNORM)
 
 }
 
