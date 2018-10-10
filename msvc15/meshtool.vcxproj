@@ -90,6 +90,7 @@
     <ClCompile Include="..\libs\imgui\imgui_demo.cpp" />
     <ClCompile Include="..\libs\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\libs\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="..\src\App.cpp" />
     <ClCompile Include="..\src\Common.cpp" />
     <ClCompile Include="..\src\LinAlgOps.cpp" />
     <ClCompile Include="..\src\main.cpp" />
@@ -99,10 +100,10 @@
     <ClCompile Include="..\src\ResourceManager.cpp" />
     <ClCompile Include="..\src\Tasks.cpp" />
     <ClCompile Include="..\src\Viewer.cpp" />
-    <ClCompile Include="..\src\VulkanApp.cpp" />
     <ClCompile Include="..\src\VulkanContext.cpp" />
     <ClCompile Include="..\src\VulkanFrameManager.cpp" />
     <ClCompile Include="..\src\VulkanInfos.cpp" />
+    <ClCompile Include="..\src\VulkanManager.cpp" />
     <ClCompile Include="..\src\VulkanResources.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -114,6 +115,7 @@
     <ClInclude Include="..\libs\imgui\imstb_rectpack.h" />
     <ClInclude Include="..\libs\imgui\imstb_textedit.h" />
     <ClInclude Include="..\libs\imgui\imstb_truetype.h" />
+    <ClInclude Include="..\src\App.h" />
     <ClInclude Include="..\src\Common.h" />
     <ClInclude Include="..\src\LinAlg.h" />
     <ClInclude Include="..\src\LinAlgOps.h" />
@@ -121,10 +123,10 @@
     <ClInclude Include="..\src\Renderer.h" />
     <ClInclude Include="..\src\ResourceManager.h" />
     <ClInclude Include="..\src\Viewer.h" />
-    <ClInclude Include="..\src\VulkanApp.h" />
     <ClInclude Include="..\src\VulkanContext.h" />
     <ClInclude Include="..\src\VulkanFrameManager.h" />
     <ClInclude Include="..\src\VulkanInfos.h" />
+    <ClInclude Include="..\src\VulkanManager.h" />
     <ClInclude Include="..\src\VulkanResources.h" />
   </ItemGroup>
   <ItemGroup>

@@ -2,9 +2,18 @@
 #include <vulkan/vulkan.h>
 #include "Common.h"
 #include "VulkanContext.h"
+#include "ResourceManager.h"
 
+struct RenderMesh : ResourceBase
+{
+  RenderMesh(ResourceManagerBase& manager) : ResourceBase(manager) {}
+  Mesh* mesh = nullptr;
+  RenderBufferHandle vtxNrmTex;
+  RenderBufferHandle color;
+  uint32_t tri_n = 0;
+};
+typedef ResourceHandle<RenderMesh> RenderMeshHandle;
 
-struct RenderMesh;
 struct Vec4f;
 struct Mat4f;
 struct Mat3f;
@@ -18,16 +27,19 @@ public:
   Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h);
   ~Renderer();
 
-  RenderMesh* createRenderMesh(Mesh* mesh);
+  RenderMeshHandle createRenderMesh(Mesh* mesh);
 
-  void updateRenderMeshColor(RenderMesh* renderMesh);
+  void houseKeep();
 
-  void drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMesh* renderMesh, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP);
-  void destroyRenderMesh(RenderMesh* renderMesh);
+  void updateRenderMeshColor(RenderMeshHandle renderMesh);
+
+  void drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMeshHandle renderMesh, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP);
 
 private:
   Logger logger;
   VulkanContext* vCtx = nullptr;
+
+  ResourceManager<RenderMesh> renderMeshResources;
 
   PipelineHandle vanillaPipeline;
   PipelineHandle wireFrontFacePipeline;

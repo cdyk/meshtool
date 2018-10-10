@@ -14,13 +14,7 @@ struct ObjectBuffer
 };
 
 
-struct RenderMesh
-{
-  Mesh* mesh = nullptr;
-  RenderBufferHandle vtxNrmTex;
-  RenderBufferHandle color;
-  uint32_t tri_n = 0;
-};
+
 
 namespace {
 
@@ -177,9 +171,21 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
 
 Renderer::~Renderer()
 {
+  houseKeep();
+  logger(0, "%d unreleased buffers", renderMeshResources.getCount());
 }
 
-RenderMesh* Renderer::createRenderMesh(Mesh* mesh)
+void Renderer::houseKeep()
+{
+  Vector<RenderMesh*> orphans;
+  renderMeshResources.getOrphans(orphans);
+  for (auto * r : orphans) {
+    delete r;
+  }
+}
+
+
+RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
 {
   struct VtxNrmTex
   {
@@ -188,7 +194,9 @@ RenderMesh* Renderer::createRenderMesh(Mesh* mesh)
     Vec2f tex;
   };
 
-  auto * renderMesh = new RenderMesh();
+  auto renderMeshHandle = renderMeshResources.createResource();
+  auto * renderMesh = renderMeshHandle.resource;
+
   renderMesh->mesh = mesh;
   renderMesh->tri_n = mesh->triCount;
   
@@ -221,26 +229,26 @@ RenderMesh* Renderer::createRenderMesh(Mesh* mesh)
   updateRenderMeshColor(renderMesh);
 
   logger(0, "CreateRenderMesh");
-  return renderMesh;
+  return renderMeshHandle;
 }
 
-void Renderer::updateRenderMeshColor(RenderMesh* renderMesh)
+void Renderer::updateRenderMeshColor(RenderMeshHandle renderMesh)
 {
-  {
-    MappedBuffer<uint32_t> map(vCtx, renderMesh->color);
-    for (unsigned i = 0; i < renderMesh->mesh->triCount; i++) {
-      auto color = renderMesh->mesh->currentColor[i];
-      map.mem[3 * i + 0] = color;
-      map.mem[3 * i + 1] = color;
-      map.mem[3 * i + 2] = color;
-    }
+  auto * rm = renderMesh.resource;
+  MappedBuffer<uint32_t> map(vCtx, rm->color);
+  for (unsigned i = 0; i < rm->mesh->triCount; i++) {
+    auto color = rm->mesh->currentColor[i];
+    map.mem[3 * i + 0] = color;
+    map.mem[3 * i + 1] = color;
+    map.mem[3 * i + 2] = color;
   }
   logger(0, "Updated mesh color");
 }
 
 
-void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMesh* renderMesh, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP)
+void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMeshHandle renderMesh, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP)
 {
+  auto * rm = renderMesh.resource;
   if(!vanillaPipeline || vanillaPipeline.resource->pass != pass)
   {
     VkDescriptorSetLayoutBinding descSetLayoutBind{};
@@ -323,7 +331,7 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
   }
 
   {
-    VkBuffer buffers[2] = { renderMesh->vtxNrmTex.resource->buffer, renderMesh->color.resource->buffer };
+    VkBuffer buffers[2] = { rm->vtxNrmTex.resource->buffer, rm->color.resource->buffer };
     VkDeviceSize offsets[2] = { 0, 0 };
     vkCmdBindVertexBuffers(cmdBuf, 0, 2, buffers, offsets);
   }
@@ -332,7 +340,7 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
   if(solid) {
     vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipe);
     vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, desc_set, 0, NULL);
-    vkCmdDraw(cmdBuf, 3 * renderMesh->tri_n, 1, 0, 0);
+    vkCmdDraw(cmdBuf, 3 * rm->tri_n, 1, 0, 0);
   }
 
   if(outlines) {
@@ -344,17 +352,11 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
       vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, wireBothFacesPipeline.resource->pipe);
       vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, desc_set, 0, NULL);
     }
-    vkCmdDraw(cmdBuf, 3 * renderMesh->tri_n, 1, 0, 0);
+    vkCmdDraw(cmdBuf, 3 * rm->tri_n, 1, 0, 0);
   }
 
 
   renamingCurr = (renamingCurr + 1);
   if (renaming.size() <= renamingCurr) renamingCurr = 0;
-}
-
-void Renderer::destroyRenderMesh(RenderMesh* renderMesh)
-{
-  logger(0, "destroyRenderMesh");
-  delete renderMesh;
 }
 

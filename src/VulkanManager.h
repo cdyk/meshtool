@@ -2,25 +2,24 @@
 #include <list>
 #include "Common.h"
 #include "VulkanResources.h"
+#include "Renderer.h"
 
 struct RenderMesh;
 struct Vec4f;
 struct Mat4f;
 struct Mat3f;
 
-class VulkanApp
+class VulkanManager
 {
 public:
-  VulkanApp(Logger l, GLFWwindow* window, uint32_t w, uint32_t h);
-  ~VulkanApp();
-
-  class Renderer* main_VulkanInit();
+  VulkanManager(Logger l, GLFWwindow* window, uint32_t w, uint32_t h);
+  ~VulkanManager();
 
   void resize(uint32_t w, uint32_t h);
 
   void startFrame();
 
-  void render(uint32_t w, uint32_t h, Vector<RenderMesh*>& renderMeshes, const Vec4f& viewerViewport, const Mat4f& P, const Mat4f& M);
+  void render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes, const Vec4f& viewerViewport, const Mat4f& P, const Mat4f& M);
 
   void present();
 

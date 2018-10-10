@@ -2,7 +2,7 @@
 #include <GLFW/glfw3.h>
 #include <vector>
 #include <cassert>
-#include "VulkanApp.h"
+#include "VulkanManager.h"
 #include "Common.h"
 #include "VulkanContext.h"
 #include "Renderer.h"
@@ -110,7 +110,7 @@ namespace
 
 }
 
-VulkanApp::VulkanApp(Logger l, GLFWwindow* window, uint32_t w, uint32_t h)
+VulkanManager::VulkanManager(Logger l, GLFWwindow* window, uint32_t w, uint32_t h)
 {
   logger = l;
 
@@ -153,7 +153,7 @@ VulkanApp::VulkanApp(Logger l, GLFWwindow* window, uint32_t w, uint32_t h)
 
 }
 
-VulkanApp::~VulkanApp()
+VulkanManager::~VulkanManager()
 {
   rendererPass.release();
   rendererFrameBuffers.resize(0);
@@ -168,14 +168,14 @@ VulkanApp::~VulkanApp()
 }
 
 
-void VulkanApp::startFrame()
+void VulkanManager::startFrame()
 {
   vCtx->houseKeep();
   ImGui_ImplVulkan_NewFrame();
 
 }
 
-void VulkanApp::resize(uint32_t w, uint32_t h)
+void VulkanManager::resize(uint32_t w, uint32_t h)
 {
   auto * wd = &imguiWindowData;
 
@@ -346,7 +346,7 @@ void VulkanApp::resize(uint32_t w, uint32_t h)
 }
 
 
-void VulkanApp::render(uint32_t w, uint32_t h, Vector<RenderMesh*>& renderMeshes, const Vec4f& viewerViewport, const Mat4f& P, const Mat4f& M)
+void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes, const Vec4f& viewerViewport, const Mat4f& P, const Mat4f& M)
 {
   VkSemaphore& image_acquired_semaphore = imguiWindowData.Frames[imguiWindowData.FrameIndex].ImageAcquiredSemaphore;
   auto rv = vkAcquireNextImageKHR(vCtx->device, imguiWindowData.Swapchain, UINT64_MAX, image_acquired_semaphore, VK_NULL_HANDLE, &imguiWindowData.FrameIndex);
@@ -430,7 +430,7 @@ void VulkanApp::render(uint32_t w, uint32_t h, Vector<RenderMesh*>& renderMeshes
   assert(rv == VK_SUCCESS);
 }
 
-void VulkanApp::present()
+void VulkanManager::present()
 {
   ImGui_ImplVulkanH_FrameData* fd = &imguiWindowData.Frames[imguiWindowData.FrameIndex];
   VkPresentInfoKHR info = {};
