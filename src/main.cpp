@@ -19,7 +19,7 @@
 #include "Mesh.h"
 #include "LinAlgOps.h"
 #include "Renderer.h"
-#include "VulkanMain.h"
+#include "VulkanApp.h"
 
 
 namespace {
@@ -42,8 +42,8 @@ namespace {
   bool colorFromSmoothingGroup = true;
   bool colorFromObjectId = false;
 
+  VulkanApp* app = nullptr;
 
-  Renderer* renderer = nullptr;
 
   std::mutex incomingMeshLock;
   std::list<Mesh*> incomingMeshes;
@@ -133,8 +133,8 @@ namespace {
       if (key == GLFW_KEY_S && action == GLFW_PRESS) moveToSelection = true;
     }
     else if (mods == 0) {
-      if (key == GLFW_KEY_W && action == GLFW_PRESS)  renderer->outlines = !renderer->outlines;
-      if (key == GLFW_KEY_S && action == GLFW_PRESS)  renderer->solid = !renderer->solid;
+      if (key == GLFW_KEY_W && action == GLFW_PRESS)  app->renderer->outlines = !app->renderer->outlines;
+      if (key == GLFW_KEY_S && action == GLFW_PRESS)  app->renderer->solid = !app->renderer->solid;
     }
 
   }
@@ -225,8 +225,8 @@ namespace {
         if (ImGui::MenuItem("View all", "CTRL+SHIFT+A", nullptr)) { viewAll = true; }
         if (ImGui::MenuItem("View selection", "CTRL+SHIFT+S")) { moveToSelection = true; }
         ImGui::Separator();
-        if (ImGui::MenuItem("Solid", "S", &renderer->solid)) {}
-        if (ImGui::MenuItem("Outlines", "W", &renderer->outlines)) {}
+        if (ImGui::MenuItem("Solid", "S", &app->renderer->solid)) {}
+        if (ImGui::MenuItem("Outlines", "W", &app->renderer->outlines)) {}
         ImGui::Separator();
         if (ImGui::MenuItem("Color from smoothing group", nullptr, &colorFromSmoothingGroup)) {
           colorFromObjectId = false;
@@ -308,7 +308,7 @@ namespace {
         std::memset(m->selected, 0, sizeof(bool)*obj_n);
         updateColor = true;
 
-        meshItems.push_back({ m, renderer->createRenderMesh(m) });
+        meshItems.push_back({ m, app->renderer->createRenderMesh(m) });
       }
       auto bbox = createEmptyBBox3f();
       for (auto & item : meshItems) {
@@ -367,8 +367,8 @@ int main(int argc, char** argv)
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
 
-  renderer = main_VulkanInit(logger, window, width, height);
 
+  app = new VulkanApp(logger, window, width, height);
 
   glfwSetWindowSizeCallback(window, resizeFunc);
   glfwSetCursorPosCallback(window, moveFunc);
@@ -413,7 +413,7 @@ int main(int argc, char** argv)
     glfwPollEvents();
     if (wasResized) {
       wasResized = false;
-      main_VulkanResize(width, height);
+      app->resize(width, height);
     }
     {
       Vec2f viewerPos(leftSplit, menuHeight);
@@ -425,7 +425,7 @@ int main(int argc, char** argv)
     tasks.update();
     checkQueues();
 
-    main_VulkanStartFrame();
+    app->startFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     guiTraversal(window);
@@ -516,22 +516,21 @@ int main(int argc, char** argv)
     for (auto & it : meshItems) {
       renderMeshes[i++] = it.renderMesh;
       if (updateColor) {
-        renderer->updateRenderMeshColor(it.renderMesh);
+        app->renderer->updateRenderMeshColor(it.renderMesh);
       }
     }
     updateColor = false;
 
-    main_VulkanRender(width, height, renderMeshes, viewport, viewer.getProjectionMatrix(), viewer.getViewMatrix());
-    main_VulkanPresent();
+    app->render(width, height, renderMeshes, viewport, viewer.getProjectionMatrix(), viewer.getViewMatrix());
+    app->present();
   }
 
   for (auto & item : meshItems) {
-    renderer->destroyRenderMesh(item.renderMesh);
+    app->renderer->destroyRenderMesh(item.renderMesh);
   }
   meshItems.clear();
 
-  main_VulkanCleanup();
-
+  delete app;
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
 

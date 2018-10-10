@@ -1,26 +1,13 @@
-#include "VulkanFrameContext.h"
+#include "VulkanInfos.h"
+#include "VulkanContext.h"
+#include "VulkanFrameManager.h"
 
-
-VulkanFrameContext::VulkanFrameContext(Logger logger, uint32_t framesInFlight,
-                                       const char**instanceExts, uint32_t instanceExtCount) :
-  VulkanResourceContext(logger, instanceExts, instanceExtCount),
-  framesInFlight(framesInFlight)
+void VulkanFrameManager::init()
 {
-}
-
-VulkanFrameContext::~VulkanFrameContext()
-{
-}
-
-
-void VulkanFrameContext::init()
-{
-  VulkanResourceContext::init();
-
-  surface = createSurface();
+  surface = vCtx->surfaceManager->createSurface(vCtx);
 
   VkBool32 supportsPresent = VK_FALSE;
-  vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, queueFamilyIndex, surface, &supportsPresent);
+  vkGetPhysicalDeviceSurfaceSupportKHR(vCtx->physicalDevice, vCtx->queueFamilyIndex, surface, &supportsPresent);
   assert(supportsPresent == VK_TRUE);
 
   Vector<VkFormat> requestedFormats;
@@ -34,26 +21,28 @@ void VulkanFrameContext::init()
   requestedPresentModes.pushBack(VK_PRESENT_MODE_FIFO_KHR);
   presentMode = choosePresentMode(requestedPresentModes);
 
+  auto * res = vCtx->resources;
+
   frameData.resize(framesInFlight);
   for (auto & frame : frameData) {
-    frame.commandPool = createCommandPool(queueFamilyIndex);
-    frame.commandBuffer = createPrimaryCommandBuffer(frame.commandPool);
-    frame.imageAcquiredSemaphore = createSemaphore();
-    frame.renderCompleteSemaphore = createSemaphore();
-    frame.fence = createFence(true);
+    frame.commandPool = res->createCommandPool(vCtx->queueFamilyIndex);
+    frame.commandBuffer = res->createPrimaryCommandBuffer(frame.commandPool);
+    frame.imageAcquiredSemaphore = res->createSemaphore();
+    frame.renderCompleteSemaphore = res->createSemaphore();
+    frame.fence = res->createFence(true);
   }
 }
 
-VkSurfaceFormatKHR VulkanFrameContext::chooseFormat(Vector<VkFormat>& requestedFormats, VkColorSpaceKHR requestedColorSpace)
+VkSurfaceFormatKHR VulkanFrameManager::chooseFormat(Vector<VkFormat>& requestedFormats, VkColorSpaceKHR requestedColorSpace)
 {
   assert(requestedFormats.size() != 0);
 
   uint32_t count = 0;
-  auto rv = vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &count, nullptr);
+  auto rv = vkGetPhysicalDeviceSurfaceFormatsKHR(vCtx->physicalDevice, surface, &count, nullptr);
   assert(rv == VK_SUCCESS);
 
   Vector<VkSurfaceFormatKHR> availableFormats(count);
-  rv = vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &count, availableFormats.data());
+  rv = vkGetPhysicalDeviceSurfaceFormatsKHR(vCtx->physicalDevice, surface, &count, availableFormats.data());
   assert(rv == VK_SUCCESS);
 
   if (availableFormats.size() == 1 && availableFormats[0].format == VK_FORMAT_UNDEFINED) {
@@ -72,15 +61,15 @@ VkSurfaceFormatKHR VulkanFrameContext::chooseFormat(Vector<VkFormat>& requestedF
   return availableFormats[0];
 }
 
-VkPresentModeKHR VulkanFrameContext::choosePresentMode(Vector<VkPresentModeKHR>& requestedModes)
+VkPresentModeKHR VulkanFrameManager::choosePresentMode(Vector<VkPresentModeKHR>& requestedModes)
 {
   assert(requestedModes.size() != 0);
 
   uint32_t count = 0;
-  vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &count, nullptr);
+  vkGetPhysicalDeviceSurfacePresentModesKHR(vCtx->physicalDevice, surface, &count, nullptr);
 
   Vector<VkPresentModeKHR> availableModes(count);
-  vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &count, availableModes.data());
+  vkGetPhysicalDeviceSurfacePresentModesKHR(vCtx->physicalDevice, surface, &count, availableModes.data());
 
   for (auto & requestedMode : requestedModes) {
     for (auto & availableMode : availableModes) {
@@ -93,24 +82,23 @@ VkPresentModeKHR VulkanFrameContext::choosePresentMode(Vector<VkPresentModeKHR>&
 
 
 
-void VulkanFrameContext::resize(uint32_t w, uint32_t h)
+void VulkanFrameManager::resize(uint32_t w, uint32_t h)
 {
-  auto rv = vkDeviceWaitIdle(device);
+  auto rv = vkDeviceWaitIdle(vCtx->device);
   assert(rv == VK_SUCCESS);
 
 }
 
 
-void VulkanFrameContext::houseKeep()
+void VulkanFrameManager::houseKeep()
 {
-  VulkanResourceContext::houseKeep();
-  
+ 
 }
 
-void VulkanFrameContext::copyBuffer(RenderBufferHandle dst, RenderBufferHandle src, VkDeviceSize size)
+void VulkanFrameManager::copyBuffer(RenderBufferHandle dst, RenderBufferHandle src, VkDeviceSize size)
 {
-  auto cmdBuf = createPrimaryCommandBuffer(currentFrameData().commandPool);
-  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &infos.commandBuffer.singleShot);
+  auto cmdBuf = vCtx->resources->createPrimaryCommandBuffer(currentFrameData().commandPool);
+  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &vCtx->infos->commandBuffer.singleShot);
   VkBufferCopy copyRegion{};
   copyRegion.size = size;
   vkCmdCopyBuffer(cmdBuf.resource->cmdBuf, src.resource->buffer, dst.resource->buffer, 1, &copyRegion);
@@ -118,10 +106,10 @@ void VulkanFrameContext::copyBuffer(RenderBufferHandle dst, RenderBufferHandle s
   submitGraphics(cmdBuf, true);
 }
 
-void VulkanFrameContext::transitionImageLayout(RenderImageHandle image, VkImageLayout layout)
+void VulkanFrameManager::transitionImageLayout(RenderImageHandle image, VkImageLayout layout)
 {
-  auto cmdBuf = createPrimaryCommandBuffer(currentFrameData().commandPool);
-  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &infos.commandBuffer.singleShot);
+  auto cmdBuf = vCtx->resources->createPrimaryCommandBuffer(currentFrameData().commandPool);
+  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &vCtx->infos->commandBuffer.singleShot);
 
   VkImageMemoryBarrier barrier = {};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -154,10 +142,10 @@ void VulkanFrameContext::transitionImageLayout(RenderImageHandle image, VkImageL
   image.resource->layout = layout;
 }
 
-void VulkanFrameContext::copyBufferToImage(RenderImageHandle dst, RenderBufferHandle src, uint32_t w, uint32_t h)
+void VulkanFrameManager::copyBufferToImage(RenderImageHandle dst, RenderBufferHandle src, uint32_t w, uint32_t h)
 {
-  auto cmdBuf = createPrimaryCommandBuffer(currentFrameData().commandPool);
-  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &infos.commandBuffer.singleShot);
+  auto cmdBuf = vCtx->resources->createPrimaryCommandBuffer(currentFrameData().commandPool);
+  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &vCtx->infos->commandBuffer.singleShot);
 
   VkBufferImageCopy region{};
   region.bufferOffset = 0;
@@ -176,18 +164,18 @@ void VulkanFrameContext::copyBufferToImage(RenderImageHandle dst, RenderBufferHa
 
 
 
-void VulkanFrameContext::submitGraphics(CommandBufferHandle cmdBuf, bool wait)
+void VulkanFrameManager::submitGraphics(CommandBufferHandle cmdBuf, bool wait)
 {
   VkSubmitInfo submitInfo{};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &cmdBuf.resource->cmdBuf;
-  vkQueueSubmit(queue, 1, &submitInfo, VK_NULL_HANDLE);
-  if (wait) vkQueueWaitIdle(queue);
+  vkQueueSubmit(vCtx->queue, 1, &submitInfo, VK_NULL_HANDLE);
+  if (wait) vkQueueWaitIdle(vCtx->queue);
 }
 
 
-void VulkanFrameContext::updateDescriptorSet(DescriptorSetHandle descriptorSet, RenderBufferHandle buffer)
+void VulkanFrameManager::updateDescriptorSet(DescriptorSetHandle descriptorSet, RenderBufferHandle buffer)
 {
   VkDescriptorBufferInfo descBufInfo;
   descBufInfo.buffer = buffer.resource->buffer;
@@ -204,5 +192,5 @@ void VulkanFrameContext::updateDescriptorSet(DescriptorSetHandle descriptorSet, 
   writes[0].pBufferInfo = &descBufInfo;
   writes[0].dstArrayElement = 0;
   writes[0].dstBinding = 0;
-  vkUpdateDescriptorSets(device, 1, writes, 0, NULL);
+  vkUpdateDescriptorSets(vCtx->device, 1, writes, 0, NULL);
 }

@@ -2,7 +2,8 @@
 #include <vulkan/vulkan.h>
 #include "Common.h"
 #include "ResourceManager.h"
-#include "VulkanContext.h"
+
+class VulkanContext;
 
 struct ShaderInputSpec {
   uint32_t* spv;
@@ -109,19 +110,18 @@ struct SwapChain : public ResourceBase
 typedef ResourceHandle<SwapChain> SwapChainHandle;
 
 
-class VulkanResourceContext : public VulkanContext
+class VulkanContext;
+
+class VulkanResources
 {
 public:
-  VulkanResourceContext() = delete;
+  VulkanResources(VulkanContext* vCtx, Logger logger) : vCtx(vCtx), logger(logger) {}
 
-  VulkanResourceContext(Logger logger, const char**instanceExts, uint32_t instanceExtCount);
+  ~VulkanResources();
 
-  virtual ~VulkanResourceContext();
+  void init();
 
-  virtual void init();
-
-  virtual void houseKeep();
-
+  void houseKeep();
 
   PipelineHandle createPipeline(Vector<VkVertexInputBindingDescription>& inputBind,
                                 Vector<VkVertexInputAttributeDescription>& inputAttrib,
@@ -158,6 +158,8 @@ public:
 
 
 private:
+  VulkanContext* vCtx = nullptr;
+  Logger logger = nullptr;
   bool getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements);
 
   void destroyBuffer(RenderBuffer*);

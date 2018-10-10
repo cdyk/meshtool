@@ -1,21 +1,14 @@
 #include <cassert>
-#include "VulkanResourceContext.h"
+#include "VulkanContext.h"
+#include "VulkanResources.h"
 
 
-VulkanResourceContext::VulkanResourceContext(Logger logger, const char** instanceExts, uint32_t instanceExtCount) :
-  VulkanContext(logger, instanceExts, instanceExtCount)
-  
+void VulkanResources::init()
 {
 }
 
 
-void VulkanResourceContext::init()
-{
-  VulkanContext::init();
-}
-
-
-VulkanResourceContext::~VulkanResourceContext()
+VulkanResources::~VulkanResources()
 {
   houseKeep();
   logger(0, "%d unreleased buffers", bufferResources.getCount());
@@ -33,10 +26,8 @@ VulkanResourceContext::~VulkanResourceContext()
   logger(0, "%d unreleased swapChainResources", swapChainResources.getCount());
 }
 
-void VulkanResourceContext::houseKeep()
+void VulkanResources::houseKeep()
 {
-  VulkanContext::houseKeep();
-
   {
     Vector<RenderBuffer*> orphans;
     bufferResources.getOrphans(orphans);
@@ -142,7 +133,7 @@ void VulkanResourceContext::houseKeep()
 }
 
 
-PipelineHandle VulkanResourceContext::createPipeline(Vector<VkVertexInputBindingDescription>& inputBind,
+PipelineHandle VulkanResources::createPipeline(Vector<VkVertexInputBindingDescription>& inputBind,
                                                      Vector<VkVertexInputAttributeDescription>& inputAttrib,
                                                      VkPipelineLayoutCreateInfo& pipelineLayoutInfo,
                                                      VkDescriptorSetLayoutCreateInfo& descLayoutInfo,
@@ -161,12 +152,12 @@ PipelineHandle VulkanResourceContext::createPipeline(Vector<VkVertexInputBinding
     VK_DYNAMIC_STATE_SCISSOR
   };
 
-  auto rv = vkCreateDescriptorSetLayout(device, &descLayoutInfo, nullptr, &pipe->descLayout);
+  auto rv = vkCreateDescriptorSetLayout(vCtx->device, &descLayoutInfo, nullptr, &pipe->descLayout);
   assert(rv == VK_SUCCESS);
 
   pipelineLayoutInfo.setLayoutCount = 1;// uint32_t(descSetLayout.getCount());
   pipelineLayoutInfo.pSetLayouts = &pipe->descLayout;
-  rv = vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipe->pipeLayout);
+  rv = vkCreatePipelineLayout(vCtx->device, &pipelineLayoutInfo, nullptr, &pipe->pipeLayout);
   assert(rv == VK_SUCCESS);
 
   VkPipelineDynamicStateCreateInfo dynamicState = {};
@@ -275,22 +266,22 @@ PipelineHandle VulkanResourceContext::createPipeline(Vector<VkVertexInputBinding
   pipelineCI.renderPass = renderPass.resource->pass;
   pipelineCI.subpass = 0;
 
-  rv = vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &pipe->pipe);
+  rv = vkCreateGraphicsPipelines(vCtx->device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &pipe->pipe);
   assert(rv == VK_SUCCESS);
 
   logger(0, "Built pipeline");
   return pipeHandle;
 }
 
-void VulkanResourceContext::destroyPipeline(Pipeline* pipe)
+void VulkanResources::destroyPipeline(Pipeline* pipe)
 {
-  if (pipe->pipe) vkDestroyPipeline(device, pipe->pipe, nullptr);
-  if (pipe->pipeLayout) vkDestroyPipelineLayout(device, pipe->pipeLayout, nullptr);
-  if (pipe->descLayout) vkDestroyDescriptorSetLayout(device, pipe->descLayout, nullptr);
+  if (pipe->pipe) vkDestroyPipeline(vCtx->device, pipe->pipe, nullptr);
+  if (pipe->pipeLayout) vkDestroyPipelineLayout(vCtx->device, pipe->pipeLayout, nullptr);
+  if (pipe->descLayout) vkDestroyDescriptorSetLayout(vCtx->device, pipe->descLayout, nullptr);
 }
 
 
-RenderBufferHandle VulkanResourceContext::createBuffer(size_t requestedSize, VkImageUsageFlags usageFlags)
+RenderBufferHandle VulkanResources::createBuffer(size_t requestedSize, VkImageUsageFlags usageFlags)
 {
   auto bufHandle = bufferResources.createResource();
   auto * buf = bufHandle.resource;
@@ -307,11 +298,11 @@ RenderBufferHandle VulkanResourceContext::createBuffer(size_t requestedSize, VkI
   bufferCI.pQueueFamilyIndices = nullptr;
   bufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   bufferCI.flags = 0;
-  auto rv = vkCreateBuffer(device, &bufferCI, nullptr, &buf->buffer);
+  auto rv = vkCreateBuffer(vCtx->device, &bufferCI, nullptr, &buf->buffer);
   assert(rv == VK_SUCCESS);
 
   VkMemoryRequirements memReqs;
-  vkGetBufferMemoryRequirements(device, buf->buffer, &memReqs);
+  vkGetBufferMemoryRequirements(vCtx->device, buf->buffer, &memReqs);
   buf->alignedSize = memReqs.size;
 
   VkMemoryAllocateInfo allocInfo = {};
@@ -323,23 +314,23 @@ RenderBufferHandle VulkanResourceContext::createBuffer(size_t requestedSize, VkI
                                 VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
   assert(rvb);
 
-  rv = vkAllocateMemory(device, &allocInfo, NULL, &buf->mem);
+  rv = vkAllocateMemory(vCtx->device, &allocInfo, NULL, &buf->mem);
   assert(rv == VK_SUCCESS);
 
-  rv = vkBindBufferMemory(device, buf->buffer, buf->mem, 0);
+  rv = vkBindBufferMemory(vCtx->device, buf->buffer, buf->mem, 0);
   assert(rv == VK_SUCCESS);
 
   return bufHandle;
 }
 
-void VulkanResourceContext::destroyBuffer(RenderBuffer* buffer)
+void VulkanResources::destroyBuffer(RenderBuffer* buffer)
 {
-  if (buffer->buffer) vkDestroyBuffer(device, buffer->buffer, nullptr);
-  if (buffer->mem) vkFreeMemory(device, buffer->mem, nullptr);
+  if (buffer->buffer) vkDestroyBuffer(vCtx->device, buffer->buffer, nullptr);
+  if (buffer->mem) vkFreeMemory(vCtx->device, buffer->mem, nullptr);
 }
 
 
-DescriptorSetHandle VulkanResourceContext::createDescriptorSet(VkDescriptorSetLayout descLayout)
+DescriptorSetHandle VulkanResources::createDescriptorSet(VkDescriptorSetLayout descLayout)
 {
   auto descSetHandle = descriptorSetResources.createResource();
   auto * descSet = descSetHandle.resource;
@@ -347,23 +338,23 @@ DescriptorSetHandle VulkanResourceContext::createDescriptorSet(VkDescriptorSetLa
   VkDescriptorSetAllocateInfo alloc_info[1];
   alloc_info[0].sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
   alloc_info[0].pNext = nullptr;
-  alloc_info[0].descriptorPool = descPool;
+  alloc_info[0].descriptorPool = vCtx->descPool;
   alloc_info[0].descriptorSetCount = 1;
   alloc_info[0].pSetLayouts = &descLayout;
 
-  auto rv = vkAllocateDescriptorSets(device, alloc_info, &descSet->descSet);
+  auto rv = vkAllocateDescriptorSets(vCtx->device, alloc_info, &descSet->descSet);
   assert(rv == VK_SUCCESS);
 
   return descSetHandle;
 }
 
-void VulkanResourceContext::destroyDescriptorSet(DescriptorSet* descSet)
+void VulkanResources::destroyDescriptorSet(DescriptorSet* descSet)
 {
-  if (descSet->descSet) vkFreeDescriptorSets(device, descPool, 1, &descSet->descSet);
+  if (descSet->descSet) vkFreeDescriptorSets(vCtx->device, vCtx->descPool, 1, &descSet->descSet);
 }
 
 
-ShaderHandle VulkanResourceContext::createShader(Vector<ShaderInputSpec>& spec, const char* name)
+ShaderHandle VulkanResources::createShader(Vector<ShaderInputSpec>& spec, const char* name)
 {
   //char buf[256];
 
@@ -385,7 +376,7 @@ ShaderHandle VulkanResourceContext::createShader(Vector<ShaderInputSpec>& spec, 
     moduleCreateInfo.flags = 0;
     moduleCreateInfo.codeSize = spec[i].siz;
     moduleCreateInfo.pCode = spec[i].spv;
-    auto rv = vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &shader->stageCreateInfo[i].module);
+    auto rv = vkCreateShaderModule(vCtx->device, &moduleCreateInfo, nullptr, &shader->stageCreateInfo[i].module);
     assert(rv == VK_SUCCESS);
 
     //if (name) {
@@ -397,16 +388,16 @@ ShaderHandle VulkanResourceContext::createShader(Vector<ShaderInputSpec>& spec, 
   return shaderHandle;
 }
 
-void VulkanResourceContext::destroyShader(Shader* shader)
+void VulkanResources::destroyShader(Shader* shader)
 {
   for (size_t i = 0; i < shader->stageCreateInfo.size(); i++) {
-    vkDestroyShaderModule(device, shader->stageCreateInfo[i].module, nullptr);
+    vkDestroyShaderModule(vCtx->device, shader->stageCreateInfo[i].module, nullptr);
   }
   shader->stageCreateInfo.resize(0);
 }
 
 
-RenderImageHandle VulkanResourceContext::wrapRenderImageView(VkImageView view)
+RenderImageHandle VulkanResources::wrapRenderImageView(VkImageView view)
 {
   auto renderImageHandle = renderImageResources.createResource();
   auto * renderImage = renderImageHandle.resource;
@@ -415,17 +406,17 @@ RenderImageHandle VulkanResourceContext::wrapRenderImageView(VkImageView view)
   return renderImageHandle;
 }
 
-RenderImageHandle VulkanResourceContext::createRenderImage(VkImageCreateInfo& imageCreateInfo)
+RenderImageHandle VulkanResources::createRenderImage(VkImageCreateInfo& imageCreateInfo)
 {
   auto renderImageHandle = renderImageResources.createResource();
   auto * renderImage = renderImageHandle.resource;
   renderImage->format = imageCreateInfo.format;
 
-  auto rv = vkCreateImage(device, &imageCreateInfo, nullptr, &renderImage->image);
+  auto rv = vkCreateImage(vCtx->device, &imageCreateInfo, nullptr, &renderImage->image);
   assert(rv == VK_SUCCESS);
 
   VkMemoryRequirements memReqs;
-  vkGetImageMemoryRequirements(device, renderImage->image, &memReqs);
+  vkGetImageMemoryRequirements(vCtx->device, renderImage->image, &memReqs);
 
   VkMemoryAllocateInfo memAllocInfo = {};
   memAllocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -437,16 +428,16 @@ RenderImageHandle VulkanResourceContext::createRenderImage(VkImageCreateInfo& im
   auto rvb = getMemoryTypeIndex(memAllocInfo.memoryTypeIndex, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
   assert(rvb);
 
-  rv = vkAllocateMemory(device, &memAllocInfo, NULL, &renderImage->mem);
+  rv = vkAllocateMemory(vCtx->device, &memAllocInfo, NULL, &renderImage->mem);
   assert(rv == VK_SUCCESS);
 
-  rv = vkBindImageMemory(device, renderImage->image, renderImage->mem, 0);
+  rv = vkBindImageMemory(vCtx->device, renderImage->image, renderImage->mem, 0);
   assert(rv == VK_SUCCESS);
 
   return renderImageHandle;
 }
 
-RenderImageHandle VulkanResourceContext::createRenderImage(uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format)
+RenderImageHandle VulkanResources::createRenderImage(uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format)
 {
   VkImageCreateInfo imageCI = {};
   imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -467,7 +458,7 @@ RenderImageHandle VulkanResourceContext::createRenderImage(uint32_t w, uint32_t 
   imageCI.flags = 0;
 
   VkFormatProperties props;
-  vkGetPhysicalDeviceFormatProperties(physicalDevice, format, &props);
+  vkGetPhysicalDeviceFormatProperties(vCtx->physicalDevice, format, &props);
   if (props.linearTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) {
     imageCI.tiling = VK_IMAGE_TILING_LINEAR;
   }
@@ -500,13 +491,13 @@ RenderImageHandle VulkanResourceContext::createRenderImage(uint32_t w, uint32_t 
   imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
   imageViewCI.flags = 0;
   imageViewCI.image = renderImage->image;
-  auto rv = vkCreateImageView(device, &imageViewCI, NULL, &renderImage->view);
+  auto rv = vkCreateImageView(vCtx->device, &imageViewCI, NULL, &renderImage->view);
   assert(rv == VK_SUCCESS);
 
   return renderImageHandle;
 }
 
-RenderImageHandle VulkanResourceContext::createRenderImage(VkImage image, VkFormat format, VkImageSubresourceRange imageRange)
+RenderImageHandle VulkanResources::createRenderImage(VkImage image, VkFormat format, VkImageSubresourceRange imageRange)
 {
   auto renderImageHandle = renderImageResources.createResource();
   auto * renderImage = renderImageHandle.resource;
@@ -522,21 +513,21 @@ RenderImageHandle VulkanResourceContext::createRenderImage(VkImage image, VkForm
   info.image = image;
   info.subresourceRange = imageRange;
 
-  auto rv = vkCreateImageView(device, &info, nullptr, &renderImage->view);
+  auto rv = vkCreateImageView(vCtx->device, &info, nullptr, &renderImage->view);
   assert(rv == VK_SUCCESS);
   
   return renderImageHandle;
 }
 
-void VulkanResourceContext::destroyRenderImage(RenderImage* renderImage)
+void VulkanResources::destroyRenderImage(RenderImage* renderImage)
 {
-  if(renderImage->view) vkDestroyImageView(device, renderImage->view, nullptr);
-  if(renderImage->image)vkDestroyImage(device, renderImage->image, nullptr);
-  if(renderImage->mem) vkFreeMemory(device, renderImage->mem, nullptr);
+  if(renderImage->view) vkDestroyImageView(vCtx->device, renderImage->view, nullptr);
+  if(renderImage->image)vkDestroyImage(vCtx->device, renderImage->image, nullptr);
+  if(renderImage->mem) vkFreeMemory(vCtx->device, renderImage->mem, nullptr);
 }
 
 
-RenderPassHandle VulkanResourceContext::createRenderPass(VkAttachmentDescription* attachments, uint32_t attachmentCount,
+RenderPassHandle VulkanResources::createRenderPass(VkAttachmentDescription* attachments, uint32_t attachmentCount,
                                                          VkSubpassDescription* subpasses, uint32_t subpassCount,
                                                          VkSubpassDependency* dependency)
 {
@@ -555,21 +546,21 @@ RenderPassHandle VulkanResourceContext::createRenderPass(VkAttachmentDescription
     rp_info.dependencyCount = 0;
     rp_info.pDependencies = dependency;
 
-    auto rv = vkCreateRenderPass(device, &rp_info, NULL, &pass->pass);
+    auto rv = vkCreateRenderPass(vCtx->device, &rp_info, NULL, &pass->pass);
     assert(rv == VK_SUCCESS);
   }
 
   return passHandle;
 }
 
-void VulkanResourceContext::destroyRenderPass(RenderPass* pass)
+void VulkanResources::destroyRenderPass(RenderPass* pass)
 {
-  if (pass->pass) vkDestroyRenderPass(device, pass->pass, nullptr);
+  if (pass->pass) vkDestroyRenderPass(vCtx->device, pass->pass, nullptr);
   pass->pass = nullptr;
 }
 
 
-FrameBufferHandle VulkanResourceContext::createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<RenderImageHandle>& attachments)
+FrameBufferHandle VulkanResources::createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<RenderImageHandle>& attachments)
 {
   auto fbHandle = frameBufferResources.createResource();
   auto * fb = fbHandle.resource;
@@ -592,19 +583,19 @@ FrameBufferHandle VulkanResourceContext::createFrameBuffer(RenderPassHandle pass
   info.width = w;
   info.height = h;
   info.layers = 1;
-  auto rv = vkCreateFramebuffer(device, &info, NULL, &fb->fb);
+  auto rv = vkCreateFramebuffer(vCtx->device, &info, NULL, &fb->fb);
   assert(rv == VK_SUCCESS);
 
   return fbHandle;
 }
 
-void VulkanResourceContext::destroyFrameBuffer(FrameBuffer* fb)
+void VulkanResources::destroyFrameBuffer(FrameBuffer* fb)
 {
-  if (fb->fb) vkDestroyFramebuffer(device, fb->fb, nullptr);
+  if (fb->fb) vkDestroyFramebuffer(vCtx->device, fb->fb, nullptr);
 }
 
 
-CommandPoolHandle VulkanResourceContext::createCommandPool(uint32_t queueFamilyIx)
+CommandPoolHandle VulkanResources::createCommandPool(uint32_t queueFamilyIx)
 {
   VkCommandPoolCreateInfo info{};
   info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -612,19 +603,19 @@ CommandPoolHandle VulkanResourceContext::createCommandPool(uint32_t queueFamilyI
   info.queueFamilyIndex = queueFamilyIx;
 
   auto poolHandle = commandPoolResources.createResource();
-  auto rv = vkCreateCommandPool(device, &info, nullptr, &poolHandle.resource->cmdPool);
+  auto rv = vkCreateCommandPool(vCtx->device, &info, nullptr, &poolHandle.resource->cmdPool);
   assert(rv == VK_SUCCESS);
   return poolHandle;
 }
 
-void VulkanResourceContext::destroyCommandPool(CommandPool* cmdPool)
+void VulkanResources::destroyCommandPool(CommandPool* cmdPool)
 {
-  if (cmdPool->cmdPool) vkDestroyCommandPool(device, cmdPool->cmdPool, nullptr);
+  if (cmdPool->cmdPool) vkDestroyCommandPool(vCtx->device, cmdPool->cmdPool, nullptr);
   cmdPool->cmdPool = nullptr;
 }
 
 
-CommandBufferHandle VulkanResourceContext::createPrimaryCommandBuffer(CommandPoolHandle pool)
+CommandBufferHandle VulkanResources::createPrimaryCommandBuffer(CommandPoolHandle pool)
 {
   VkCommandBufferAllocateInfo info{};
   info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -633,72 +624,72 @@ CommandBufferHandle VulkanResourceContext::createPrimaryCommandBuffer(CommandPoo
   info.commandBufferCount = 1;
   auto handle = commandBufferResources.createResource();
   handle.resource->pool = pool;
-  auto rv = vkAllocateCommandBuffers(device, &info, &handle.resource->cmdBuf);
+  auto rv = vkAllocateCommandBuffers(vCtx->device, &info, &handle.resource->cmdBuf);
   assert(rv == VK_SUCCESS);
   return handle;
 }
 
-void VulkanResourceContext::destroyCommandBuffer(CommandBuffer* cmdBuf)
+void VulkanResources::destroyCommandBuffer(CommandBuffer* cmdBuf)
 {
 }
 
 
-FenceHandle VulkanResourceContext::createFence(bool signalled)
+FenceHandle VulkanResources::createFence(bool signalled)
 {
   VkFenceCreateInfo info = {};
   info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
   info.flags = signalled ? VK_FENCE_CREATE_SIGNALED_BIT : 0;
 
   auto handle = fenceResources.createResource();
-  auto rv = vkCreateFence(device, &info, nullptr, &handle.resource->fence);
+  auto rv = vkCreateFence(vCtx->device, &info, nullptr, &handle.resource->fence);
   assert(rv == VK_SUCCESS);
   return handle;
 }
 
-void VulkanResourceContext::destroyFence(Fence* fence)
+void VulkanResources::destroyFence(Fence* fence)
 {
-  if (fence->fence) vkDestroyFence(device, fence->fence, nullptr);
+  if (fence->fence) vkDestroyFence(vCtx->device, fence->fence, nullptr);
   fence->fence = nullptr;
 }
 
 
-SemaphoreHandle VulkanResourceContext::createSemaphore()
+SemaphoreHandle VulkanResources::createSemaphore()
 {
   VkSemaphoreCreateInfo info = {};
   info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
 
   auto handle = semaphoreResources.createResource();
-  auto rv = vkCreateSemaphore(device, &info, nullptr, &handle.resource->semaphore);
+  auto rv = vkCreateSemaphore(vCtx->device, &info, nullptr, &handle.resource->semaphore);
   assert(rv == VK_SUCCESS);
   return handle;
 }
 
 
-void VulkanResourceContext::destroySemaphore(Semaphore* semaphore)
+void VulkanResources::destroySemaphore(Semaphore* semaphore)
 {
-  vkDestroySemaphore(device, semaphore->semaphore, nullptr);
+  vkDestroySemaphore(vCtx->device, semaphore->semaphore, nullptr);
   semaphore->semaphore = nullptr;
 }
 
 
-SwapChainHandle VulkanResourceContext::createSwapChain(SwapChainHandle oldSwapChain, VkSwapchainCreateInfoKHR& swapChainInfo)
+SwapChainHandle VulkanResources::createSwapChain(SwapChainHandle oldSwapChain, VkSwapchainCreateInfoKHR& swapChainInfo)
 {
   return SwapChainHandle();
 }
 
-void VulkanResourceContext::destroySwapChain(SwapChain* swapChain)
+void VulkanResources::destroySwapChain(SwapChain* swapChain)
 {
 
 }
 
 
 
-bool VulkanResourceContext::getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements)
+bool VulkanResources::getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements)
 {
-  for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
+  for (uint32_t i = 0; i < vCtx->memoryProperties.memoryTypeCount; i++) {
     auto bit = 1 << i;
     if (typeBits & bit) {
-      if ((memoryProperties.memoryTypes[i].propertyFlags & requirements) == requirements) {
+      if ((vCtx->memoryProperties.memoryTypes[i].propertyFlags & requirements) == requirements) {
         index = i;
         return true;
       }

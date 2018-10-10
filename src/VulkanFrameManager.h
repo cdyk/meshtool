@@ -1,23 +1,18 @@
 #pragma once
 #include "Common.h"
-#include "VulkanResourceContext.h"
+#include "VulkanResources.h"
 
+class VulkanContext;
 
-
-
-class VulkanFrameContext : public VulkanResourceContext
+class VulkanFrameManager
 {
 public:
-  VulkanFrameContext(Logger logger, uint32_t framesInFlight,
-                     const char**instanceExts, uint32_t instanceExtCount);
+  VulkanFrameManager(VulkanContext* vCtx, Logger logger, uint32_t framesInFlight) : vCtx(vCtx), logger(logger), framesInFlight(framesInFlight) {}
 
-  virtual ~VulkanFrameContext();
 
-  virtual void init() override;
+  void init();
 
-  virtual void houseKeep() override;
-
-  virtual VkSurfaceKHR createSurface() = 0;
+  void houseKeep();
 
   void resize(uint32_t w, uint32_t h);
 
@@ -28,9 +23,6 @@ public:
   void copyBufferToImage(RenderImageHandle dst, RenderBufferHandle src, uint32_t w, uint32_t h);
   void submitGraphics(CommandBufferHandle cmdBuf, bool wait = false);
 
-
-
-  uint32_t framesInFlight;
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   VkSurfaceFormatKHR surfaceFormat;
   VkPresentModeKHR presentMode;
@@ -46,6 +38,7 @@ public:
   Vector<FrameData> frameData;
 
   uint32_t frameIndex = 0;
+  uint32_t framesInFlight = 0;
   FrameData& currentFrameData() { return frameData[frameIndex]; }
 
 
@@ -53,7 +46,8 @@ public:
   VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
 
 private:
-
+  VulkanContext* vCtx = nullptr;
+  Logger logger = nullptr;
 
 
   VkSurfaceFormatKHR chooseFormat(Vector<VkFormat>& requestedFormats, VkColorSpaceKHR requestedColorSpace);

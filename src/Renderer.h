@@ -1,7 +1,7 @@
 #pragma once
 #include <vulkan/vulkan.h>
 #include "Common.h"
-#include "VulkanFrameContext.h"
+#include "VulkanContext.h"
 
 
 struct RenderMesh;
@@ -15,7 +15,7 @@ public:
   bool outlines = true;
   bool solid = true;
 
-  Renderer(Logger logger, VulkanFrameContext* vCtx, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h);
+  Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h);
   ~Renderer();
 
   RenderMesh* createRenderMesh(Mesh* mesh);
@@ -27,7 +27,7 @@ public:
 
 private:
   Logger logger;
-  VulkanFrameContext* vCtx = nullptr;
+  VulkanContext* vCtx = nullptr;
 
   PipelineHandle vanillaPipeline;
   PipelineHandle wireFrontFacePipeline;

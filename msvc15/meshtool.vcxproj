@@ -99,11 +99,11 @@
     <ClCompile Include="..\src\ResourceManager.cpp" />
     <ClCompile Include="..\src\Tasks.cpp" />
     <ClCompile Include="..\src\Viewer.cpp" />
+    <ClCompile Include="..\src\VulkanApp.cpp" />
     <ClCompile Include="..\src\VulkanContext.cpp" />
-    <ClCompile Include="..\src\VulkanFrameContext.cpp" />
+    <ClCompile Include="..\src\VulkanFrameManager.cpp" />
     <ClCompile Include="..\src\VulkanInfos.cpp" />
-    <ClCompile Include="..\src\VulkanMain.cpp" />
-    <ClCompile Include="..\src\VulkanResourceContext.cpp" />
+    <ClCompile Include="..\src\VulkanResources.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\libs\imgui\examples\imgui_impl_glfw.h" />
@@ -121,11 +121,11 @@
     <ClInclude Include="..\src\Renderer.h" />
     <ClInclude Include="..\src\ResourceManager.h" />
     <ClInclude Include="..\src\Viewer.h" />
+    <ClInclude Include="..\src\VulkanApp.h" />
     <ClInclude Include="..\src\VulkanContext.h" />
-    <ClInclude Include="..\src\VulkanFrameContext.h" />
+    <ClInclude Include="..\src\VulkanFrameManager.h" />
     <ClInclude Include="..\src\VulkanInfos.h" />
-    <ClInclude Include="..\src\VulkanMain.h" />
-    <ClInclude Include="..\src\VulkanResourceContext.h" />
+    <ClInclude Include="..\src\VulkanResources.h" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\shaders\vanillaPS.glsl">

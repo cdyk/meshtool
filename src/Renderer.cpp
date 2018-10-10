@@ -48,19 +48,19 @@ namespace {
   {
     {
       inputBind.resize(2);
-      inputBind[0] = vCtx->infos.vertexInput.v32b;
+      inputBind[0] = vCtx->infos->vertexInput.v32b;
       inputBind[0].binding = 0;
-      inputBind[1] = vCtx->infos.vertexInput.v4b;
+      inputBind[1] = vCtx->infos->vertexInput.v4b;
       inputBind[1].binding = 1;
 
       inputAttrib.resize(4);
-      inputAttrib[0] = vCtx->infos.vertexInput.v3f_0_0b;
+      inputAttrib[0] = vCtx->infos->vertexInput.v3f_0_0b;
       inputAttrib[0].location = 0;
-      inputAttrib[1] = vCtx->infos.vertexInput.v3f_1_12b;
+      inputAttrib[1] = vCtx->infos->vertexInput.v3f_1_12b;
       inputAttrib[1].location = 1;
-      inputAttrib[2] = vCtx->infos.vertexInput.v2f_2_24b;
+      inputAttrib[2] = vCtx->infos->vertexInput.v2f_2_24b;
       inputAttrib[2].location = 2;
-      inputAttrib[3] = vCtx->infos.vertexInput.v4u8_0b;
+      inputAttrib[3] = vCtx->infos->vertexInput.v4u8_0b;
       inputAttrib[3].location = 3;
       inputAttrib[3].binding = 1;
     }
@@ -80,15 +80,15 @@ namespace {
   {
     {
       inputBind.resize(2);
-      inputBind[0] = vCtx->infos.vertexInput.v32b;
+      inputBind[0] = vCtx->infos->vertexInput.v32b;
       inputBind[0].binding = 0;
-      inputBind[1] = vCtx->infos.vertexInput.v4b;
+      inputBind[1] = vCtx->infos->vertexInput.v4b;
       inputBind[1].binding = 1;
 
       inputAttrib.resize(2);
-      inputAttrib[0] = vCtx->infos.vertexInput.v3f_0_0b;
+      inputAttrib[0] = vCtx->infos->vertexInput.v3f_0_0b;
       inputAttrib[0].location = 0;
-      inputAttrib[1] = vCtx->infos.vertexInput.v4u8_0b;
+      inputAttrib[1] = vCtx->infos->vertexInput.v4u8_0b;
       inputAttrib[1].location = 1;
       inputAttrib[1].binding = 1;
     }
@@ -106,7 +106,7 @@ namespace {
 }
 
 
-Renderer::Renderer(Logger logger, VulkanFrameContext* vCtx, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h) :
+Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h) :
   logger(logger),
   vCtx(vCtx)
 {
@@ -115,26 +115,26 @@ Renderer::Renderer(Logger logger, VulkanFrameContext* vCtx, VkImageView* backBuf
     Vector<ShaderInputSpec> stages(2);
     stages[0] = { vanillaVS, sizeof(vanillaVS), VK_SHADER_STAGE_VERTEX_BIT };
     stages[1] = { vanillaPS, sizeof(vanillaPS), VK_SHADER_STAGE_FRAGMENT_BIT };
-    vanillaShader = vCtx->createShader(stages);
+    vanillaShader = vCtx->resources->createShader(stages);
   }
   {
     Vector<ShaderInputSpec> stages(2);
     stages[0] = { flatVS, sizeof(flatVS), VK_SHADER_STAGE_VERTEX_BIT };
     stages[1] = { flatPS, sizeof(flatPS), VK_SHADER_STAGE_FRAGMENT_BIT };
-    flatShader = vCtx->createShader(stages);
+    flatShader = vCtx->resources->createShader(stages);
   }
 
   renaming.resize(10);
   for (size_t i = 0; i < renaming.size(); i++) {
-    renaming[i].ready = vCtx->createFence(true);
-    renaming[i].objectBuffer = vCtx->createUniformBuffer(sizeof(ObjectBuffer));
+    renaming[i].ready = vCtx->resources->createFence(true);
+    renaming[i].objectBuffer = vCtx->resources->createUniformBuffer(sizeof(ObjectBuffer));
   }
   
 
   uint32_t texW = 8;
   uint32_t texH = 8;
 
-  auto stagingBuffer = vCtx->createBuffer(texW*texH * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+  auto stagingBuffer = vCtx->resources->createBuffer(texW*texH * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
   {
     MappedBuffer<uint8_t> map(vCtx, stagingBuffer);
     for (unsigned j = 0; j < texH; j++) {
@@ -164,7 +164,7 @@ Renderer::Renderer(Logger logger, VulkanFrameContext* vCtx, VkImageView* backBuf
     info.samples = VK_SAMPLE_COUNT_1_BIT;
     info.flags = 0;
 
-    texImage = vCtx->createRenderImage(info);
+    texImage = vCtx->resources->createRenderImage(info);
   }
 
   // FIXME: need queue
@@ -192,7 +192,7 @@ RenderMesh* Renderer::createRenderMesh(Mesh* mesh)
   renderMesh->mesh = mesh;
   renderMesh->tri_n = mesh->triCount;
   
-  renderMesh->vtxNrmTex = vCtx->createVertexBuffer(sizeof(VtxNrmTex) * 3 * renderMesh->tri_n);
+  renderMesh->vtxNrmTex = vCtx->resources->createVertexBuffer(sizeof(VtxNrmTex) * 3 * renderMesh->tri_n);
 
   {
     MappedBuffer<VtxNrmTex> map(vCtx, renderMesh->vtxNrmTex);
@@ -217,7 +217,7 @@ RenderMesh* Renderer::createRenderMesh(Mesh* mesh)
     }
   }
 
-  renderMesh->color = vCtx->createVertexBuffer(sizeof(uint32_t) * 3 * renderMesh->tri_n);
+  renderMesh->color = vCtx->resources->createVertexBuffer(sizeof(uint32_t) * 3 * renderMesh->tri_n);
   updateRenderMeshColor(renderMesh);
 
   logger(0, "CreateRenderMesh");
@@ -262,34 +262,34 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     VkPipelineLayoutCreateInfo pipeLayoutCI;
     vanillaPipelineInfo(vCtx, inputBind, inputAttrib, pipeLayoutCI);
 
-    vanillaPipeline = vCtx->createPipeline(inputBind,
-                                           inputAttrib,
-                                           pipeLayoutCI,
-                                           descLayoutCI,
-                                           pass,
-                                           vanillaShader,
-                                           vCtx->infos.pipelineRasterization.cullBackDepthBias);
+    vanillaPipeline = vCtx->resources->createPipeline(inputBind,
+                                                      inputAttrib,
+                                                      pipeLayoutCI,
+                                                      descLayoutCI,
+                                                      pass,
+                                                      vanillaShader,
+                                                      vCtx->infos->pipelineRasterization.cullBackDepthBias);
 
     wirePipelineInfo(vCtx, inputBind, inputAttrib, pipeLayoutCI);
-    wireFrontFacePipeline = vCtx->createPipeline(inputBind,
-                                                 inputAttrib,
-                                                 pipeLayoutCI,
-                                                 descLayoutCI,
-                                                 pass,
-                                                 flatShader,
-                                                 vCtx->infos.pipelineRasterization.cullBackLine);
+    wireFrontFacePipeline = vCtx->resources->createPipeline(inputBind,
+                                                            inputAttrib,
+                                                            pipeLayoutCI,
+                                                            descLayoutCI,
+                                                            pass,
+                                                            flatShader,
+                                                            vCtx->infos->pipelineRasterization.cullBackLine);
 
-    wireBothFacesPipeline = vCtx->createPipeline(inputBind,
-                                                 inputAttrib,
-                                                 pipeLayoutCI,
-                                                 descLayoutCI,
-                                                 pass,
-                                                 flatShader,
-                                                 vCtx->infos.pipelineRasterization.cullNoneLine);
+    wireBothFacesPipeline = vCtx->resources->createPipeline(inputBind,
+                                                            inputAttrib,
+                                                            pipeLayoutCI,
+                                                            descLayoutCI,
+                                                            pass,
+                                                            flatShader,
+                                                            vCtx->infos->pipelineRasterization.cullNoneLine);
 
 
     for (size_t i = 0; i < renaming.size(); i++) {
-      renaming[i].sharedDescSet = vCtx->createDescriptorSet(vanillaPipeline.resource->descLayout);
+      renaming[i].sharedDescSet = vCtx->resources->createDescriptorSet(vanillaPipeline.resource->descLayout);
     }
   }
   auto & rename = renaming[renamingCurr];
@@ -301,7 +301,7 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     map.mem->Ncol1 = Vec4f(N.cols[1], 0.f);
     map.mem->Ncol2 = Vec4f(N.cols[2], 0.f);
   }
-  vCtx->updateDescriptorSet(rename.sharedDescSet, rename.objectBuffer);
+  vCtx->frameManager->updateDescriptorSet(rename.sharedDescSet, rename.objectBuffer);
 
   {
     VkViewport vp = {};

@@ -58,22 +58,22 @@
     <ClCompile Include="..\src\Renderer.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\ResourceManager.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\VulkanApp.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\VulkanContext.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\ResourceManager.cpp">
+    <ClCompile Include="..\src\VulkanFrameManager.cpp">
       <Filter>src</Filter>
     </ClCompile>
     <ClCompile Include="..\src\VulkanInfos.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\VulkanMain.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\VulkanFrameContext.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\VulkanResourceContext.cpp">
+    <ClCompile Include="..\src\VulkanResources.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
@@ -120,22 +120,22 @@
     <ClInclude Include="..\src\Renderer.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="..\src\ResourceManager.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\VulkanApp.h">
+      <Filter>src</Filter>
+    </ClInclude>
     <ClInclude Include="..\src\VulkanContext.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\ResourceManager.h">
+    <ClInclude Include="..\src\VulkanFrameManager.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\src\VulkanInfos.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\VulkanMain.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\VulkanFrameContext.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\VulkanResourceContext.h">
+    <ClInclude Include="..\src\VulkanResources.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

@@ -2,6 +2,10 @@
 #include <GLFW/glfw3.h>
 #include <cassert>
 #include "VulkanContext.h"
+#include "VulkanInfos.h"
+#include "VulkanResources.h"
+#include "VulkanFrameManager.h"
+
 
 namespace
 {
@@ -20,8 +24,10 @@ namespace
 
 
 VulkanContext::VulkanContext(Logger logger,
-                             const char** instanceExts, uint32_t instanceExtCount) :
-  logger(logger)
+                             const char** instanceExts, uint32_t instanceExtCount,
+                             uint32_t framesInFlight, ISurfaceManager* presentationSupport) :
+  logger(logger),
+  surfaceManager(presentationSupport)
 {
 
   // create instance
@@ -141,8 +147,8 @@ VulkanContext::VulkanContext(Logger logger,
     bool found = false;
     for (uint32_t queueFamilyIx = 0; queueFamilyIx < queueFamilyCount; queueFamilyIx++) {
       if (queueProps[queueFamilyIx].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
-        // FIXME: something is off with virtual funcs
-        if(glfwGetPhysicalDevicePresentationSupport(instance, physicalDevice, queueFamilyIx)) {
+        if(presentationSupport->hasPresentationSupport(this, queueFamilyIx)) {
+        //if(glfwGetPhysicalDevicePresentationSupport(instance, physicalDevice, queueFamilyIx)) {
         //if (hasPresentationSupport(queueFamilyIx)) {
           queueInfo.queueFamilyIndex = queueFamilyIx;
           found = true;
@@ -214,16 +220,25 @@ VulkanContext::VulkanContext(Logger logger,
   }
   vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
   vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
+
+
+  infos = new VulkanInfos();
+  resources = new VulkanResources(this, logger);
+  frameManager = new VulkanFrameManager(this, logger, framesInFlight);
 }
 
 
 void VulkanContext::init()
 {
+  resources->init();
+  frameManager->init();
 }
 
 
 void VulkanContext::houseKeep()
 {
+  resources->houseKeep();
+  frameManager->houseKeep();
 }
 
 

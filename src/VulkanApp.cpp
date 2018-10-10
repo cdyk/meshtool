@@ -2,9 +2,9 @@
 #include <GLFW/glfw3.h>
 #include <vector>
 #include <cassert>
-#include "VulkanMain.h"
+#include "VulkanApp.h"
 #include "Common.h"
-#include "VulkanFrameContext.h"
+#include "VulkanContext.h"
 #include "Renderer.h"
 #include "LinAlgOps.h"
 
@@ -15,54 +15,36 @@
 
 namespace
 {
-  Logger logger;
-  Renderer* renderer = nullptr;
-
-  class VulkanGLWFContext : public VulkanFrameContext
-  {
-  public:
-    VulkanGLWFContext(Logger logger, GLFWwindow* window, uint32_t framesInFlight,
-                      const char**instanceExts, uint32_t instanceExtCount) :
-      VulkanFrameContext(logger, framesInFlight, instanceExts, instanceExtCount),
-      window(window)
-    {}
-
-    VkSurfaceKHR createSurface() override
-    {
-      VkSurfaceKHR surface;
-      auto rv = glfwCreateWindowSurface(instance, window, nullptr, &surface);
-      assert(rv == VK_SUCCESS);
-      return surface;
-    };
-
-    bool hasPresentationSupport(uint32_t queueFamily) override
-    {
-      return glfwGetPhysicalDevicePresentationSupport(instance, physicalDevice, queueFamily);
-    }
-
-  protected:
-    GLFWwindow* window;
-
-  };
-
-
-
-  VulkanFrameContext* vCtx = nullptr;
   ImGui_ImplVulkanH_WindowData imguiWindowData;
 
-  RenderPassHandle rendererPass;
-  RenderPassHandle imguiRenderPass;
 
-  Vector<RenderImageHandle> backBufferViews;
+  class GLFWPresentationSupport : public ISurfaceManager
+  {
+  public:
+    GLFWPresentationSupport(GLFWwindow* window) : window(window) {}
 
-  Vector<FrameBufferHandle> rendererFrameBuffers;
-  Vector<FrameBufferHandle> imguiFrameBuffers;
+    VkSurfaceKHR createSurface(VulkanContext* vCtx) override
+    {
+      VkSurfaceKHR surface;
+      auto rv = glfwCreateWindowSurface(vCtx->instance, window, nullptr, &surface);
+      assert(rv == VK_SUCCESS);
+      return surface;
 
+    }
+
+    bool hasPresentationSupport(VulkanContext* vCtx, uint32_t queueFamily) override
+    {
+      return glfwGetPhysicalDevicePresentationSupport(vCtx->instance, vCtx->physicalDevice, queueFamily);
+    }
+
+  private:
+    GLFWwindow* window;
+  };
 
   void check_vk_result(VkResult err)
   {
     if (err == 0) return;
-    logger(2, "VkResult %d", err);
+    fprintf(stderr, "VkResult %d", err);
     if (err < 0)
       abort();
   }
@@ -128,30 +110,30 @@ namespace
 
 }
 
-Renderer* main_VulkanInit(Logger l, GLFWwindow* window, uint32_t w, uint32_t h)
+VulkanApp::VulkanApp(Logger l, GLFWwindow* window, uint32_t w, uint32_t h)
 {
   logger = l;
 
   uint32_t extensions_count = 0;
   const char** extensions = glfwGetRequiredInstanceExtensions(&extensions_count);
-  vCtx = new VulkanGLWFContext(logger, window, IMGUI_VK_QUEUED_FRAMES, extensions, extensions_count);
+  vCtx = new VulkanContext(logger, extensions, extensions_count, IMGUI_VK_QUEUED_FRAMES, new GLFWPresentationSupport(window));
   vCtx->init();
 
-  imguiWindowData.Surface = vCtx->surface;
-  imguiWindowData.SurfaceFormat = vCtx->surfaceFormat;
-  imguiWindowData.PresentMode = vCtx->presentMode;
+  imguiWindowData.Surface = vCtx->frameManager->surface;
+  imguiWindowData.SurfaceFormat = vCtx->frameManager->surfaceFormat;
+  imguiWindowData.PresentMode = vCtx->frameManager->presentMode;
   for (int i = 0; i < IMGUI_VK_QUEUED_FRAMES; i++) {
     auto& fd = imguiWindowData.Frames[i];
-    fd.CommandPool = vCtx->frameData[i].commandPool.resource->cmdPool;
-    fd.CommandBuffer = vCtx->frameData[i].commandBuffer.resource->cmdBuf;
-    fd.Fence = vCtx->frameData[i].fence.resource->fence;
-    fd.ImageAcquiredSemaphore = vCtx->frameData[i].imageAcquiredSemaphore.resource->semaphore;
-    fd.RenderCompleteSemaphore = vCtx->frameData[i].renderCompleteSemaphore.resource->semaphore;
+    fd.CommandPool = vCtx->frameManager->frameData[i].commandPool.resource->cmdPool;
+    fd.CommandBuffer = vCtx->frameManager->frameData[i].commandBuffer.resource->cmdBuf;
+    fd.Fence = vCtx->frameManager->frameData[i].fence.resource->fence;
+    fd.ImageAcquiredSemaphore = vCtx->frameManager->frameData[i].imageAcquiredSemaphore.resource->semaphore;
+    fd.RenderCompleteSemaphore = vCtx->frameManager->frameData[i].renderCompleteSemaphore.resource->semaphore;
   }
   ImGui_ImplGlfw_InitForVulkan(window, true);
 
 
-  main_VulkanResize(w, h);
+  resize(w, h);
 
   renderer = new Renderer(logger, vCtx, imguiWindowData.BackBufferView, imguiWindowData.BackBufferCount, w, h);
 
@@ -169,18 +151,31 @@ Renderer* main_VulkanInit(Logger l, GLFWwindow* window, uint32_t w, uint32_t h)
   ImGui_ImplVulkan_Init(&init_info, imguiWindowData.RenderPass);
   uploadFonts(vCtx->device, vCtx->queue);
 
-  return renderer;
+}
+
+VulkanApp::~VulkanApp()
+{
+  rendererPass.release();
+  rendererFrameBuffers.resize(0);
+
+  delete renderer;
+
+  auto rv = vkDeviceWaitIdle(vCtx->device);
+  assert(rv == VK_SUCCESS);
+
+  ImGui_ImplVulkan_Shutdown();
+  delete vCtx;
 }
 
 
-void main_VulkanStartFrame()
+void VulkanApp::startFrame()
 {
   vCtx->houseKeep();
   ImGui_ImplVulkan_NewFrame();
 
 }
 
-void main_VulkanResize(uint32_t w, uint32_t h)
+void VulkanApp::resize(uint32_t w, uint32_t h)
 {
   auto * wd = &imguiWindowData;
 
@@ -274,14 +269,14 @@ void main_VulkanResize(uint32_t w, uint32_t h)
     dependency.srcAccessMask = 0;
     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-    imguiRenderPass = vCtx->createRenderPass(&attachment, 1, &subpass, 1, &dependency);
+    imguiRenderPass = vCtx->resources->createRenderPass(&attachment, 1, &subpass, 1, &dependency);
     wd->RenderPass = imguiRenderPass.resource->pass;
   }
 
   {
     backBufferViews.resize(wd->BackBufferCount);
     for (uint32_t i = 0; i < wd->BackBufferCount; i++) {
-      backBufferViews[i] = vCtx->createRenderImage(wd->BackBuffer[i], wd->SurfaceFormat.format, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
+      backBufferViews[i] = vCtx->resources->createRenderImage(wd->BackBuffer[i], wd->SurfaceFormat.format, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
       wd->BackBufferView[i] = backBufferViews[i].resource->view;
     }
 
@@ -289,7 +284,7 @@ void main_VulkanResize(uint32_t w, uint32_t h)
     imguiFrameBuffers.resize(wd->BackBufferCount);
     for (uint32_t i = 0; i < wd->BackBufferCount; i++) {
       attachments[0] = backBufferViews[i];
-      imguiFrameBuffers[i] = vCtx->createFrameBuffer(imguiRenderPass, w, h, attachments);
+      imguiFrameBuffers[i] = vCtx->resources->createFrameBuffer(imguiRenderPass, w, h, attachments);
       wd->Framebuffer[i] = imguiFrameBuffers[i].resource->fb;
     }
   }
@@ -336,22 +331,22 @@ void main_VulkanResize(uint32_t w, uint32_t h)
     subpass.pDepthStencilAttachment = &depth_reference;
     subpass.preserveAttachmentCount = 0;
     subpass.pPreserveAttachments = NULL;
-    rendererPass = vCtx->createRenderPass(attachments, 2, &subpass, 1, nullptr);
+    rendererPass = vCtx->resources->createRenderPass(attachments, 2, &subpass, 1, nullptr);
   }
 
   Vector<RenderImageHandle> attachments(2);
-  attachments[1] = vCtx->createRenderImage(w, h, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_FORMAT_D32_SFLOAT);
+  attachments[1] = vCtx->resources->createRenderImage(w, h, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_FORMAT_D32_SFLOAT);
 
   rendererFrameBuffers.resize(wd->BackBufferCount);
   for (uint32_t i = 0; i < wd->BackBufferCount; i++) {
     attachments[0] = backBufferViews[i];
-    rendererFrameBuffers[i] = vCtx->createFrameBuffer(rendererPass, w, h, attachments);
+    rendererFrameBuffers[i] = vCtx->resources->createFrameBuffer(rendererPass, w, h, attachments);
   }
 
 }
 
 
-void main_VulkanRender(uint32_t w, uint32_t h, Vector<RenderMesh*>& renderMeshes, const Vec4f& viewerViewport, const Mat4f& P, const Mat4f& M)
+void VulkanApp::render(uint32_t w, uint32_t h, Vector<RenderMesh*>& renderMeshes, const Vec4f& viewerViewport, const Mat4f& P, const Mat4f& M)
 {
   VkSemaphore& image_acquired_semaphore = imguiWindowData.Frames[imguiWindowData.FrameIndex].ImageAcquiredSemaphore;
   auto rv = vkAcquireNextImageKHR(vCtx->device, imguiWindowData.Swapchain, UINT64_MAX, image_acquired_semaphore, VK_NULL_HANDLE, &imguiWindowData.FrameIndex);
@@ -435,7 +430,7 @@ void main_VulkanRender(uint32_t w, uint32_t h, Vector<RenderMesh*>& renderMeshes
   assert(rv == VK_SUCCESS);
 }
 
-void main_VulkanPresent()
+void VulkanApp::present()
 {
   ImGui_ImplVulkanH_FrameData* fd = &imguiWindowData.Frames[imguiWindowData.FrameIndex];
   VkPresentInfoKHR info = {};
@@ -447,20 +442,4 @@ void main_VulkanPresent()
   info.pImageIndices = &imguiWindowData.FrameIndex;
   auto rv = vkQueuePresentKHR(vCtx->queue, &info);
   assert(rv == VK_SUCCESS);
-}
-
-
-void main_VulkanCleanup()
-{
-
-  rendererPass.release();
-  rendererFrameBuffers.resize(0);
-
-  delete renderer;
-
-  auto rv = vkDeviceWaitIdle(vCtx->device);
-  assert(rv == VK_SUCCESS);
-
-  delete vCtx;
-  ImGui_ImplVulkan_Shutdown();
 }
