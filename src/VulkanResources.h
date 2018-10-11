@@ -60,17 +60,31 @@ struct RenderImage : ResourceBase
   VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
   VkImage image = VK_NULL_HANDLE;
   VkDeviceMemory mem = VK_NULL_HANDLE;
-  VkImageView view;
   VkFormat format;
 };
 typedef ResourceHandle<RenderImage> RenderImageHandle;
+
+struct ImageView : ResourceBase
+{
+  ImageView(ResourceManagerBase& manager) : ResourceBase(manager) {}
+  RenderImageHandle image;
+  VkImageView view;
+};
+typedef ResourceHandle<ImageView> ImageViewHandle;
+
+struct Sampler : ResourceBase
+{
+  Sampler(ResourceManagerBase& manager) : ResourceBase(manager) {}
+  VkSampler sampler = VK_NULL_HANDLE;
+};
+typedef ResourceHandle<Sampler> SamplerHandle;
 
 struct FrameBuffer : ResourceBase
 {
   FrameBuffer(ResourceManagerBase& manager) : ResourceBase(manager) {}
   VkFramebuffer fb = VK_NULL_HANDLE;
   RenderPassHandle pass;
-  Vector<RenderImageHandle> attachments;
+  Vector<ImageViewHandle> attachments;
 };
 typedef ResourceHandle<FrameBuffer> FrameBufferHandle;
 
@@ -142,14 +156,16 @@ public:
   RenderPassHandle createRenderPass(VkAttachmentDescription* attachments, uint32_t attachmentCount,
                                     VkSubpassDescription* subpasses, uint32_t subpassCount,
                                     VkSubpassDependency* dependency);
-  RenderImageHandle wrapRenderImageView(VkImageView view);
+  //RenderImageHandle wrapRenderImageView(VkImageView view);
 
-  RenderImageHandle createRenderImage(VkImage image, VkFormat format, VkImageSubresourceRange subResRange);
 
   RenderImageHandle createRenderImage(VkImageCreateInfo& imageCreateInfo);
-
   RenderImageHandle createRenderImage(uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format);
-  FrameBufferHandle createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<RenderImageHandle>& attachments);
+
+  ImageViewHandle createImageView(VkImage image, VkFormat format, VkImageSubresourceRange subResRange);
+  ImageViewHandle createImageView(RenderImageHandle, VkImageViewCreateInfo& imageViewCreateInfo);
+
+  FrameBufferHandle createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<ImageViewHandle>& attachments);
   CommandPoolHandle createCommandPool(uint32_t queueFamilyIx);
   CommandBufferHandle createPrimaryCommandBuffer(CommandPoolHandle pool);
   FenceHandle createFence(bool signalled);
@@ -169,6 +185,8 @@ private:
   void destroyRenderPass(RenderPass*);
   void destroyFrameBuffer(FrameBuffer*);
   void destroyRenderImage(RenderImage*);
+  void destroyImageView(ImageView*);
+  void destroySampler(Sampler*);
   void destroyCommandPool(CommandPool*);
   void destroyCommandBuffer(CommandBuffer*);
   void destroyFence(Fence*);
@@ -183,6 +201,8 @@ private:
   ResourceManager<RenderPass> renderPassResources;
   ResourceManager<FrameBuffer> frameBufferResources;
   ResourceManager<RenderImage> renderImageResources;
+  ResourceManager<ImageView> imageViewResources;
+  ResourceManager<Sampler> samplerResources;
   ResourceManager<CommandPool> commandPoolResources;
   ResourceManager<CommandBuffer> commandBufferResources;
   ResourceManager<Fence> fenceResources;

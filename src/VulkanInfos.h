@@ -27,6 +27,10 @@ struct VulkanInfos
 
   } commandBuffer;
 
+  struct {
+    VkImageViewCreateInfo view2dVaseLevel;
+
+  } imageView;
 
 };
 

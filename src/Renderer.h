@@ -52,6 +52,7 @@ private:
   uint32_t frameCount;
 
   RenderImageHandle texImage;
+  ImageViewHandle texImageView;
 
   struct Rename {
     FenceHandle ready;

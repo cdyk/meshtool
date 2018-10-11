@@ -159,13 +159,13 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
     info.flags = 0;
 
     texImage = vCtx->resources->createRenderImage(info);
+    texImageView = vCtx->resources->createImageView(texImage, vCtx->infos->imageView.view2dVaseLevel);
   }
 
-  // FIXME: need queue
 
-  //vCtx->transitionImageLayout(texImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-  //vCtx->copyBufferToImage(texImage, stagingBuffer, texW, texH);
-  //vCtx->transitionImageLayout(texImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+  vCtx->frameManager->transitionImageLayout(texImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+  vCtx->frameManager->copyBufferToImage(texImage, stagingBuffer, texW, texH);
+  vCtx->frameManager->transitionImageLayout(texImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 }
 

@@ -30,7 +30,7 @@ public:
   RenderPassHandle rendererPass;
   RenderPassHandle imguiRenderPass;
 
-  Vector<RenderImageHandle> backBufferViews;
+  Vector<ImageViewHandle> backBufferViews;
 
   Vector<FrameBufferHandle> rendererFrameBuffers;
   Vector<FrameBufferHandle> imguiFrameBuffers;

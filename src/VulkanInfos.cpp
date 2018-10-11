@@ -113,6 +113,27 @@ VulkanInfos::VulkanInfos()
     info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   }
+  {
+    auto & info = imageView.view2dVaseLevel;
+    info = {};
+    info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    info.pNext = NULL;
+    info.image = VK_NULL_HANDLE;
+    info.format = VK_FORMAT_UNDEFINED;
+    info.components.r = VK_COMPONENT_SWIZZLE_R;
+    info.components.g = VK_COMPONENT_SWIZZLE_G;
+    info.components.b = VK_COMPONENT_SWIZZLE_B;
+    info.components.a = VK_COMPONENT_SWIZZLE_A;
+    info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    info.subresourceRange.baseMipLevel = 0;
+    info.subresourceRange.levelCount = 1;
+    info.subresourceRange.baseArrayLayer = 0;
+    info.subresourceRange.layerCount = 1;
+    info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    info.flags = 0;
+    info.image = VK_NULL_HANDLE;
+
+  }
 
 
 }

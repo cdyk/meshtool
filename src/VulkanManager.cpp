@@ -276,11 +276,11 @@ void VulkanManager::resize(uint32_t w, uint32_t h)
   {
     backBufferViews.resize(wd->BackBufferCount);
     for (uint32_t i = 0; i < wd->BackBufferCount; i++) {
-      backBufferViews[i] = vCtx->resources->createRenderImage(wd->BackBuffer[i], wd->SurfaceFormat.format, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
+      backBufferViews[i] = vCtx->resources->createImageView(wd->BackBuffer[i], wd->SurfaceFormat.format, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
       wd->BackBufferView[i] = backBufferViews[i].resource->view;
     }
 
-    Vector<RenderImageHandle> attachments(1);
+    Vector<ImageViewHandle> attachments(1);
     imguiFrameBuffers.resize(wd->BackBufferCount);
     for (uint32_t i = 0; i < wd->BackBufferCount; i++) {
       attachments[0] = backBufferViews[i];
@@ -334,8 +334,9 @@ void VulkanManager::resize(uint32_t w, uint32_t h)
     rendererPass = vCtx->resources->createRenderPass(attachments, 2, &subpass, 1, nullptr);
   }
 
-  Vector<RenderImageHandle> attachments(2);
-  attachments[1] = vCtx->resources->createRenderImage(w, h, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_FORMAT_D32_SFLOAT);
+  Vector<ImageViewHandle> attachments(2);
+  attachments[1] = vCtx->resources->createImageView(vCtx->resources->createRenderImage(w, h, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_FORMAT_D32_SFLOAT),
+                                                    vCtx->infos->imageView.view2dVaseLevel);
 
   rendererFrameBuffers.resize(wd->BackBufferCount);
   for (uint32_t i = 0; i < wd->BackBufferCount; i++) {
@@ -411,6 +412,7 @@ void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& ren
   vkCmdBeginRenderPass(frameData->CommandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
   ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), frameData->CommandBuffer);
   vkCmdEndRenderPass(frameData->CommandBuffer);
+
 
   VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkSubmitInfo submitInfo = {};

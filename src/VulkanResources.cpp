@@ -72,7 +72,6 @@ void VulkanResources::houseKeep()
       delete r;
     }
   }
-
   {
     Vector<FrameBuffer*> orphans;
     frameBufferResources.getOrphans(orphans);
@@ -81,12 +80,27 @@ void VulkanResources::houseKeep()
       delete r;
     }
   }
-
   {
     Vector<RenderImage*> orphans;
     renderImageResources.getOrphans(orphans);
     for (auto * r : orphans) {
       if (!r->hasFlag(ResourceBase::Flags::External)) destroyRenderImage(r);
+      delete r;
+    }
+  }
+  {
+    Vector<ImageView*> orphans;
+    imageViewResources.getOrphans(orphans);
+    for (auto * r : orphans) {
+      if (!r->hasFlag(ResourceBase::Flags::External)) destroyImageView(r);
+      delete r;
+    }
+  }
+  {
+    Vector<Sampler*> orphans;
+    samplerResources.getOrphans(orphans);
+    for (auto * r : orphans) {
+      if (!r->hasFlag(ResourceBase::Flags::External)) destroySampler(r);
       delete r;
     }
   }
@@ -397,14 +411,14 @@ void VulkanResources::destroyShader(Shader* shader)
 }
 
 
-RenderImageHandle VulkanResources::wrapRenderImageView(VkImageView view)
-{
-  auto renderImageHandle = renderImageResources.createResource();
-  auto * renderImage = renderImageHandle.resource;
-  renderImage->setFlag(ResourceBase::Flags::External);
-  renderImage->view = view;
-  return renderImageHandle;
-}
+//RenderImageHandle VulkanResources::wrapRenderImageView(VkImageView view)
+//{
+//  auto renderImageHandle = renderImageResources.createResource();
+//  auto * renderImage = renderImageHandle.resource;
+//  renderImage->setFlag(ResourceBase::Flags::External);
+//  renderImage->view = view;
+//  return renderImageHandle;
+//}
 
 RenderImageHandle VulkanResources::createRenderImage(VkImageCreateInfo& imageCreateInfo)
 {
@@ -433,6 +447,8 @@ RenderImageHandle VulkanResources::createRenderImage(VkImageCreateInfo& imageCre
 
   rv = vkBindImageMemory(vCtx->device, renderImage->image, renderImage->mem, 0);
   assert(rv == VK_SUCCESS);
+
+  
 
   return renderImageHandle;
 }
@@ -472,35 +488,34 @@ RenderImageHandle VulkanResources::createRenderImage(uint32_t w, uint32_t h, VkI
   auto renderImageHandle = createRenderImage(imageCI);
   auto * renderImage = renderImageHandle.resource;
 
-  // create view
-
-  VkImageViewCreateInfo imageViewCI = {};
-  imageViewCI.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-  imageViewCI.pNext = NULL;
-  imageViewCI.image = VK_NULL_HANDLE;
-  imageViewCI.format = format;
-  imageViewCI.components.r = VK_COMPONENT_SWIZZLE_R;
-  imageViewCI.components.g = VK_COMPONENT_SWIZZLE_G;
-  imageViewCI.components.b = VK_COMPONENT_SWIZZLE_B;
-  imageViewCI.components.a = VK_COMPONENT_SWIZZLE_A;
-  imageViewCI.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-  imageViewCI.subresourceRange.baseMipLevel = 0;
-  imageViewCI.subresourceRange.levelCount = 1;
-  imageViewCI.subresourceRange.baseArrayLayer = 0;
-  imageViewCI.subresourceRange.layerCount = 1;
-  imageViewCI.viewType = VK_IMAGE_VIEW_TYPE_2D;
-  imageViewCI.flags = 0;
-  imageViewCI.image = renderImage->image;
-  auto rv = vkCreateImageView(vCtx->device, &imageViewCI, NULL, &renderImage->view);
-  assert(rv == VK_SUCCESS);
-
   return renderImageHandle;
 }
 
-RenderImageHandle VulkanResources::createRenderImage(VkImage image, VkFormat format, VkImageSubresourceRange imageRange)
+
+void VulkanResources::destroyRenderImage(RenderImage* renderImage)
 {
-  auto renderImageHandle = renderImageResources.createResource();
-  auto * renderImage = renderImageHandle.resource;
+  if(renderImage->image)vkDestroyImage(vCtx->device, renderImage->image, nullptr);
+  if(renderImage->mem) vkFreeMemory(vCtx->device, renderImage->mem, nullptr);
+}
+
+
+ImageViewHandle VulkanResources::createImageView(RenderImageHandle image, VkImageViewCreateInfo& imageViewCreateInfo)
+{
+  auto view = imageViewResources.createResource();
+  view.resource->image = image;
+
+  VkImageViewCreateInfo info = imageViewCreateInfo;
+  info.format = image.resource->format;
+  info.image = image.resource->image;
+  auto rv = vkCreateImageView(vCtx->device, &info, NULL, &view.resource->view);
+  assert(rv == VK_SUCCESS);
+
+  return view;
+}
+
+ImageViewHandle VulkanResources::createImageView(VkImage image, VkFormat format, VkImageSubresourceRange imageRange)
+{
+  auto view = imageViewResources.createResource();
 
   VkImageViewCreateInfo info = {};
   info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -513,18 +528,23 @@ RenderImageHandle VulkanResources::createRenderImage(VkImage image, VkFormat for
   info.image = image;
   info.subresourceRange = imageRange;
 
-  auto rv = vkCreateImageView(vCtx->device, &info, nullptr, &renderImage->view);
+  auto rv = vkCreateImageView(vCtx->device, &info, nullptr, &view.resource->view);
   assert(rv == VK_SUCCESS);
-  
-  return renderImageHandle;
+
+  return view;
 }
 
-void VulkanResources::destroyRenderImage(RenderImage* renderImage)
+void VulkanResources::destroyImageView(ImageView* view)
 {
-  if(renderImage->view) vkDestroyImageView(vCtx->device, renderImage->view, nullptr);
-  if(renderImage->image)vkDestroyImage(vCtx->device, renderImage->image, nullptr);
-  if(renderImage->mem) vkFreeMemory(vCtx->device, renderImage->mem, nullptr);
+  if (view->view) vkDestroyImageView(vCtx->device, view->view, nullptr);
 }
+
+
+void VulkanResources::destroySampler(Sampler*)
+{
+
+}
+
 
 
 RenderPassHandle VulkanResources::createRenderPass(VkAttachmentDescription* attachments, uint32_t attachmentCount,
@@ -560,7 +580,7 @@ void VulkanResources::destroyRenderPass(RenderPass* pass)
 }
 
 
-FrameBufferHandle VulkanResources::createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<RenderImageHandle>& attachments)
+FrameBufferHandle VulkanResources::createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<ImageViewHandle>& attachments)
 {
   auto fbHandle = frameBufferResources.createResource();
   auto * fb = fbHandle.resource;
