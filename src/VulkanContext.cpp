@@ -172,6 +172,7 @@ VulkanContext::VulkanContext(Logger logger,
 
     VkPhysicalDeviceFeatures enabledFeatures{};
     enabledFeatures.fillModeNonSolid = 1;
+    enabledFeatures.samplerAnisotropy = 1;
 
     VkDeviceCreateInfo deviceInfo = {};
     deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

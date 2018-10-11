@@ -81,7 +81,7 @@ void VulkanResources::houseKeep()
     }
   }
   {
-    Vector<RenderImage*> orphans;
+    Vector<Image*> orphans;
     renderImageResources.getOrphans(orphans);
     for (auto * r : orphans) {
       if (!r->hasFlag(ResourceBase::Flags::External)) destroyRenderImage(r);
@@ -420,7 +420,7 @@ void VulkanResources::destroyShader(Shader* shader)
 //  return renderImageHandle;
 //}
 
-RenderImageHandle VulkanResources::createRenderImage(VkImageCreateInfo& imageCreateInfo)
+ImageHandle VulkanResources::createImage(VkImageCreateInfo& imageCreateInfo)
 {
   auto renderImageHandle = renderImageResources.createResource();
   auto * renderImage = renderImageHandle.resource;
@@ -453,7 +453,7 @@ RenderImageHandle VulkanResources::createRenderImage(VkImageCreateInfo& imageCre
   return renderImageHandle;
 }
 
-RenderImageHandle VulkanResources::createRenderImage(uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format)
+ImageHandle VulkanResources::createImage(uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format)
 {
   VkImageCreateInfo imageCI = {};
   imageCI.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -485,21 +485,21 @@ RenderImageHandle VulkanResources::createRenderImage(uint32_t w, uint32_t h, VkI
     assert(false && "depth format unsupported");
   }
 
-  auto renderImageHandle = createRenderImage(imageCI);
+  auto renderImageHandle = createImage(imageCI);
   auto * renderImage = renderImageHandle.resource;
 
   return renderImageHandle;
 }
 
 
-void VulkanResources::destroyRenderImage(RenderImage* renderImage)
+void VulkanResources::destroyRenderImage(Image* renderImage)
 {
   if(renderImage->image)vkDestroyImage(vCtx->device, renderImage->image, nullptr);
   if(renderImage->mem) vkFreeMemory(vCtx->device, renderImage->mem, nullptr);
 }
 
 
-ImageViewHandle VulkanResources::createImageView(RenderImageHandle image, VkImageViewCreateInfo& imageViewCreateInfo)
+ImageViewHandle VulkanResources::createImageView(ImageHandle image, VkImageViewCreateInfo& imageViewCreateInfo)
 {
   auto view = imageViewResources.createResource();
   view.resource->image = image;
@@ -540,9 +540,17 @@ void VulkanResources::destroyImageView(ImageView* view)
 }
 
 
-void VulkanResources::destroySampler(Sampler*)
+SamplerHandle VulkanResources::createSampler(VkSamplerCreateInfo& samplerCreateInfo)
 {
+  auto sampler = samplerResources.createResource();
+  auto rv = vkCreateSampler(vCtx->device, &samplerCreateInfo, nullptr, &sampler.resource->sampler);
+  assert(rv == VK_SUCCESS);
+  return sampler;
+}
 
+void VulkanResources::destroySampler(Sampler* sampler)
+{
+  if (sampler->sampler) vkDestroySampler(vCtx->device, sampler->sampler, nullptr);
 }
 
 

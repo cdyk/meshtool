@@ -106,7 +106,7 @@ void VulkanFrameManager::copyBuffer(RenderBufferHandle dst, RenderBufferHandle s
   submitGraphics(cmdBuf, true);
 }
 
-void VulkanFrameManager::transitionImageLayout(RenderImageHandle image, VkImageLayout layout)
+void VulkanFrameManager::transitionImageLayout(ImageHandle image, VkImageLayout layout)
 {
   auto cmdBuf = vCtx->resources->createPrimaryCommandBuffer(currentFrameData().commandPool);
   vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &vCtx->infos->commandBuffer.singleShot);
@@ -156,7 +156,7 @@ void VulkanFrameManager::transitionImageLayout(RenderImageHandle image, VkImageL
   image.resource->layout = layout;
 }
 
-void VulkanFrameManager::copyBufferToImage(RenderImageHandle dst, RenderBufferHandle src, uint32_t w, uint32_t h)
+void VulkanFrameManager::copyBufferToImage(ImageHandle dst, RenderBufferHandle src, uint32_t w, uint32_t h)
 {
   auto cmdBuf = vCtx->resources->createPrimaryCommandBuffer(currentFrameData().commandPool);
   vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &vCtx->infos->commandBuffer.singleShot);

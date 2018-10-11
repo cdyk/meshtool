@@ -114,7 +114,7 @@ VulkanInfos::VulkanInfos()
     info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   }
   {
-    auto & info = imageView.view2dVaseLevel;
+    auto & info = imageView.baseLevel2D;
     info = {};
     info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     info.pNext = NULL;
@@ -124,7 +124,7 @@ VulkanInfos::VulkanInfos()
     info.components.g = VK_COMPONENT_SWIZZLE_G;
     info.components.b = VK_COMPONENT_SWIZZLE_B;
     info.components.a = VK_COMPONENT_SWIZZLE_A;
-    info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+    info.subresourceRange.aspectMask = 0;// VK_IMAGE_ASPECT_DEPTH_BIT;
     info.subresourceRange.baseMipLevel = 0;
     info.subresourceRange.levelCount = 1;
     info.subresourceRange.baseArrayLayer = 0;
@@ -135,5 +135,25 @@ VulkanInfos::VulkanInfos()
 
   }
 
+  {
+    auto & info = samplers.triLlinearRepeat;
+    info = {};
+    info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    info.magFilter = VK_FILTER_LINEAR;
+    info.minFilter = VK_FILTER_LINEAR;
+    info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    info.anisotropyEnable = VK_TRUE;
+    info.maxAnisotropy = 16;
+    info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    info.unnormalizedCoordinates = VK_FALSE;
+    info.compareEnable = VK_FALSE;
+    info.compareOp = VK_COMPARE_OP_ALWAYS;
+    info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    info.mipLodBias = 0.0f;
+    info.minLod = 0.0f;
+    info.maxLod = 0.0f;
+  }
 
 }

@@ -28,9 +28,16 @@ struct VulkanInfos
   } commandBuffer;
 
   struct {
-    VkImageViewCreateInfo view2dVaseLevel;
+    VkImageViewCreateInfo baseLevel2D;
 
   } imageView;
+
+  struct {
+    VkSamplerCreateInfo triLlinearRepeat;
+
+  } samplers;
+
+
 
 };
 

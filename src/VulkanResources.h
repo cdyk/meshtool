@@ -54,20 +54,20 @@ struct Pipeline : ResourceBase
 typedef ResourceHandle<Pipeline> PipelineHandle;
 
 
-struct RenderImage : ResourceBase
+struct Image : ResourceBase
 {
-  RenderImage(ResourceManagerBase& manager) : ResourceBase(manager) {}
+  Image(ResourceManagerBase& manager) : ResourceBase(manager) {}
   VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
   VkImage image = VK_NULL_HANDLE;
   VkDeviceMemory mem = VK_NULL_HANDLE;
   VkFormat format;
 };
-typedef ResourceHandle<RenderImage> RenderImageHandle;
+typedef ResourceHandle<Image> ImageHandle;
 
 struct ImageView : ResourceBase
 {
   ImageView(ResourceManagerBase& manager) : ResourceBase(manager) {}
-  RenderImageHandle image;
+  ImageHandle image;
   VkImageView view;
 };
 typedef ResourceHandle<ImageView> ImageViewHandle;
@@ -159,11 +159,13 @@ public:
   //RenderImageHandle wrapRenderImageView(VkImageView view);
 
 
-  RenderImageHandle createRenderImage(VkImageCreateInfo& imageCreateInfo);
-  RenderImageHandle createRenderImage(uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format);
+  ImageHandle createImage(VkImageCreateInfo& imageCreateInfo);
+  ImageHandle createImage(uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format);
 
   ImageViewHandle createImageView(VkImage image, VkFormat format, VkImageSubresourceRange subResRange);
-  ImageViewHandle createImageView(RenderImageHandle, VkImageViewCreateInfo& imageViewCreateInfo);
+  ImageViewHandle createImageView(ImageHandle, VkImageViewCreateInfo& imageViewCreateInfo);
+
+  SamplerHandle createSampler(VkSamplerCreateInfo& samplerCreateInfo);
 
   FrameBufferHandle createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<ImageViewHandle>& attachments);
   CommandPoolHandle createCommandPool(uint32_t queueFamilyIx);
@@ -184,7 +186,7 @@ private:
   void destroyPipeline(Pipeline*);
   void destroyRenderPass(RenderPass*);
   void destroyFrameBuffer(FrameBuffer*);
-  void destroyRenderImage(RenderImage*);
+  void destroyRenderImage(Image*);
   void destroyImageView(ImageView*);
   void destroySampler(Sampler*);
   void destroyCommandPool(CommandPool*);
@@ -200,7 +202,7 @@ private:
   ResourceManager<Pipeline> pipelineResources;
   ResourceManager<RenderPass> renderPassResources;
   ResourceManager<FrameBuffer> frameBufferResources;
-  ResourceManager<RenderImage> renderImageResources;
+  ResourceManager<Image> renderImageResources;
   ResourceManager<ImageView> imageViewResources;
   ResourceManager<Sampler> samplerResources;
   ResourceManager<CommandPool> commandPoolResources;

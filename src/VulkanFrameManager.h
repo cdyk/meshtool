@@ -19,8 +19,8 @@ public:
   void updateDescriptorSet(DescriptorSetHandle descriptorSet, RenderBufferHandle buffer);
 
   void copyBuffer(RenderBufferHandle dst, RenderBufferHandle src, VkDeviceSize size);
-  void transitionImageLayout(RenderImageHandle image, VkImageLayout layout);
-  void copyBufferToImage(RenderImageHandle dst, RenderBufferHandle src, uint32_t w, uint32_t h);
+  void transitionImageLayout(ImageHandle image, VkImageLayout layout);
+  void copyBufferToImage(ImageHandle dst, RenderBufferHandle src, uint32_t w, uint32_t h);
   void submitGraphics(CommandBufferHandle cmdBuf, bool wait = false);
 
   VkSurfaceKHR surface = VK_NULL_HANDLE;

@@ -158,8 +158,11 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
     info.samples = VK_SAMPLE_COUNT_1_BIT;
     info.flags = 0;
 
-    texImage = vCtx->resources->createRenderImage(info);
-    texImageView = vCtx->resources->createImageView(texImage, vCtx->infos->imageView.view2dVaseLevel);
+    texImage = vCtx->resources->createImage(info);
+    auto viewInfo = vCtx->infos->imageView.baseLevel2D;
+    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    texImageView = vCtx->resources->createImageView(texImage, viewInfo);
+    texSampler = vCtx->resources->createSampler(vCtx->infos->samplers.triLlinearRepeat);
   }
 
 
