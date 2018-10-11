@@ -107,6 +107,7 @@ namespace {
     else if (mods == 0) {
       if (key == GLFW_KEY_W && action == GLFW_PRESS)  app->vulkanManager->renderer->outlines = !app->vulkanManager->renderer->outlines;
       if (key == GLFW_KEY_S && action == GLFW_PRESS)  app->vulkanManager->renderer->solid = !app->vulkanManager->renderer->solid;
+      if (key == GLFW_KEY_T && action == GLFW_PRESS)  app->vulkanManager->renderer->textured = !app->vulkanManager->renderer->textured;
     }
 
   }
@@ -199,6 +200,8 @@ namespace {
         ImGui::Separator();
         if (ImGui::MenuItem("Solid", "S", &app->vulkanManager->renderer->solid)) {}
         if (ImGui::MenuItem("Outlines", "W", &app->vulkanManager->renderer->outlines)) {}
+        ImGui::Separator();
+        if (ImGui::MenuItem("Overlay texcoords", "T", &app->vulkanManager->renderer->textured)) {}
         ImGui::Separator();
         if (ImGui::MenuItem("Color from smoothing group", nullptr, &app->colorFromSmoothingGroup)) {
           app->colorFromObjectId = false;
@@ -325,7 +328,7 @@ int main(int argc, char** argv)
   if (!glfwInit()) return -1;
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  window = glfwCreateWindow(1280, 720, "Hello World", NULL, NULL);
+  window = glfwCreateWindow(1280, 720, "MeshTool", NULL, NULL);
   if (!window) {
     glfwTerminate();
     return -1;

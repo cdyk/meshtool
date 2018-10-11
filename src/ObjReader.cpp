@@ -534,6 +534,33 @@ Mesh*  readObj(Logger logger, const void * ptr, size_t size)
     assert(o == 3 * mesh->triCount);
   }
 
+  if (context.useTexcoords) {
+
+    unsigned o;
+
+    o = 0;
+    mesh->texCount = context.texcoords_n;
+    mesh->tex = (Vec2f*)mesh->arena.alloc(sizeof(Vec2f)*mesh->texCount);
+    for (auto * block = context.texcoords.first; block; block = block->next) {
+      for (unsigned i = 0; i < block->fill; i++) {
+        mesh->tex[o++] = block->data[i];
+      }
+    }
+    assert(o == mesh->texCount);
+
+    o = 0;
+    mesh->triTexIx = (uint32_t*)mesh->arena.alloc(sizeof(uint32_t) * 3 * mesh->triCount);
+    for (auto * block = context.triangles.first; block; block = block->next) {
+      for (unsigned i = 0; i < block->fill; i++) {
+        for (unsigned k = 0; k < 3; k++) {
+          auto ix = block->data[i].tex[k];
+          assert(0 <= ix && ix < context.texcoords_n);
+          mesh->triTexIx[o++] = ix;
+        }
+      }
+    }
+    assert(o == 3 * mesh->triCount);
+  }
 
 
   logger(0, "readObj parsed %d lines, Vn=%d, Nn=%d, Tn=%d, tris=%d",

@@ -15,4 +15,5 @@ void main() {
                                normalize(vec3(1, 1, 1))));
 
   fragColor = vec4(diffuse * albedo.rgb * texture(texSampler, texCoord).rgb, albedo.a);
+  //fragColor = vec4(fract(30*texCoord), 0, 1);
 }

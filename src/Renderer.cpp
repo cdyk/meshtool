@@ -221,21 +221,44 @@ RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
   {
     MappedBuffer<VtxNrmTex> map(vCtx, renderMesh->vtxNrmTex);
     if (mesh->nrmCount) {
-      for (unsigned i = 0; i < 3*mesh->triCount; i++) {
-        map.mem[i].vtx = mesh->vtx[mesh->triVtxIx[i]];
-        map.mem[i].nrm = mesh->nrm[mesh->triNrmIx[i]];
-        map.mem[i].tex = Vec2f(mesh->vtx[mesh->triVtxIx[i]].data);
+      if (mesh->texCount) {
+        for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
+          map.mem[i].vtx = mesh->vtx[mesh->triVtxIx[i]];
+          map.mem[i].nrm = mesh->nrm[mesh->triNrmIx[i]];
+          map.mem[i].tex = mesh->tex[mesh->triTexIx[i]];
+        }
+      }
+      else {
+        for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
+          map.mem[i].vtx = mesh->vtx[mesh->triVtxIx[i]];
+          map.mem[i].nrm = mesh->nrm[mesh->triNrmIx[i]];
+          map.mem[i].tex = Vec2f(0.5f);
+        }
       }
     }
     else {
-      for (unsigned i = 0; i < mesh->triCount; i++) {
-        Vec3f p[3];
-        for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
-        auto n = cross(p[1] - p[0], p[2] - p[0]);
-        for (unsigned k = 0; k < 3; k++) {
-          map.mem[3 * i + k].vtx = p[k];
-          map.mem[3 * i + k].nrm = n;
-          map.mem[3 * i + k].tex = Vec2f(p[k].x, p[k].y);
+      if (mesh->texCount) {
+        for (unsigned i = 0; i < mesh->triCount; i++) {
+          Vec3f p[3];
+          for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
+          auto n = cross(p[1] - p[0], p[2] - p[0]);
+          for (unsigned k = 0; k < 3; k++) {
+            map.mem[3 * i + k].vtx = p[k];
+            map.mem[3 * i + k].nrm = n;
+            map.mem[3 * i + k].tex = 10.f*mesh->tex[mesh->triTexIx[3 * i + k]];
+          }
+        }
+      }
+      else {
+        for (unsigned i = 0; i < mesh->triCount; i++) {
+          Vec3f p[3];
+          for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
+          auto n = cross(p[1] - p[0], p[2] - p[0]);
+          for (unsigned k = 0; k < 3; k++) {
+            map.mem[3 * i + k].vtx = p[k];
+            map.mem[3 * i + k].nrm = n;
+            map.mem[3 * i + k].tex = Vec2f(0.5f);
+          }
         }
       }
     }
