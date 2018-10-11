@@ -15,6 +15,9 @@ struct Mesh
   Vec3f* nrm = nullptr;
   uint32_t nrmCount = 0;
 
+  Vec2f* tex = nullptr;
+  uint32_t texCount;
+
   uint32_t* triVtxIx = nullptr;
   uint32_t* triNrmIx = nullptr;
   uint32_t* TriObjIx = nullptr;   // Triangle object index, one uint32_t per triangle.

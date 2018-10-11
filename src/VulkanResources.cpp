@@ -334,6 +334,10 @@ RenderBufferHandle VulkanResources::createBuffer(size_t requestedSize, VkImageUs
   rv = vkBindBufferMemory(vCtx->device, buf->buffer, buf->mem, 0);
   assert(rv == VK_SUCCESS);
 
+  buf->descInfo.buffer = buf->buffer;
+  buf->descInfo.offset = 0;
+  buf->descInfo.range = VK_WHOLE_SIZE;
+
   return bufHandle;
 }
 

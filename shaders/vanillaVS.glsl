@@ -14,9 +14,12 @@ layout(location = 3) in vec4 inColor;
 
 layout(location = 0) out vec4 albedo;
 layout(location = 1) out vec3 normal;
+layout(location = 2) out vec2 texCoord;
+
 
 void main() {
   normal = normalize(objBuf.N * nrm);
   albedo = inColor;
+  texCoord = tex;
   gl_Position = objBuf.MP * vec4(pos, 1);
 }

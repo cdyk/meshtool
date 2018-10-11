@@ -187,24 +187,3 @@ void VulkanFrameManager::submitGraphics(CommandBufferHandle cmdBuf, bool wait)
   vkQueueSubmit(vCtx->queue, 1, &submitInfo, VK_NULL_HANDLE);
   if (wait) vkQueueWaitIdle(vCtx->queue);
 }
-
-
-void VulkanFrameManager::updateDescriptorSet(DescriptorSetHandle descriptorSet, RenderBufferHandle buffer)
-{
-  VkDescriptorBufferInfo descBufInfo;
-  descBufInfo.buffer = buffer.resource->buffer;
-  descBufInfo.offset = 0;
-  descBufInfo.range = VK_WHOLE_SIZE;
-
-  VkWriteDescriptorSet writes[1];
-  writes[0] = {};
-  writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-  writes[0].pNext = nullptr;
-  writes[0].dstSet = descriptorSet.resource->descSet;
-  writes[0].descriptorCount = 1;
-  writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  writes[0].pBufferInfo = &descBufInfo;
-  writes[0].dstArrayElement = 0;
-  writes[0].dstBinding = 0;
-  vkUpdateDescriptorSets(vCtx->device, 1, writes, 0, NULL);
-}

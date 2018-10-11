@@ -23,6 +23,7 @@ class Renderer
 public:
   bool outlines = true;
   bool solid = true;
+  bool textured = true;
 
   Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h);
   ~Renderer();
@@ -42,11 +43,13 @@ private:
   ResourceManager<RenderMesh> renderMeshResources;
 
   PipelineHandle vanillaPipeline;
+  PipelineHandle texturedPipeline;
   PipelineHandle wireFrontFacePipeline;
   PipelineHandle wireBothFacesPipeline;
 
   ShaderHandle vanillaShader;
   ShaderHandle flatShader;
+  ShaderHandle texturedShader;
 
   uint32_t viewport[4];
   uint32_t frameCount;
@@ -57,7 +60,8 @@ private:
 
   struct Rename {
     FenceHandle ready;
-    DescriptorSetHandle sharedDescSet;
+    DescriptorSetHandle objBufDescSet;
+    DescriptorSetHandle objBufSamplerDescSet;
     RenderBufferHandle objectBuffer;
   };
   Vector<Rename> renaming;

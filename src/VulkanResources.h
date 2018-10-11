@@ -33,6 +33,7 @@ struct RenderBuffer : ResourceBase
   VkDeviceMemory mem = VK_NULL_HANDLE;
   size_t requestedSize = 0;
   size_t alignedSize = 0;
+  VkDescriptorBufferInfo descInfo;
 };
 typedef ResourceHandle<RenderBuffer> RenderBufferHandle;
 

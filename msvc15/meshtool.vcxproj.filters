@@ -158,5 +158,8 @@
     <CustomBuild Include="..\shaders\flatPS.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
+    <CustomBuild Include="..\shaders\texturedPS.glsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

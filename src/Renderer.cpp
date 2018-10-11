@@ -34,6 +34,10 @@ namespace {
 #include "vanillaPS.glsl.h"
     ;
 
+  uint32_t texturedPS[]
+#include "texturedPS.glsl.h"
+    ;
+
 
   void vanillaPipelineInfo(VulkanContext* vCtx,
                            Vector<VkVertexInputBindingDescription>& inputBind,
@@ -117,6 +121,12 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
     stages[1] = { flatPS, sizeof(flatPS), VK_SHADER_STAGE_FRAGMENT_BIT };
     flatShader = vCtx->resources->createShader(stages);
   }
+  {
+    Vector<ShaderInputSpec> stages(2);
+    stages[0] = { vanillaVS, sizeof(vanillaVS), VK_SHADER_STAGE_VERTEX_BIT };
+    stages[1] = { texturedPS, sizeof(texturedPS), VK_SHADER_STAGE_FRAGMENT_BIT };
+    texturedShader = vCtx->resources->createShader(stages);
+  }
 
   renaming.resize(10);
   for (size_t i = 0; i < renaming.size(); i++) {
@@ -125,19 +135,22 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
   }
   
 
-  uint32_t texW = 8;
-  uint32_t texH = 8;
+
+
+  uint32_t texW = 500;
+  uint32_t texH = 500;
 
   auto stagingBuffer = vCtx->resources->createBuffer(texW*texH * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
   {
     MappedBuffer<uint8_t> map(vCtx, stagingBuffer);
     for (unsigned j = 0; j < texH; j++) {
       for (unsigned i = 0; i < texW; i++) {
-        auto f = ((i / (w / 2) + j / (h / 2))) & 1 ? 170 : 255;
-        map.mem[4 * (w*j + i) + 0] = f;
-        map.mem[4 * (w*j + i) + 1] = f;
-        map.mem[4 * (w*j + i) + 2] = f;
-        map.mem[4 * (w*j + i) + 3] = 255;
+        auto g = ((i / (texW / 10) + j / (texH / 10))) & 1 ? 0 : 20;
+        auto f = ((i / (texW / 2) + j / (texH / 2))) & 1 ? 150 : 235;
+        map.mem[4 * (texW*j + i) + 0] = f + g;
+        map.mem[4 * (texW*j + i) + 1] = f + g;
+        map.mem[4 * (texW*j + i) + 2] = f + g;
+        map.mem[4 * (texW*j + i) + 3] = 255;
       }
     }
   }
@@ -211,7 +224,7 @@ RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
       for (unsigned i = 0; i < 3*mesh->triCount; i++) {
         map.mem[i].vtx = mesh->vtx[mesh->triVtxIx[i]];
         map.mem[i].nrm = mesh->nrm[mesh->triNrmIx[i]];
-        map.mem[i].tex = Vec2f(0.f);
+        map.mem[i].tex = Vec2f(mesh->vtx[mesh->triVtxIx[i]].data);
       }
     }
     else {
@@ -222,7 +235,7 @@ RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
         for (unsigned k = 0; k < 3; k++) {
           map.mem[3 * i + k].vtx = p[k];
           map.mem[3 * i + k].nrm = n;
-          map.mem[3 * i + k].tex = Vec2f(0.f);
+          map.mem[3 * i + k].tex = Vec2f(p[k].x, p[k].y);
         }
       }
     }
@@ -254,19 +267,36 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
   auto * rm = renderMesh.resource;
   if(!vanillaPipeline || vanillaPipeline.resource->pass != pass)
   {
-    VkDescriptorSetLayoutBinding descSetLayoutBind{};
-    descSetLayoutBind = {};
-    descSetLayoutBind.binding = 0;
-    descSetLayoutBind.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descSetLayoutBind.descriptorCount = 1;
-    descSetLayoutBind.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    descSetLayoutBind.pImmutableSamplers = NULL;
+    VkDescriptorSetLayoutBinding objBufLayoutBinding[1];
+    objBufLayoutBinding[0] = {};
+    objBufLayoutBinding[0].binding = 0;
+    objBufLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    objBufLayoutBinding[0].descriptorCount = 1;
+    objBufLayoutBinding[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
-    VkDescriptorSetLayoutCreateInfo descLayoutCI{};
-    descLayoutCI.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    descLayoutCI.pNext = NULL;
-    descLayoutCI.bindingCount = 1;
-    descLayoutCI.pBindings = &descSetLayoutBind;
+    VkDescriptorSetLayoutCreateInfo objBufLayoutInfo{};
+    objBufLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    objBufLayoutInfo.bindingCount = 1;
+    objBufLayoutInfo.pBindings = objBufLayoutBinding;
+
+    VkDescriptorSetLayoutBinding objBufSamplerLayoutBinding[2];
+    objBufSamplerLayoutBinding[0] = {};
+    objBufSamplerLayoutBinding[0].binding = 0;
+    objBufSamplerLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    objBufSamplerLayoutBinding[0].descriptorCount = 1;
+    objBufSamplerLayoutBinding[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    objBufSamplerLayoutBinding[1].binding = 1;
+    objBufSamplerLayoutBinding[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    objBufSamplerLayoutBinding[1].descriptorCount = 1;
+    objBufSamplerLayoutBinding[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    objBufSamplerLayoutBinding[1].pImmutableSamplers = NULL;
+
+    VkDescriptorSetLayoutCreateInfo objBufSamplerLayoutInfo{};
+    objBufSamplerLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    objBufSamplerLayoutInfo.bindingCount = 2;
+    objBufSamplerLayoutInfo.pBindings = objBufSamplerLayoutBinding;
+
+
 
     Vector<VkVertexInputBindingDescription> inputBind;
     Vector<VkVertexInputAttributeDescription> inputAttrib;
@@ -276,16 +306,26 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     vanillaPipeline = vCtx->resources->createPipeline(inputBind,
                                                       inputAttrib,
                                                       pipeLayoutCI,
-                                                      descLayoutCI,
+                                                      objBufLayoutInfo,
                                                       pass,
                                                       vanillaShader,
                                                       vCtx->infos->pipelineRasterization.cullBackDepthBias);
+
+    texturedPipeline = vCtx->resources->createPipeline(inputBind,
+                                                       inputAttrib,
+                                                       pipeLayoutCI,
+                                                       objBufSamplerLayoutInfo,
+                                                       pass,
+                                                       texturedShader,
+                                                       vCtx->infos->pipelineRasterization.cullBackDepthBias);
+
+
 
     wirePipelineInfo(vCtx, inputBind, inputAttrib, pipeLayoutCI);
     wireFrontFacePipeline = vCtx->resources->createPipeline(inputBind,
                                                             inputAttrib,
                                                             pipeLayoutCI,
-                                                            descLayoutCI,
+                                                            objBufLayoutInfo,
                                                             pass,
                                                             flatShader,
                                                             vCtx->infos->pipelineRasterization.cullBackLine);
@@ -293,14 +333,15 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     wireBothFacesPipeline = vCtx->resources->createPipeline(inputBind,
                                                             inputAttrib,
                                                             pipeLayoutCI,
-                                                            descLayoutCI,
+                                                            objBufLayoutInfo,
                                                             pass,
                                                             flatShader,
                                                             vCtx->infos->pipelineRasterization.cullNoneLine);
 
 
     for (size_t i = 0; i < renaming.size(); i++) {
-      renaming[i].sharedDescSet = vCtx->resources->createDescriptorSet(vanillaPipeline.resource->descLayout);
+      renaming[i].objBufDescSet = vCtx->resources->createDescriptorSet(vanillaPipeline.resource->descLayout);
+      renaming[i].objBufSamplerDescSet = vCtx->resources->createDescriptorSet(texturedPipeline.resource->descLayout);
     }
   }
   auto & rename = renaming[renamingCurr];
@@ -312,7 +353,48 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     map.mem->Ncol1 = Vec4f(N.cols[1], 0.f);
     map.mem->Ncol2 = Vec4f(N.cols[2], 0.f);
   }
-  vCtx->frameManager->updateDescriptorSet(rename.sharedDescSet, rename.objectBuffer);
+  {
+    VkWriteDescriptorSet writes[1];
+    writes[0] = {};
+    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[0].pNext = nullptr;
+    writes[0].dstSet = rename.objBufDescSet.resource->descSet;
+    writes[0].descriptorCount = 1;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes[0].pBufferInfo = &rename.objectBuffer.resource->descInfo;
+    writes[0].dstArrayElement = 0;
+    writes[0].dstBinding = 0;
+    vkUpdateDescriptorSets(vCtx->device, 1, writes, 0, nullptr);
+  }
+  {
+    VkWriteDescriptorSet writes[2];
+    writes[0] = {};
+    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[0].dstSet = rename.objBufSamplerDescSet.resource->descSet;
+    writes[0].descriptorCount = 1;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes[0].dstArrayElement = 0;
+    writes[0].dstBinding = 0;
+    writes[0].pBufferInfo = &rename.objectBuffer.resource->descInfo;
+
+    // Fixme: this is only needed once    
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = texImageView.resource->view;
+    imageInfo.sampler = texSampler.resource->sampler;
+
+    writes[1] = {};
+    writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[1].dstSet = rename.objBufSamplerDescSet.resource->descSet;
+    writes[1].descriptorCount = 1;
+    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writes[1].dstArrayElement = 0;
+    writes[1].dstBinding = 1;
+    writes[1].pImageInfo = &imageInfo;
+
+    vkUpdateDescriptorSets(vCtx->device, 2, writes, 0, nullptr);
+  }
+
 
   {
     VkViewport vp = {};
@@ -339,21 +421,27 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     vkCmdBindVertexBuffers(cmdBuf, 0, 2, buffers, offsets);
   }
 
-  VkDescriptorSet desc_set[1] = { rename.sharedDescSet.resource->descSet };
   if(solid) {
-    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipe);
-    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, desc_set, 0, NULL);
+    if (textured) {
+      vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipe);
+      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipeLayout, 0, 1, &rename.objBufSamplerDescSet.resource->descSet, 0, NULL);
+
+    }
+    else {
+      vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipe);
+      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
+    }
     vkCmdDraw(cmdBuf, 3 * rm->tri_n, 1, 0, 0);
   }
 
   if(outlines) {
     if (solid) {
       vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, wireFrontFacePipeline.resource->pipe);
-      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, desc_set, 0, NULL);
+      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
     }
     else {
       vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, wireBothFacesPipeline.resource->pipe);
-      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, desc_set, 0, NULL);
+      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
     }
     vkCmdDraw(cmdBuf, 3 * rm->tri_n, 1, 0, 0);
   }

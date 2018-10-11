@@ -16,8 +16,6 @@ public:
 
   void resize(uint32_t w, uint32_t h);
 
-  void updateDescriptorSet(DescriptorSetHandle descriptorSet, RenderBufferHandle buffer);
-
   void copyBuffer(RenderBufferHandle dst, RenderBufferHandle src, VkDeviceSize size);
   void transitionImageLayout(ImageHandle image, VkImageLayout layout);
   void copyBufferToImage(ImageHandle dst, RenderBufferHandle src, uint32_t w, uint32_t h);
