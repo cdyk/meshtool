@@ -79,6 +79,9 @@
     <ClCompile Include="..\src\VulkanManager.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\HandlePicking.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\src\LinAlg.h">
@@ -142,6 +145,9 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\src\VulkanManager.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\HandlePicking.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

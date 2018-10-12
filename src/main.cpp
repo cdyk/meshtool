@@ -18,7 +18,7 @@
 #include "LinAlgOps.h"
 #include "Renderer.h"
 #include "VulkanManager.h"
-
+#include "HandlePicking.h"
 #include "App.h"
 
 
@@ -177,7 +177,7 @@ namespace {
       auto time1 = std::chrono::high_resolution_clock::now();
       auto e = std::chrono::duration_cast<std::chrono::milliseconds>((time1 - time0)).count();
       std::lock_guard<std::mutex> guard(app->incomingMeshLock);
-      app->incomingMeshes.push_back(mesh);
+      app->incomingMeshes.pushBack(mesh);
       logger(0, "Read %s in %lldms", path.c_str(), e);
     }
     else {
@@ -253,8 +253,7 @@ namespace {
 
       ImGui::SetCursorPos(backup_pos);
       ImGui::BeginChild("Meshes", ImVec2(app->leftSplit - app->thickness - backup_pos.x, -1), false, ImGuiWindowFlags_AlwaysHorizontalScrollbar);
-      for(auto & item : app->meshItems) {
-        auto * m = item.mesh;
+      for(auto * m : app->items.meshes) {
         if (ImGui::TreeNodeEx(m, ImGuiTreeNodeFlags_DefaultOpen, "%s Vn=%d Tn=%d", m->name ? m->name : "unnamed", m->vtxCount, m->triCount)) {
           for (unsigned o = 0; o < m->obj_n; o++) {
             if (ImGui::Selectable(m->obj[o], &m->selected[o], ImGuiSelectableFlags_PressedOnClick)) {
@@ -273,15 +272,17 @@ namespace {
 
   void checkQueues()
   {
-    std::list<Mesh*> newMeshes;
+    Vector<Mesh*> newMeshes;
     {
       std::lock_guard<std::mutex> guard(app->incomingMeshLock);
-      if (!app->incomingMeshes.empty()) {
-        newMeshes = std::move(app->incomingMeshes);
-        app->incomingMeshes.clear();
+      for(auto & mesh : app->incomingMeshes)
+      if (app->incomingMeshes.size() != 0) {
+        newMeshes.pushBack(mesh);
       }
+      app->incomingMeshes.resize(0);
     }
-    if (!newMeshes.empty()) {
+
+    if (newMeshes.size() != 0) {
       for (auto & m : newMeshes) {
 
         auto obj_n = m->obj_n;
@@ -292,11 +293,11 @@ namespace {
         std::memset(m->selected, 0, sizeof(bool)*obj_n);
         app->updateColor = true;
 
-        app->meshItems.push_back({ m, app->vulkanManager->renderer->createRenderMesh(m) });
+        app->items.meshes.pushBack(m);
+        app->items.renderMeshes.pushBack(app->vulkanManager->renderer->createRenderMesh(m));
       }
       auto bbox = createEmptyBBox3f();
-      for (auto & item : app->meshItems) {
-        auto * m = item.mesh;
+      for (auto * m : app->items.meshes) {
         if (isEmpty(m->bbox)) continue;
         engulf(bbox, m->bbox);
       }
@@ -423,14 +424,33 @@ int main(int argc, char** argv)
       double x, y;
       glfwGetCursorPos(window, &x, &y);
 
-      logger(0, "picking at %f %f", x, y);
+      Hit hit;
+      HitTmp tmp;
+      Vec2f viewerPos(app->leftSplit, app->menuHeight);
+      Vec2f viewerSize(app->width - viewerPos.x, app->height - viewerPos.y);
+
+      if(nearestHit(hit, tmp, logger,
+                    app->items.meshes,
+                    app->viewer->getProjectionViewMatrix(),
+                    app->viewer->getProjectionViewInverseMatrix(),
+                    viewerPos, viewerSize, Vec2f(float(x), float(y))))
+      {
+        auto * m = app->items.meshes[hit.mesh];
+        auto o = m->TriObjIx[hit.triangle];
+        m->selected[o] = !m->selected[o];
+        app->updateColor = true;
+        logger(0, "Hit mesh %d triangle %d at %f", hit.mesh, hit.triangle, hit.depth);
+      }
+      else {
+        logger(0, "Miss");
+      }
     }
 
     if (app->selectAll | app->selectNone) {
       app->selectAll = app->selectNone = false;
-      for (auto & m : app->meshItems) {
-        for (uint32_t i = 0; i < m.mesh->obj_n; i++) {
-          m.mesh->selected[i] = app->selectAll;
+      for (auto * m : app->items.meshes) {
+        for (uint32_t i = 0; i < m->obj_n; i++) {
+          m->selected[i] = app->selectAll;
           app->updateColor = true;
         }
       }
@@ -444,8 +464,7 @@ int main(int argc, char** argv)
     if (app->moveToSelection) {
       app->moveToSelection = false;
       BBox3f bbox = createEmptyBBox3f();
-      for (auto & it : app->meshItems) {
-        auto * m = it.mesh;
+      for (auto * m : app->items.meshes) {
         for (uint32_t i = 0; i < m->triCount; i++) {
           if (m->selected[m->TriObjIx[i]]) {
             for (unsigned k = 0; k < 3; k++) {
@@ -460,9 +479,7 @@ int main(int argc, char** argv)
     }
 
     if (app->updateColor) {
-      for (auto & it : app->meshItems) {
-        auto * m = it.mesh;
-
+      for (auto * m : app->items.meshes) {
         if (app->colorFromSmoothingGroup && m->triSmoothGroupIx) {
           for (uint32_t i = 0; i < m->triCount; i++) {
             if (m->selected[m->TriObjIx[i]]) {
@@ -496,20 +513,19 @@ int main(int argc, char** argv)
       }
     }
 
-    app->renderMeshes.resize(app->meshItems.size());
     size_t i = 0; 
-    for (auto & it : app->meshItems) {
-      app->renderMeshes[i++] = it.renderMesh;
+    for (auto & renderMesh : app->items.renderMeshes) {
       if (app->updateColor) {
-        app->vulkanManager->renderer->updateRenderMeshColor(it.renderMesh);
+        app->vulkanManager->renderer->updateRenderMeshColor(renderMesh);
       }
     }
     app->updateColor = false;
 
-    app->vulkanManager->render(app->width, app->height, app->renderMeshes, viewport, app->viewer->getProjectionMatrix(), app->viewer->getViewMatrix());
+    app->vulkanManager->render(app->width, app->height, app->items.renderMeshes, viewport, app->viewer->getProjectionMatrix(), app->viewer->getViewMatrix());
     app->vulkanManager->present();
   }
-  app->meshItems.clear();
+  app->items.meshes.resize(0);
+  app->items.renderMeshes.resize(0);
   app->vulkanManager->renderer->houseKeep();
 
   delete app->vulkanManager;

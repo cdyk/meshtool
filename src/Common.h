@@ -11,6 +11,7 @@ void* xcalloc(size_t count, size_t size);
 void* xrealloc(void* ptr, size_t size);
 
 struct Mesh;
+struct MeshItem;
 
 class NonCopyable
 {
@@ -162,7 +163,7 @@ public:
     if (fill <= allocated()) {
       _accommodate(sizeof(T), 2 * fill < 16 ? 16 : 2 * fill, true);
     }
-    data()[fill++] = t;
+    new(data() + (fill++)) T(t);
   }
 
   size_t size() const { return fill; }

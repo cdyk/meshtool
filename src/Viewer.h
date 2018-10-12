@@ -25,6 +25,8 @@ public:
 
   const Mat4f& getProjectionMatrix() const { return curr.P; }
   const Mat4f& getViewMatrix() const { return curr.M; }
+  const Mat4f& getProjectionViewMatrix() const { return curr.PM; }
+  const Mat4f& getProjectionViewInverseMatrix() const { return curr.PMinv; }
 
 private:
   enum Projection {

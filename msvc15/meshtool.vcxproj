@@ -92,6 +92,7 @@
     <ClCompile Include="..\libs\imgui\imgui_widgets.cpp" />
     <ClCompile Include="..\src\App.cpp" />
     <ClCompile Include="..\src\Common.cpp" />
+    <ClCompile Include="..\src\HandlePicking.cpp" />
     <ClCompile Include="..\src\LinAlgOps.cpp" />
     <ClCompile Include="..\src\main.cpp" />
     <ClCompile Include="..\src\Mesh.cpp" />
@@ -117,6 +118,7 @@
     <ClInclude Include="..\libs\imgui\imstb_truetype.h" />
     <ClInclude Include="..\src\App.h" />
     <ClInclude Include="..\src\Common.h" />
+    <ClInclude Include="..\src\HandlePicking.h" />
     <ClInclude Include="..\src\LinAlg.h" />
     <ClInclude Include="..\src\LinAlgOps.h" />
     <ClInclude Include="..\src\Mesh.h" />

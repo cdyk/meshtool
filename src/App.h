@@ -1,6 +1,5 @@
 #pragma once
 #include <mutex>
-#include <list>
 #include "Common.h"
 #include "Renderer.h"
 
@@ -43,10 +42,11 @@ public:
 
 
   std::mutex incomingMeshLock;
-  std::list<Mesh*> incomingMeshes;
+  Vector<Mesh*> incomingMeshes;
 
-  Vector<RenderMeshHandle> renderMeshes;
-
-  std::list<MeshItem> meshItems;
+  struct {
+    Vector<Mesh*> meshes;
+    Vector<RenderMeshHandle> renderMeshes;
+  } items;
 
 };
