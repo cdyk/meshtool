@@ -99,6 +99,7 @@ namespace {
     if (mods == GLFW_MOD_CONTROL) {
       if (key == GLFW_KEY_A && action == GLFW_PRESS) app->selectAll = true;
       if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) app->selectNone = true;
+      if (key == GLFW_KEY_Q && action == GLFW_PRESS) glfwSetWindowShouldClose(window, true);
     }
     else if (mods == (GLFW_MOD_CONTROL | GLFW_MOD_SHIFT)) {
       if (key == GLFW_KEY_A && action == GLFW_PRESS) app->viewAll = true;
@@ -108,6 +109,14 @@ namespace {
       if (key == GLFW_KEY_W && action == GLFW_PRESS)  app->vulkanManager->renderer->outlines = !app->vulkanManager->renderer->outlines;
       if (key == GLFW_KEY_S && action == GLFW_PRESS)  app->vulkanManager->renderer->solid = !app->vulkanManager->renderer->solid;
       if (key == GLFW_KEY_T && action == GLFW_PRESS)  app->vulkanManager->renderer->textured = !app->vulkanManager->renderer->textured;
+      if (key == GLFW_KEY_F && action == GLFW_PRESS) {
+        if (glfwGetWindowAttrib(window, GLFW_MAXIMIZED)) {
+          glfwRestoreWindow(window);
+        }
+        else {
+          glfwMaximizeWindow(window);
+        }
+      }
     }
 
   }
