@@ -123,6 +123,9 @@
     <ClCompile Include="..\core\Common.cpp" />
     <ClCompile Include="..\core\HandlePicking.cpp" />
     <ClCompile Include="..\core\LinAlgOps.cpp" />
+    <ClCompile Include="..\core\mem\Allocators.cpp" />
+    <ClCompile Include="..\core\mem\Arena.cpp" />
+    <ClCompile Include="..\core\mem\Pool.cpp" />
     <ClCompile Include="..\core\Mesh.cpp" />
     <ClCompile Include="..\core\ObjReader.cpp" />
     <ClCompile Include="..\core\ResourceManager.cpp" />
@@ -134,6 +137,7 @@
     <ClInclude Include="..\core\HandlePicking.h" />
     <ClInclude Include="..\core\LinAlg.h" />
     <ClInclude Include="..\core\LinAlgOps.h" />
+    <ClInclude Include="..\core\mem\Allocators.h" />
     <ClInclude Include="..\core\Mesh.h" />
     <ClInclude Include="..\core\ResourceManager.h" />
     <ClInclude Include="..\core\Viewer.h" />

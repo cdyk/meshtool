@@ -5,6 +5,9 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
+    <Filter Include="src\mem">
+      <UniqueIdentifier>{5a472d31-bf2b-4726-a4c1-2071036cddf9}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\core\Common.cpp">
@@ -31,6 +34,15 @@
     <ClCompile Include="..\core\Tasks.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\core\mem\Arena.cpp">
+      <Filter>src\mem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\core\mem\Pool.cpp">
+      <Filter>src\mem</Filter>
+    </ClCompile>
+    <ClCompile Include="..\core\mem\Allocators.cpp">
+      <Filter>src\mem</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\core\Common.h">
@@ -53,6 +65,9 @@
     </ClInclude>
     <ClInclude Include="..\core\Viewer.h">
       <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\core\mem\Allocators.h">
+      <Filter>src\mem</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
