@@ -126,6 +126,7 @@
     <ClCompile Include="..\core\Mesh.cpp" />
     <ClCompile Include="..\core\ObjReader.cpp" />
     <ClCompile Include="..\core\ResourceManager.cpp" />
+    <ClCompile Include="..\core\Tasks.cpp" />
     <ClCompile Include="..\core\Viewer.cpp" />
   </ItemGroup>
   <ItemGroup>

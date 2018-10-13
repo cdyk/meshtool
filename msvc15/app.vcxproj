@@ -92,7 +92,6 @@
     <ClCompile Include="..\app\App.cpp" />
     <ClCompile Include="..\app\main.cpp" />
     <ClCompile Include="..\app\Renderer.cpp" />
-    <ClCompile Include="..\app\Tasks.cpp" />
     <ClCompile Include="..\app\VulkanContext.cpp" />
     <ClCompile Include="..\app\VulkanFrameManager.cpp" />
     <ClCompile Include="..\app\VulkanInfos.cpp" />

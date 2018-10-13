@@ -79,7 +79,7 @@ void  Tasks::update()
 void  Tasks::cleanup()
 {
   for (auto it = impl->tasks.begin(); it != impl->tasks.end();) {
-    it->thread.join();
+    if(it->thread.joinable()) it->thread.join();
   }
   impl->tasks.clear();
 }

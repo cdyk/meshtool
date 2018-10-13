@@ -43,9 +43,6 @@
     <ClCompile Include="..\app\Renderer.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\app\Tasks.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="..\app\VulkanContext.cpp">
       <Filter>src</Filter>
     </ClCompile>

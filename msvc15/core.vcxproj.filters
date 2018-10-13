@@ -28,6 +28,9 @@
     <ClCompile Include="..\core\Viewer.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\core\Tasks.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\core\Common.h">
