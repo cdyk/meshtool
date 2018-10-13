@@ -16,15 +16,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\src\main.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\LinAlgOps.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\Viewer.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="..\libs\imgui\examples\imgui_impl_glfw.cpp">
       <Filter>imgui\examples</Filter>
     </ClCompile>
@@ -40,59 +31,38 @@
     <ClCompile Include="..\libs\imgui\imgui_widgets.cpp">
       <Filter>imgui</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\ObjReader.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\Tasks.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\Common.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="..\src\Mesh.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="..\libs\imgui\examples\imgui_impl_vulkan.cpp">
       <Filter>imgui\examples</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\Renderer.cpp">
+    <ClCompile Include="..\app\App.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\ResourceManager.cpp">
+    <ClCompile Include="..\app\main.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\VulkanContext.cpp">
+    <ClCompile Include="..\app\Renderer.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\VulkanFrameManager.cpp">
+    <ClCompile Include="..\app\Tasks.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\VulkanInfos.cpp">
+    <ClCompile Include="..\app\VulkanContext.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\VulkanResources.cpp">
+    <ClCompile Include="..\app\VulkanFrameManager.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\App.cpp">
+    <ClCompile Include="..\app\VulkanInfos.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\VulkanManager.cpp">
+    <ClCompile Include="..\app\VulkanManager.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\HandlePicking.cpp">
+    <ClCompile Include="..\app\VulkanResources.cpp">
       <Filter>src</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\src\LinAlg.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\LinAlgOps.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\Viewer.h">
-      <Filter>src</Filter>
-    </ClInclude>
     <ClInclude Include="..\libs\imgui\examples\imgui_impl_glfw.h">
       <Filter>imgui\examples</Filter>
     </ClInclude>
@@ -114,40 +84,28 @@
     <ClInclude Include="..\libs\imgui\imstb_truetype.h">
       <Filter>imgui</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\Common.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\Mesh.h">
-      <Filter>src</Filter>
-    </ClInclude>
     <ClInclude Include="..\libs\imgui\examples\imgui_impl_vulkan.h">
       <Filter>imgui\examples</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\Renderer.h">
+    <ClInclude Include="..\app\App.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\ResourceManager.h">
+    <ClInclude Include="..\app\Renderer.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\VulkanContext.h">
+    <ClInclude Include="..\app\VulkanContext.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\VulkanFrameManager.h">
+    <ClInclude Include="..\app\VulkanFrameManager.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\VulkanInfos.h">
+    <ClInclude Include="..\app\VulkanInfos.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\VulkanResources.h">
+    <ClInclude Include="..\app\VulkanManager.h">
       <Filter>src</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\App.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\VulkanManager.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\HandlePicking.h">
+    <ClInclude Include="..\app\VulkanResources.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,6 +1,6 @@
 #include "HandlePicking.h"
 #include "LinAlgOps.h"
-#include "App.h"  // MeshItem
+//#include "App.h"  // MeshItem
 #include "Mesh.h"
 
 namespace {

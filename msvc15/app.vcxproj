@@ -42,14 +42,19 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
-  <PropertyGroup />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IntDir>$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IntDir>$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..\libs\glfw\include;..\libs\imgui;..\libs\gl3w\include;..\shaders\;%VULKAN_SDK%\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\core\;..\libs\glfw\include;..\libs\imgui;..\libs\gl3w\include;..\shaders\;%VULKAN_SDK%\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -69,7 +74,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>..\libs\glfw\include;..\libs\imgui;..\libs\gl3w\include;..\shaders\;%VULKAN_SDK%\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\core\;..\libs\glfw\include;..\libs\imgui;..\libs\gl3w\include;..\shaders\;%VULKAN_SDK%\include</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -84,30 +89,30 @@
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\app\App.cpp" />
+    <ClCompile Include="..\app\main.cpp" />
+    <ClCompile Include="..\app\Renderer.cpp" />
+    <ClCompile Include="..\app\Tasks.cpp" />
+    <ClCompile Include="..\app\VulkanContext.cpp" />
+    <ClCompile Include="..\app\VulkanFrameManager.cpp" />
+    <ClCompile Include="..\app\VulkanInfos.cpp" />
+    <ClCompile Include="..\app\VulkanManager.cpp" />
+    <ClCompile Include="..\app\VulkanResources.cpp" />
     <ClCompile Include="..\libs\imgui\examples\imgui_impl_glfw.cpp" />
     <ClCompile Include="..\libs\imgui\examples\imgui_impl_vulkan.cpp" />
     <ClCompile Include="..\libs\imgui\imgui.cpp" />
     <ClCompile Include="..\libs\imgui\imgui_demo.cpp" />
     <ClCompile Include="..\libs\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\libs\imgui\imgui_widgets.cpp" />
-    <ClCompile Include="..\src\App.cpp" />
-    <ClCompile Include="..\src\Common.cpp" />
-    <ClCompile Include="..\src\HandlePicking.cpp" />
-    <ClCompile Include="..\src\LinAlgOps.cpp" />
-    <ClCompile Include="..\src\main.cpp" />
-    <ClCompile Include="..\src\Mesh.cpp" />
-    <ClCompile Include="..\src\ObjReader.cpp" />
-    <ClCompile Include="..\src\Renderer.cpp" />
-    <ClCompile Include="..\src\ResourceManager.cpp" />
-    <ClCompile Include="..\src\Tasks.cpp" />
-    <ClCompile Include="..\src\Viewer.cpp" />
-    <ClCompile Include="..\src\VulkanContext.cpp" />
-    <ClCompile Include="..\src\VulkanFrameManager.cpp" />
-    <ClCompile Include="..\src\VulkanInfos.cpp" />
-    <ClCompile Include="..\src\VulkanManager.cpp" />
-    <ClCompile Include="..\src\VulkanResources.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\app\App.h" />
+    <ClInclude Include="..\app\Renderer.h" />
+    <ClInclude Include="..\app\VulkanContext.h" />
+    <ClInclude Include="..\app\VulkanFrameManager.h" />
+    <ClInclude Include="..\app\VulkanInfos.h" />
+    <ClInclude Include="..\app\VulkanManager.h" />
+    <ClInclude Include="..\app\VulkanResources.h" />
     <ClInclude Include="..\libs\imgui\examples\imgui_impl_glfw.h" />
     <ClInclude Include="..\libs\imgui\examples\imgui_impl_vulkan.h" />
     <ClInclude Include="..\libs\imgui\imconfig.h" />
@@ -116,20 +121,6 @@
     <ClInclude Include="..\libs\imgui\imstb_rectpack.h" />
     <ClInclude Include="..\libs\imgui\imstb_textedit.h" />
     <ClInclude Include="..\libs\imgui\imstb_truetype.h" />
-    <ClInclude Include="..\src\App.h" />
-    <ClInclude Include="..\src\Common.h" />
-    <ClInclude Include="..\src\HandlePicking.h" />
-    <ClInclude Include="..\src\LinAlg.h" />
-    <ClInclude Include="..\src\LinAlgOps.h" />
-    <ClInclude Include="..\src\Mesh.h" />
-    <ClInclude Include="..\src\Renderer.h" />
-    <ClInclude Include="..\src\ResourceManager.h" />
-    <ClInclude Include="..\src\Viewer.h" />
-    <ClInclude Include="..\src\VulkanContext.h" />
-    <ClInclude Include="..\src\VulkanFrameManager.h" />
-    <ClInclude Include="..\src\VulkanInfos.h" />
-    <ClInclude Include="..\src\VulkanManager.h" />
-    <ClInclude Include="..\src\VulkanResources.h" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\shaders\vanillaPS.glsl">
@@ -175,6 +166,11 @@
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
     </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="core.vcxproj">
+      <Project>{d0a57f09-95f7-4fa5-93be-46096e34b449}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
