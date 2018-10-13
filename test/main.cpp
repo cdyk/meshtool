@@ -106,18 +106,29 @@ int main(int argc, char** argv)
   logger(0, "vtxCount=%d", app->mesh->vtxCount);
   logger(0, "triCount=%d", app->mesh->triCount);
 
+  delete app;
 
   {
+    logger(0, "Pool checks...");
     Pool<Vec3f> pool;
     auto poolBase = (PoolBase*)&pool;
 
     Vector<Vec3f*> tmp(7000);
-    assert(poolBase->pagesAlloc == 0);
+    assert(poolBase->pageCount == 0);
     for (size_t i = 0; i < tmp.size(); i++) {
       tmp[i] = pool.alloc();
     }
-    auto pagesN = poolBase->pagesAlloc;
-    assert(poolBase->pagesAlloc != 0);
+    for (size_t i = 0; i < tmp.size(); i++) {
+      auto ix = pool.getIndex(tmp[i]);
+      assert(ix == i);
+      auto ptr = pool.fromIndex(ix);
+      assert(ptr == tmp[i]);
+      ptr = &pool[ix];
+      assert(ptr == tmp[i]);
+    }
+
+    auto pagesN = poolBase->pageCount;
+    assert(poolBase->pageCount != 0);
     assert(poolBase->itemsAlloc == tmp.size32());
     for (size_t i = 0; i < tmp.size(); i++) {
       pool.release(tmp[i]);
@@ -126,15 +137,20 @@ int main(int argc, char** argv)
     for (size_t i = 0; i < tmp.size(); i++) {
       tmp[i] = pool.alloc();
     }
-    assert(poolBase->pagesAlloc == pagesN);
+    for (size_t i = 0; i < tmp.size(); i++) {
+      auto ix = pool.getIndex(tmp[i]);
+      auto ptr = pool.fromIndex(ix);
+      assert(ptr == tmp[i]);
+    }
+    assert(poolBase->pageCount == pagesN);
     assert(poolBase->itemsAlloc == tmp.size32());
     for (size_t i = tmp.size(); 0 < i; i--) {
       pool.release(tmp[i-1]);
     }
     assert(poolBase->itemsAlloc == 0);
+    logger(0, "Pool checks... OK");
   }
 
 
-  delete app;
   return 0;
 }
