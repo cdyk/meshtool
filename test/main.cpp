@@ -7,10 +7,12 @@
 #include <chrono>
 #include <mutex>
 #include <cassert>
+#include <vector>
+#include <algorithm>
 
 #include "Common.h"
 #include "Mesh.h"
-
+#include "adt/KeyedHeap.h"
 
 
 namespace {
@@ -151,6 +153,31 @@ int main(int argc, char** argv)
     logger(0, "Pool checks... OK");
   }
 
+  if(true) {
+    logger(0, "Keyed heap checks...");
+
+    srand(42);
+    uint32_t N = 700;
+    std::vector<float> values(N);
+
+    KeyedHeap heap;
+    heap.setKeyDomain(N);
+ 
+    for (uint32_t i = 0; i < N; i++) {
+      values[i] = float(rand());
+      heap.insert(i, values[i]);
+      heap.assertHeapInvariants();
+    }
+    std::sort(values.begin(), values.end());
+    for (uint32_t i = 0; i < N; i++) {
+      auto a = values[i];
+      auto b = heap.removeMin();
+
+      assert(a == b);
+      heap.assertHeapInvariants();
+    }
+    logger(0, "Keyed heap checks... OK");
+  }
 
   return 0;
 }

@@ -8,6 +8,9 @@
     <Filter Include="src\mem">
       <UniqueIdentifier>{5a472d31-bf2b-4726-a4c1-2071036cddf9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\adt">
+      <UniqueIdentifier>{4ad5e6a3-7922-4e4e-bc62-2ddd5e3c0bfa}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\core\Common.cpp">
@@ -43,6 +46,9 @@
     <ClCompile Include="..\core\mem\Allocators.cpp">
       <Filter>src\mem</Filter>
     </ClCompile>
+    <ClCompile Include="..\core\adt\KeyedHeap.cpp">
+      <Filter>src\adt</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\core\Common.h">
@@ -68,6 +74,9 @@
     </ClInclude>
     <ClInclude Include="..\core\mem\Allocators.h">
       <Filter>src\mem</Filter>
+    </ClInclude>
+    <ClInclude Include="..\core\adt\KeyedHeap.h">
+      <Filter>src\adt</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
