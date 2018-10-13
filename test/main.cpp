@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <chrono>
 #include <mutex>
+#include <cassert>
 
 #include "Common.h"
 #include "Mesh.h"
@@ -104,6 +105,35 @@ int main(int argc, char** argv)
 
   logger(0, "vtxCount=%d", app->mesh->vtxCount);
   logger(0, "triCount=%d", app->mesh->triCount);
+
+
+  {
+    Pool<Vec3f> pool;
+    auto poolBase = (PoolBase*)&pool;
+
+    Vector<Vec3f*> tmp(7000);
+    assert(poolBase->pagesAlloc == 0);
+    for (size_t i = 0; i < tmp.size(); i++) {
+      tmp[i] = pool.alloc();
+    }
+    auto pagesN = poolBase->pagesAlloc;
+    assert(poolBase->pagesAlloc != 0);
+    assert(poolBase->itemsAlloc == tmp.size32());
+    for (size_t i = 0; i < tmp.size(); i++) {
+      pool.release(tmp[i]);
+    }
+    assert(poolBase->itemsAlloc == 0);
+    for (size_t i = 0; i < tmp.size(); i++) {
+      tmp[i] = pool.alloc();
+    }
+    assert(poolBase->pagesAlloc == pagesN);
+    assert(poolBase->itemsAlloc == tmp.size32());
+    for (size_t i = tmp.size(); 0 < i; i--) {
+      pool.release(tmp[i-1]);
+    }
+    assert(poolBase->itemsAlloc == 0);
+  }
+
 
   delete app;
   return 0;
