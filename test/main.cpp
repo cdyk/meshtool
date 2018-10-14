@@ -8,6 +8,7 @@
 #include <mutex>
 #include <cassert>
 #include <vector>
+#include <list>
 #include <algorithm>
 
 #include "Common.h"
@@ -92,6 +93,12 @@ namespace {
     app->done = true;
   }
 
+  struct HeapItem
+  {
+    uint32_t key;
+    float value;
+  };
+
 }
 
 
@@ -157,28 +164,66 @@ int main(int argc, char** argv)
     logger(0, "Keyed heap checks...");
 
     srand(42);
-    uint32_t N = 15;
-    std::vector<float> values(N);
+    uint32_t N = 100;
 
     KeyedHeap heap;
-    heap.setKeyDomain(N);
+    heap.setKeyRange(N);
  
+    std::list<HeapItem> items;
     for (uint32_t i = 0; i < N; i++) {
-      values[i] = float(rand());
-      heap.insert(i, values[i]);
+      HeapItem item{ i, float(rand()) };
+      items.push_back(item);
+      heap.insert(item.key, item.value);
       heap.assertHeapInvariants();
     }
 
-    auto sorted = values;
-    std::sort(sorted.begin(), sorted.end());
-    for (uint32_t i = 0; i < N; i++) {
-      auto a = sorted[i];
+    items.sort([](const HeapItem & a, const HeapItem &  b) { return a.value < b.value; });
+
+    // regular delmin on the first half
+    auto Na = N / 2;
+    for (uint32_t i = 0; i < Na; i++) {
+      auto item = items.front();
+      items.pop_front();
+
       auto key = heap.removeMin();
       auto b = heap.getValue(key);
 
-      assert(a == b);
+      assert(item.key == key);
+      assert(item.value == b);
       heap.assertHeapInvariants();
     }
+
+    assert(!items.empty());
+    unsigned m = 0;
+    for (auto it = items.begin(); it != items.end();) {
+      // change value
+      if (m == 1) {
+        it->value = float(rand());
+        heap.update(it->key, it->value);
+        it++;
+      }
+      // erase
+      else if (m == 2) {
+        heap.erase(it->key);
+        it = items.erase(it);
+      }
+      // keep
+      else {
+        it++;
+      }
+      m = (m + 1) % 3;
+    }
+    items.sort([](const HeapItem & a, const HeapItem &  b) { return a.value < b.value; });
+
+    for (auto & item : items) {
+      auto key = heap.removeMin();
+      auto b = heap.getValue(key);
+
+      assert(item.key == key);
+      assert(item.value == b);
+      heap.assertHeapInvariants();
+    }
+
     logger(0, "Keyed heap checks... OK");
   }
 

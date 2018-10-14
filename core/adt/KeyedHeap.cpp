@@ -4,26 +4,20 @@
 #include "keyedheap.h"
 
 
-void KeyedHeap::setKeyDomain(uint32_t size)
+void KeyedHeap::setKeyRange(Key size)
 {
-  lut.clear();
-  heap.clear();
-  lut.resize(size);
+  keyRange = size;
+  lut.accommodate(size);
+  for (Key i = 0; i < keyRange; i++) {
+    lut[i].heapPos = ~0u;
+    lut[i].value = 0.f;
+  }
+
+  heap.accommodate(size);
+  fill = 0;
 }
 
-void KeyedHeap::heapSwap(uint32_t heapPosA, uint32_t heapPosB)
-{
-  std::swap(heap[heapPosA], heap[heapPosB]);
-  lut[heap[heapPosA]].heapPos = heapPosA;
-  lut[heap[heapPosB]].heapPos = heapPosB;
-}
-
-float KeyedHeap::valueAtHeapPos(uint32_t heapPos)
-{
-  return lut[heap[heapPos]].value;
-}
-
-void KeyedHeap::percolateUp(uint32_t child)
+void KeyedHeap::percolateUp(HeapPos child)
 {
   while (child) {
     auto childKey = heap[child];
@@ -42,19 +36,18 @@ void KeyedHeap::percolateUp(uint32_t child)
   }
 }
 
-void KeyedHeap::percolateDown(uint32_t parent)
+void KeyedHeap::percolateDown(HeapPos parent)
 {
-  auto N = uint32_t(heap.size());
   while (true) {
     auto childA = 2 * parent + 1;
 
-    if (N <= childA) return;
+    if (fill <= childA) return;
 
     auto smallestChild = childA;
     auto smallestChildKey = heap[childA];
 
     auto childB = 2 * parent + 2;
-    if (childB < N) {
+    if (childB < fill) {
       auto childBKey = heap[childB];
       if (lut[childBKey].value < lut[smallestChildKey].value) {
         smallestChild = childB;
@@ -74,41 +67,29 @@ void KeyedHeap::percolateDown(uint32_t parent)
   }
 }
 
-void KeyedHeap::insert(uint32_t key, float value)
+void KeyedHeap::insert(Key key, float value)
 {
+  assert(lut[key].heapPos == ~0u);
   lut[key].value = value;
-  lut[key].heapPos = uint32_t(heap.size());
-  heap.push_back(key);
+  lut[key].heapPos = fill;
+  heap[fill++] = key;
   percolateUp(lut[key].heapPos);
 }
 
-void KeyedHeap::decreaseValue(uint32_t key, float value)
+void KeyedHeap::erase(Key key)
 {
-  lut[key].value = value;
-  percolateUp(lut[key].heapPos);
-}
-
-void KeyedHeap::increaseValue(uint32_t key, float value)
-{
-  lut[key].value = value;
-  percolateDown(lut[key].heapPos);
-}
-
-void KeyedHeap::erase(uint32_t key)
-{
-  assert(lut[key].heapPos != illegal_index && "Element not present in heap");
+  assert(lut[key].heapPos != ~0u && "Element not present in heap");
 
   auto t = lut[key].value;
-
-  decreaseValue(key, -std::numeric_limits<float>::max());
+  update(key, -FLT_MAX);
   assert(removeMin() == key);
 
-  lut[key].value = t; // hmm, I don't remember why...
+  lut[key].value = t; // in case we call getValue with key
 }
 
 void KeyedHeap::assertHeapInvariants()
 {
-  for (uint32_t child = 1; child < uint32_t(heap.size()); child++) {
+  for (HeapPos child = 1; child < fill; child++) {
     auto parent = (child - 1) / 2;
     auto childKey = heap[child];
     auto parentKey = heap[parent];
@@ -116,34 +97,30 @@ void KeyedHeap::assertHeapInvariants()
   }
 }
 
-void KeyedHeap::update(uint32_t key, float value)
+void KeyedHeap::update(Key key, float value)
 {
-  assert(lut[key].heapPos != illegal_index && "Element not present in heap");
+  assert(lut[key].heapPos != ~0u && "Element not present in heap");
   if (value < lut[key].value) {
-    decreaseValue(key, value);
+    lut[key].value = value;
+    percolateUp(lut[key].heapPos);
   }
   else if(lut[key].value < value) {
-    increaseValue(key, value);
-  }
-}
 
-uint32_t KeyedHeap::peekMin() const
-{
-  assert(!heap.empty());
-  return heap[0];
+    lut[key].value = value;
+    percolateDown(lut[key].heapPos);
+  }
 }
 
 uint32_t KeyedHeap::removeMin()
 {
-  assert(!heap.empty());
+  assert(fill);
 
   Key headKey = heap[0];
   lut[headKey].heapPos = ~0u;
 
-  Key tailKey = heap[uint32_t(heap.size() - 1)];
-  heap.pop_back();
+  Key tailKey = heap[--fill];
 
-  if (!heap.empty()) {
+  if (fill) {
     heap[0] = tailKey;
     lut[tailKey].heapPos = 0;
     percolateDown(0);
