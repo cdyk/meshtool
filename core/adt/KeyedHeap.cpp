@@ -4,22 +4,6 @@
 #include "keyedheap.h"
 
 
-uint32_t KeyedHeap::getParent(uint32_t heapPos)
-{
-  return heapPos > 0 ? (heapPos - 1) / 2 : illegal_index;
-}
-
-uint32_t KeyedHeap::getLeftChild(uint32_t heapPos)
-{
-  return 2 * heapPos + 1 < uint32_t(heap.size()) ? 2 * heapPos + 1 : illegal_index;
-}
-
-uint32_t KeyedHeap::getRightChild(uint32_t heapPos)
-{
-  return 2 * heapPos + 2 < uint32_t(heap.size()) ? 2 * heapPos + 2 : illegal_index;
-}
-
-
 void KeyedHeap::setKeyDomain(uint32_t size)
 {
   lut.clear();
@@ -34,55 +18,60 @@ void KeyedHeap::heapSwap(uint32_t heapPosA, uint32_t heapPosB)
   lut[heap[heapPosB]].heapPos = heapPosB;
 }
 
-float KeyedHeap::getValue(uint32_t key)
-{
-  return lut[key].value;
-}
-
 float KeyedHeap::valueAtHeapPos(uint32_t heapPos)
 {
   return lut[heap[heapPos]].value;
 }
 
-void KeyedHeap::percolateUp(uint32_t heapPos)
+void KeyedHeap::percolateUp(uint32_t child)
 {
-  // Start at heapPos and enforce heap invariant up to the root.
-  do {
-    auto parent = getParent(heapPos);
-    if (parent == illegal_index)
-      return; // top of heap
-    if (valueAtHeapPos(parent) < valueAtHeapPos(heapPos))
-      return; // invariant o.k.
-    heapSwap(heapPos, parent);
-    heapPos = parent;
-  } while (1);
-}
-
-void KeyedHeap::percolateDown(uint32_t heapPos)
-{
-  // Start at heapPos and enforce heap invariant down to the first leaf along min value branches.
-  do {
-    auto left = getLeftChild(heapPos);
-    auto right = getRightChild(heapPos);
-
-    if (left == illegal_index) { return; } // Reached bottom of heap.
-
-   // get smallest child
-    uint32_t child;
-    if (right != illegal_index) {
-      child = valueAtHeapPos(left) < valueAtHeapPos(right) ? left : right;
-    }
-    else {
-      child = left;
-    }
-
-    if (valueAtHeapPos(heapPos) < valueAtHeapPos(child)) {
-      // invariant o.k.
+  while (child) {
+    auto childKey = heap[child];
+    auto parent = (child - 1) / 2;
+    auto parentKey = heap[parent];
+    if (lut[parentKey].value < lut[childKey].value) {
       return;
     }
-    heapSwap(heapPos, child);
-    heapPos = child;
-  } while (1);
+
+    heap[child] = parentKey;
+    heap[parent] = childKey;
+    lut[childKey].heapPos = parent;
+    lut[parentKey].heapPos = child;
+
+    child = parent;
+  }
+}
+
+void KeyedHeap::percolateDown(uint32_t parent)
+{
+  auto N = uint32_t(heap.size());
+  while (true) {
+    auto childA = 2 * parent + 1;
+
+    if (N <= childA) return;
+
+    auto smallestChild = childA;
+    auto smallestChildKey = heap[childA];
+
+    auto childB = 2 * parent + 2;
+    if (childB < N) {
+      auto childBKey = heap[childB];
+      if (lut[childBKey].value < lut[smallestChildKey].value) {
+        smallestChild = childB;
+        smallestChildKey = childBKey;
+      }
+    }
+
+    auto parentKey = heap[parent];
+    if (lut[parentKey].value < lut[smallestChildKey].value) return;
+
+    heap[smallestChild] = parentKey;
+    heap[parent] = smallestChildKey;
+    lut[smallestChildKey].heapPos = parent;
+    lut[parentKey].heapPos = smallestChild;
+
+    parent = smallestChild;
+  }
 }
 
 void KeyedHeap::insert(uint32_t key, float value)
@@ -119,10 +108,11 @@ void KeyedHeap::erase(uint32_t key)
 
 void KeyedHeap::assertHeapInvariants()
 {
-  for (uint32_t i = 1; i < uint32_t(heap.size()); i++) {
-    auto a = valueAtHeapPos(i);
-    auto b = valueAtHeapPos(getParent(i));
-    assert(a <= b);
+  for (uint32_t child = 1; child < uint32_t(heap.size()); child++) {
+    auto parent = (child - 1) / 2;
+    auto childKey = heap[child];
+    auto parentKey = heap[parent];
+    assert(lut[parentKey].value < lut[childKey].value);
   }
 }
 
@@ -146,10 +136,18 @@ uint32_t KeyedHeap::peekMin() const
 uint32_t KeyedHeap::removeMin()
 {
   assert(!heap.empty());
-  auto index = heap[0];
-  heapSwap(0, uint32_t(heap.size()) - 1);
+
+  Key headKey = heap[0];
+  lut[headKey].heapPos = ~0u;
+
+  Key tailKey = heap[uint32_t(heap.size() - 1)];
   heap.pop_back();
-  lut[index].heapPos = illegal_index;
-  percolateDown(0);
-  return index;
+
+  if (!heap.empty()) {
+    heap[0] = tailKey;
+    lut[tailKey].heapPos = 0;
+    percolateDown(0);
+  }
+
+  return headKey;
 }

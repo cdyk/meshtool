@@ -157,7 +157,7 @@ int main(int argc, char** argv)
     logger(0, "Keyed heap checks...");
 
     srand(42);
-    uint32_t N = 700;
+    uint32_t N = 15;
     std::vector<float> values(N);
 
     KeyedHeap heap;
@@ -168,10 +168,13 @@ int main(int argc, char** argv)
       heap.insert(i, values[i]);
       heap.assertHeapInvariants();
     }
-    std::sort(values.begin(), values.end());
+
+    auto sorted = values;
+    std::sort(sorted.begin(), sorted.end());
     for (uint32_t i = 0; i < N; i++) {
-      auto a = values[i];
-      auto b = heap.removeMin();
+      auto a = sorted[i];
+      auto key = heap.removeMin();
+      auto b = heap.getValue(key);
 
       assert(a == b);
       heap.assertHeapInvariants();

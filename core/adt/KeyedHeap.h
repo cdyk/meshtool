@@ -8,6 +8,7 @@
 class KeyedHeap
 {
 public:
+  typedef uint32_t Key;
 
   // Create heap with empty key domain
   KeyedHeap() {}
@@ -15,8 +16,7 @@ public:
   // Clear heap and set key domain to [0...N-1]
   void setKeyDomain(uint32_t N);
 
-  // Get value associated with key.
-  float getValue(uint32_t key);
+  float getValue(uint32_t key) { return lut[key].value; }
 
   // Erase an existing element from the heap.
   void erase(uint32_t ix);
@@ -28,26 +28,27 @@ public:
   void update(uint32_t key, float value);
 
   // Remove smallest element and return its key.
-  uint32_t removeMin();
+  Key removeMin();
 
   // Get key of smallest element,
-  uint32_t peekMin() const;
+  Key peekMin() const;
 
   bool empty() const { return heap.empty(); }
 
   void assertHeapInvariants();
 
 protected:
+  typedef uint32_t HeapPos;
   static const uint32_t illegal_index = ~0u;
 
   struct LutEntry
   {
-    uint32_t heapPos = illegal_index;
+    HeapPos heapPos = illegal_index;
     float value = 0.f;
   };
 
   std::vector<LutEntry> lut;
-  std::vector<uint32_t> heap;
+  std::vector<Key> heap;
 
   // Swap values in the heap and update lut.
   void heapSwap(uint32_t heapPosA, uint32_t heapPosB);
