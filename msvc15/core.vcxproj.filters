@@ -11,6 +11,9 @@
     <Filter Include="src\adt">
       <UniqueIdentifier>{4ad5e6a3-7922-4e4e-bc62-2ddd5e3c0bfa}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\topo">
+      <UniqueIdentifier>{32940f34-07f7-4cf7-8b06-35264b0e5bc0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\core\Common.cpp">
@@ -49,6 +52,9 @@
     <ClCompile Include="..\core\adt\KeyedHeap.cpp">
       <Filter>src\adt</Filter>
     </ClCompile>
+    <ClCompile Include="..\core\topo\HalfEdgeMesh.cpp">
+      <Filter>src\topo</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\core\Common.h">
@@ -77,6 +83,9 @@
     </ClInclude>
     <ClInclude Include="..\core\adt\KeyedHeap.h">
       <Filter>src\adt</Filter>
+    </ClInclude>
+    <ClInclude Include="..\core\topo\HalfEdgeMesh.h">
+      <Filter>src\topo</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

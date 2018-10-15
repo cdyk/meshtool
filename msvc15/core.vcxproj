@@ -133,6 +133,7 @@
     <ClCompile Include="..\core\ObjReader.cpp" />
     <ClCompile Include="..\core\ResourceManager.cpp" />
     <ClCompile Include="..\core\Tasks.cpp" />
+    <ClCompile Include="..\core\topo\HalfEdgeMesh.cpp" />
     <ClCompile Include="..\core\Viewer.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -144,6 +145,7 @@
     <ClInclude Include="..\core\mem\Allocators.h" />
     <ClInclude Include="..\core\Mesh.h" />
     <ClInclude Include="..\core\ResourceManager.h" />
+    <ClInclude Include="..\core\topo\HalfEdgeMesh.h" />
     <ClInclude Include="..\core\Viewer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

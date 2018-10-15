@@ -14,7 +14,7 @@
 #include "Common.h"
 #include "Mesh.h"
 #include "adt/KeyedHeap.h"
-
+#include "topo/HalfEdgeMesh.h"
 
 namespace {
 
@@ -42,6 +42,29 @@ namespace {
     fprintf(stderr, "\n");
   }
 
+  Vec3f cubeVtx[8] = {
+    Vec3f(0, 0, 0),
+    Vec3f(1, 0, 0),
+    Vec3f(0, 1, 0),
+    Vec3f(1, 1, 0),
+    Vec3f(0, 0, 1),
+    Vec3f(1, 0, 1),
+    Vec3f(0, 1, 1),
+    Vec3f(1, 1, 1)
+  };
+
+  uint32_t cubeIdx[6 * 4] = {
+    0, 2, 3, 1,
+    4, 6, 2, 0,
+    5, 7, 6, 4,
+    1, 3, 7, 5,
+    2, 6, 7, 3,
+    5, 4, 0, 1
+  };
+
+  uint32_t cubeOff[7] = {
+    0, 4, 8, 12, 16, 20, 24
+  };
 
   void runObjReader(Logger logger, std::string path)
   {
@@ -225,6 +248,15 @@ int main(int argc, char** argv)
     }
 
     logger(0, "Keyed heap checks... OK");
+  }
+
+  {
+    logger(0, "Half-edge cube checks...");
+
+    HalfEdgeMesh hemesh(logger);
+    hemesh.insert(cubeVtx, cubeIdx, cubeOff, 6);
+
+    logger(0, "Half-edge cube checks... OK");
   }
 
   return 0;
