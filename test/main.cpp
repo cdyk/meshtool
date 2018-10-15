@@ -254,7 +254,7 @@ int main(int argc, char** argv)
     logger(0, "Half-edge cube checks...");
 
     HalfEdgeMesh hemesh(logger);
-    hemesh.insert(cubeVtx, cubeIdx, cubeOff, 6);
+    hemesh.insert(cubeVtx, 8,  cubeIdx, cubeOff, 6);
 
     logger(0, "Half-edge cube checks... OK");
   }
