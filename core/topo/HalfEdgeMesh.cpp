@@ -1,63 +1,68 @@
 #include "HalfEdgeMesh.h"
 #include <algorithm>
 
-HalfEdgeMesh::VtxIx HalfEdgeMesh::createVertex(const Vec3f& p)
+
+HalfEdge::Vertex* HalfEdge::Mesh::createVertex(HalfEdge* leading)
 {
-  auto * v = vertexStore.alloc();
-  //v->leadingEdge = ~0u;
-  v->pos = p;
-  auto ix = vertexStore.getIndex(v);
-  vertices.pushBack(ix);
-  return ix;
+  auto * v = store->allocVertex();
+  v->leadingEdge = leading;
+  vertices.pushBack(v);
+  return v;
 }
 
-HalfEdgeMesh::HEdgeIx HalfEdgeMesh::createHalfEdge(VtxIx srcVtx, HEdgeIx nextInFace, HEdgeIx nextInEdge, FaceIx face)
+HalfEdge::HalfEdge* HalfEdge::Mesh::createHalfEdge(Vertex* srcVtx, HalfEdge* nextInFace, HalfEdge* nextInEdge, Face* face)
 {
-  auto * he = halfEdgeStore.alloc();
+  auto * he = store->allocHalfEdge();
   he->srcVtx = srcVtx;
+  if (srcVtx->leadingEdge == nullptr) {
+    srcVtx->leadingEdge = he;
+  }
   he->nextInFace = nextInFace;
   he->nextInEdge = nextInEdge;
   he->face = face;
-  auto ix = halfEdgeStore.getIndex(he);
-  halfEdges.pushBack(ix);
-  return ix;
+  if (face->leadingEdge == nullptr) {
+    face->leadingEdge = he;
+  }
+
+  halfEdges.pushBack(he);
+  return he;
 }
 
-HalfEdgeMesh::FaceIx HalfEdgeMesh::createFace()
+HalfEdge::Face* HalfEdge::Mesh::createFace(HalfEdge* leading)
 {
-  auto f = faceStore.alloc();
-  auto ix = faceStore.getIndex(f);
-  faces.pushBack(ix);
-  return ix;
+  auto * f = store->allocFace();
+  f->leadingEdge = leading;
+  faces.pushBack(f);
+  return f;
 }
 
-
-void HalfEdgeMesh::insert(const Vec3f* vtx, uint32_t vtxCount, uint32_t* indices, uint32_t* offsets, uint32_t faceCount)
+void HalfEdge::Mesh::insert(uint32_t vtxCount, uint32_t* indices, uint32_t* offsets, uint32_t faceCount)
 {
-  Vector<uint32_t> V;
-  V.resize(vtxCount);
 
+  auto vtxMark = vertices.size32();
   for (uint32_t i = 0; i < vtxCount; i++) {
-    V[i] = createVertex(vtx[i]);
+    createVertex();
   }
 
   auto mark = halfEdges.size32();
-  Vector<uint32_t> HE;
+
+  Vector<HalfEdge*> loop;
   for (uint32_t f = 0; f < faceCount; f++) {
-    uint32_t face = createFace();
+    auto * face = createFace();
 
     auto N = offsets[f + 1] - offsets[f];
     if (N < 3) {
       logger(1, "Degenerate face with less than 3 vertices.");
     }
-    HE.resize(N);
-    for (unsigned i = 0; i < N; i++) {
-      HE[i] = createHalfEdge(V[indices[offsets[f] + i]], ~0u, ~0u, face);
+    loop.resize(N);
+    for (uint32_t i = 0; i < N; i++) {
+      auto ix = indices[offsets[f] + i];
+      loop[i] = createHalfEdge(vertices[vtxMark + ix], nullptr, nullptr, face);
       if (0 < i) {
-        getHalfEdge(HE[i - 1])->nextInFace = HE[i];
+        loop[i - 1]->nextInFace = loop[i];
       }
     }
-    getHalfEdge(HE[N - 1])->nextInFace = HE[0];
+    loop[N - 1]->nextInFace = loop[0];
   }
 
   stitchRange(mark, halfEdges.size32());
@@ -67,23 +72,23 @@ namespace {
 
   struct SortHelper
   {
-    HalfEdgeMesh::HalfEdge* he;
-    uint32_t maj;
-    uint32_t min;
+    HalfEdge::HalfEdge* he;
+    HalfEdge::Vertex* maj;
+    HalfEdge::Vertex* min;
   };
 
 
 }
 
-void HalfEdgeMesh::stitchRange(uint32_t heA, uint32_t heB)
+void HalfEdge::Mesh::stitchRange(uint32_t heA, uint32_t heB)
 {
   auto N = heB - heA;
   Vector<SortHelper> helper(N);
   for (uint32_t i = 0; i < N; i++) {
     auto & item = helper[i];
-    item.he = getHalfEdge(halfEdges[heA + i]);
+    item.he = halfEdges[heA + i];
     item.maj = item.he->srcVtx;
-    item.min = getHalfEdge(item.he->nextInFace)->srcVtx;
+    item.min = item.he->nextInFace->srcVtx;
     if (item.maj < item.min) {
       auto t = item.maj;
       item.maj = item.min;
@@ -99,10 +104,6 @@ void HalfEdgeMesh::stitchRange(uint32_t heA, uint32_t heB)
     return a.maj < b.maj;
   });
 
-  uint32_t boundary = 0;
-  uint32_t manifold = 0;
-  uint32_t nonmanifold = 0;
-
   for (uint32_t j = 0; j < N; ) {
 
     uint32_t i=j+1;
@@ -110,20 +111,31 @@ void HalfEdgeMesh::stitchRange(uint32_t heA, uint32_t heB)
 
     auto abutting = i - j;
     if (abutting == 1) {
-      boundary++;
+      boundaryEdges++;
       // stitch
     }
     else if (abutting == 2) {
-      manifold++;
+      manifoldEdges++;
       // stitch
     }
     else {
-      nonmanifold++;
+      nonManifoldEdges++;
       // stitch
     }
 
     j = i;
   }
 
-  logger(0, "Found %d boundary edges, %d manifold edges and %d non-manifold edges", boundary, manifold, nonmanifold);
+  logger(0, "Found %d boundary edges, %d manifold edges and %d non-manifold edges", boundaryEdges, manifoldEdges, nonManifoldEdges);
+}
+
+
+
+void HalfEdge::R3Mesh::insert(const Vec3f* vtx, uint32_t vtxCount, uint32_t* indices, uint32_t* offsets, uint32_t faceCount)
+{
+  auto vtxMark = vertices.size32();
+  Mesh::insert(vtxCount, indices, offsets, faceCount);
+  for (uint32_t i = 0; i < vtxCount; i++) {
+    ((R3Vertex*)vertices[vtxMark + i])->pos = vtx[i];
+  }
 }

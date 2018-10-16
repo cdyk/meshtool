@@ -253,8 +253,13 @@ int main(int argc, char** argv)
   {
     logger(0, "Half-edge cube checks...");
 
-    HalfEdgeMesh hemesh(logger);
+    HalfEdge::R3Mesh hemesh(logger);
     hemesh.insert(cubeVtx, 8,  cubeIdx, cubeOff, 6);
+
+    assert(hemesh.getBoundaryEdgeCount() == 0);
+    assert(hemesh.getManifoldEdgeCount() == 12);
+    assert(hemesh.getNonManifoldEdgeCount() == 0);
+
 
     logger(0, "Half-edge cube checks... OK");
   }
