@@ -14,6 +14,9 @@
     <Filter Include="src\topo">
       <UniqueIdentifier>{32940f34-07f7-4cf7-8b06-35264b0e5bc0}</UniqueIdentifier>
     </Filter>
+    <Filter Include="src\spatial">
+      <UniqueIdentifier>{c1e540f9-b8ae-405f-8ba6-212f414ffb7c}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\core\Common.cpp">
@@ -55,6 +58,9 @@
     <ClCompile Include="..\core\topo\HalfEdgeMesh.cpp">
       <Filter>src\topo</Filter>
     </ClCompile>
+    <ClCompile Include="..\core\spatial\R3PointKdTree.cpp">
+      <Filter>src\spatial</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\core\Common.h">
@@ -86,6 +92,9 @@
     </ClInclude>
     <ClInclude Include="..\core\topo\HalfEdgeMesh.h">
       <Filter>src\topo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\core\spatial\R3PointKdTree.h">
+      <Filter>src\spatial</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

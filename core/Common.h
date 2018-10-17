@@ -137,6 +137,13 @@ public:
     fill = newSize;
   }
 
+  void reserve(size_t size)
+  {
+    if (size < allocated()) {
+      _accommodate(sizeof(T), 2 * fill < 16 ? 16 : 2 * fill, true);
+    }
+  }
+
   void pushBack(T t)
   {
     if (fill <= allocated()) {
@@ -144,6 +151,17 @@ public:
     }
     new(data() + (fill++)) T(t);
   }
+
+  T popBack()
+  {
+    assert(fill);
+    auto t = data()[--fill];
+    (*this)[fill].~T();
+    return t;
+  }
+
+  bool empty() const { return fill == 0; }
+  bool any() const { return fill != 0; }
 
   size_t size() const { return fill; }
   uint32_t size32() const { return uint32_t(fill); }

@@ -13,8 +13,10 @@
 
 #include "Common.h"
 #include "Mesh.h"
+#include "LinAlgOps.h"
 #include "adt/KeyedHeap.h"
 #include "topo/HalfEdgeMesh.h"
+#include "spatial/R3PointKdTree.h"
 
 namespace {
 
@@ -23,7 +25,7 @@ namespace {
     Tasks tasks;
     std::mutex incomingMeshLock;
     Mesh* mesh = nullptr;
-    bool done = false;
+    volatile bool done = false;
   };
   App* app = nullptr;
 
@@ -122,6 +124,16 @@ namespace {
     float value;
   };
 
+  // mean zero, variance one, exactly zero outside +/- 6*variance
+  float normalDistRand()
+  {
+    auto sum = 0.f;
+    for (unsigned i = 0; i < 12; i++) {
+      sum += (1.f / RAND_MAX)*rand();
+    }
+    return sum - 6.f;
+  }
+
 }
 
 
@@ -134,11 +146,14 @@ int main(int argc, char** argv)
   app->tasks.enqueue(taskFunc);
 
   while (!app->done);
-
-  logger(0, "vtxCount=%d", app->mesh->vtxCount);
-  logger(0, "triCount=%d", app->mesh->triCount);
-
+  
+  auto * mesh = app->mesh;
   delete app;
+
+  logger(0, "vtxCount=%d", mesh->vtxCount);
+  logger(0, "triCount=%d", mesh->triCount);
+
+
 
   {
     logger(0, "Pool checks...");
@@ -262,6 +277,27 @@ int main(int argc, char** argv)
 
 
     logger(0, "Half-edge cube checks... OK");
+  }
+
+  {
+    logger(0, "KD-tree checks...");
+
+    Vector<Vec3f> P;
+    P.reserve(10 * mesh->vtxCount);
+
+    auto sigma = 1.f;
+    for (uint32_t i = 0; i < mesh->vtxCount; i++) {
+      for (uint32_t k = 0; k < 3; k++) {
+        P.pushBack(mesh->vtx[i] + sigma * Vec3f(normalDistRand(),
+                                                normalDistRand(),
+                                                normalDistRand()));
+      }
+    }
+
+    R3PointKDTree kdTree(P.data(), P.size32());
+
+
+    logger(0, "KD-tree checks OK");
   }
 
   return 0;
