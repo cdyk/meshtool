@@ -18,8 +18,7 @@ namespace KdTree
         NodeKind kind;
         uint8_t axis;
         float split;
-        uint32_t left;
-        uint32_t right;
+        uint32_t children[2];
       } inner;
 
       struct {
@@ -37,17 +36,24 @@ namespace KdTree
     uint32_t ix;
   };
 
+  struct QueryResult
+  {
+    uint32_t ix;
+    float distanceSquared;
+  };
+
   struct R3StaticTree
   {
+
 
     // preferSpatialSplit - trade balanced tree away for balanced spatial coverage
     R3StaticTree(Logger logger, Vec3f* P, uint32_t N, bool preferSpatialSplit);
 
     void assertInvariants();
 
-    void getPointsWithinRadius(Vector<uint32_t>& result, const Vec3f& origin, float radius);
+    void getPointsWithinRadius(Vector<QueryResult>& result, const Vec3f& origin, float radius);
 
-    void getNearestNeighbours(Vector<uint32_t>& result, const Vec3f& origin, uint32_t maximum);
+    void getNearestNeighbours(Vector<QueryResult>& result, const Vec3f& origin, uint32_t K);
 
     Vector<R3Point> points;
     Vector<Node> nodes;
@@ -59,7 +65,9 @@ namespace KdTree
 
     uint32_t buildRecurse(const BBox3f& nodeBBox, R3Point* P, uint32_t N, uint32_t level, bool preferSpatialSplit);
 
-    void getPointsWithinRadiusRecurse(Vector<uint32_t>& result, uint32_t nodeIndex, const Vec3f& origin, float radius);
+    void getPointsWithinRadiusRecurse(Vector<QueryResult>& result, uint32_t nodeIndex, const Vec3f& origin, float radius);
+
+    void getNearestNeighboursRecurse(Vector<QueryResult>& result, uint32_t nodeIx, const Vec3f& origin, uint32_t K);
 
   };
 

@@ -309,6 +309,36 @@ int main(int argc, char** argv)
     KdTree::R3StaticTree kdTree(logger, P.data(), P.size32(), false);
     kdTree.assertInvariants();
 
+    logger(0, "Find k-neareast neighbours test.");
+    float avgRadius = 0.f;  // to be used in next test.
+    auto K = 7u;
+    assert(K < P.size32());
+    Vector<KdTree::QueryResult> nNearest;
+    std::vector<std::pair<float, uint32_t>> distances(P.size());
+    for (unsigned j = 0; j < P.size32(); j++) {
+
+      kdTree.getNearestNeighbours(nNearest, P[j], 7);
+
+      for (unsigned i = 0; i < P.size32(); i++) {
+        distances[i] = std::make_pair(distanceSquared(P[i], P[j]), i);
+      }
+      std::sort(distances.begin(), distances.end(), [](auto&a, auto&b) { return a.first < b.first; });
+      for (unsigned i = 0; i < K; i++) {
+        if (i != 0) {
+          assert(distances[i - 1].first < distances[i].first);
+        }
+        bool found = false;
+        for (auto k : nNearest) {
+          if (k.ix == distances[i].second) found = true;
+        }
+        assert(found);
+      }
+      avgRadius += std::sqrt(nNearest[K - 1].distanceSquared);
+    }
+    avgRadius *= 1.f / P.size32();
+
+
+
     logger(0, "KD-tree checks OK");
   }
 
