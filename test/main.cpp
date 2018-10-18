@@ -306,41 +306,70 @@ int main(int argc, char** argv)
     }
 #endif
 
-    KdTree::R3StaticTree kdTree(logger, P.data(), P.size32(), false);
-    kdTree.assertInvariants();
+    for (unsigned l = 0; l < 2; l++) {
 
-    logger(0, "Find k-neareast neighbours test.");
-    float avgRadius = 0.f;  // to be used in next test.
-    auto K = 7u;
-    assert(K < P.size32());
-    Vector<KdTree::QueryResult> nNearest;
-    std::vector<std::pair<float, uint32_t>> distances(P.size());
-    for (unsigned j = 0; j < P.size32(); j++) {
+      logger(0, "KdTree built %s", l == 0 ? "spatially balanced" : "for minimal depth");
 
-      kdTree.getNearestNeighbours(nNearest, P[j], 7);
+      KdTree::R3StaticTree kdTree(logger, P.data(), P.size32(), l==0);
+      kdTree.assertInvariants();
 
-      for (unsigned i = 0; i < P.size32(); i++) {
-        distances[i] = std::make_pair(distanceSquared(P[i], P[j]), i);
-      }
-      std::sort(distances.begin(), distances.end(), [](auto&a, auto&b) { return a.first < b.first; });
-      for (unsigned i = 0; i < K; i++) {
-        if (i != 0) {
-          assert(distances[i - 1].first < distances[i].first);
+      logger(0, "Find k-nearest neighbours test.");
+      float avgRadius = 0.f;  // to be used in next test.
+      auto K = 7u;
+      assert(K < P.size32());
+      Vector<KdTree::QueryResult> queryResult;
+      std::vector<std::pair<float, uint32_t>> distances(P.size());
+      for (unsigned j = 0; j < P.size32(); j++) {
+
+        kdTree.getNearestNeighbours(queryResult, P[j], 7);
+
+        for (unsigned i = 0; i < P.size32(); i++) {
+          distances[i] = std::make_pair(distanceSquared(P[i], P[j]), i);
         }
-        bool found = false;
-        for (auto k : nNearest) {
-          if (k.ix == distances[i].second) found = true;
+        std::sort(distances.begin(), distances.end(), [](auto&a, auto&b) { return a.first < b.first; });
+        for (unsigned i = 0; i < K; i++) {
+          if (i != 0) {
+            assert(distances[i - 1].first < distances[i].first);
+          }
+          bool found = false;
+          for (auto k : queryResult) {
+            if (k.ix == distances[i].second) found = true;
+          }
+          assert(found);
         }
-        assert(found);
+        avgRadius += std::sqrt(queryResult[K - 1].distanceSquared);
       }
-      avgRadius += std::sqrt(nNearest[K - 1].distanceSquared);
+      avgRadius *= 1.f / P.size32();
+
+
+      logger(0, "Find points within radius test.");
+      for (unsigned j = 0; j < P.size32(); j++) {
+
+        kdTree.getPointsWithinRadius(queryResult, P[j], avgRadius);
+
+        for (unsigned i = 0; i < P.size32(); i++) {
+          distances[i] = std::make_pair(distanceSquared(P[i], P[j]), i);
+        }
+        std::sort(distances.begin(), distances.end(), [](auto&a, auto&b) { return a.first < b.first; });
+
+        unsigned n;
+        auto d2 = avgRadius * avgRadius;
+        for (n = 0; n < P.size32() && distances[n].first <= d2; n++) {
+
+          bool found = false;
+          for (auto k : queryResult) {
+            if (k.ix == distances[n].second) found = true;
+          }
+          assert(found);
+        }
+        assert(n == queryResult.size32());
+      }
     }
-    avgRadius *= 1.f / P.size32();
-
-
 
     logger(0, "KD-tree checks OK");
   }
+
+
 
   return 0;
 }

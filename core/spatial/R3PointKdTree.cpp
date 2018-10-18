@@ -248,15 +248,20 @@ void KdTree::R3StaticTree::getPointsWithinRadiusRecurse(Vector<QueryResult>& res
 {
   auto & node = nodes[nodeIndex];
   if (node.kind == NodeKind::Leaf) {
+    auto radiusSquared = radius * radius;
     for (auto i = node.leaf.rangeBegin; i < node.leaf.rangeEnd; i++) {
       auto d2 = distanceSquared(origin, points[i].p);
-      if (d2 <= radius) {
+      if (d2 == 0.f) {
+        int a = 2;
+      }
+
+      if (d2 <= radiusSquared) {
         result.pushBack({points[i].ix, d2});
       }
     }
   }
   else {
-    if (origin[node.inner.axis] - radius < node.inner.split) {
+    if (origin[node.inner.axis] - radius <= node.inner.split) {
       getPointsWithinRadiusRecurse(result, node.inner.children[0], origin, radius);
     }
     if (node.inner.split <= origin[node.inner.axis] + radius) {
@@ -265,6 +270,7 @@ void KdTree::R3StaticTree::getPointsWithinRadiusRecurse(Vector<QueryResult>& res
   }
 }
 
+
 void KdTree::R3StaticTree::getPointsWithinRadius(Vector<QueryResult>& result, const Vec3f& origin, float radius)
 {
   result.resize(0);
@@ -272,9 +278,6 @@ void KdTree::R3StaticTree::getPointsWithinRadius(Vector<QueryResult>& result, co
 
   getPointsWithinRadiusRecurse(result, 0, origin, radius);
 }
-
-
-
 
 
 void KdTree::R3StaticTree::getNearestNeighboursRecurse(Vector<QueryResult>& result, uint32_t nodeIx, const Vec3f& origin, uint32_t K)
@@ -314,6 +317,7 @@ void KdTree::R3StaticTree::getNearestNeighboursRecurse(Vector<QueryResult>& resu
     }
   }
 }
+
 
 void KdTree::R3StaticTree::getNearestNeighbours(Vector<QueryResult>& result, const Vec3f& origin, uint32_t K)
 {
