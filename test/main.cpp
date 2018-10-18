@@ -13,8 +13,10 @@
 
 #include "Common.h"
 #include "Mesh.h"
+#include "LinAlgOps.h"
 #include "adt/KeyedHeap.h"
 #include "topo/HalfEdgeMesh.h"
+#include "spatial/R3PointKdTree.h"
 
 namespace {
 
@@ -23,7 +25,7 @@ namespace {
     Tasks tasks;
     std::mutex incomingMeshLock;
     Mesh* mesh = nullptr;
-    bool done = false;
+    volatile bool done = false;
   };
   App* app = nullptr;
 
@@ -122,6 +124,16 @@ namespace {
     float value;
   };
 
+  // mean zero, variance one, exactly zero outside +/- 6*variance
+  float normalDistRand()
+  {
+    auto sum = 0.f;
+    for (unsigned i = 0; i < 12; i++) {
+      sum += (1.f / RAND_MAX)*rand();
+    }
+    return sum - 6.f;
+  }
+
 }
 
 
@@ -134,11 +146,14 @@ int main(int argc, char** argv)
   app->tasks.enqueue(taskFunc);
 
   while (!app->done);
-
-  logger(0, "vtxCount=%d", app->mesh->vtxCount);
-  logger(0, "triCount=%d", app->mesh->triCount);
-
+  
+  auto * mesh = app->mesh;
   delete app;
+
+  logger(0, "vtxCount=%d", mesh->vtxCount);
+  logger(0, "triCount=%d", mesh->triCount);
+
+
 
   {
     logger(0, "Pool checks...");
@@ -263,6 +278,98 @@ int main(int argc, char** argv)
 
     logger(0, "Half-edge cube checks... OK");
   }
+
+  {
+    logger(0, "KD-tree checks...");
+
+    Vector<Vec3f> P;
+    P.reserve(10 * mesh->vtxCount);
+
+    auto sigma = 1.f;
+#if 1
+    for (uint32_t i = 0; i < mesh->vtxCount; i++) {
+      for (uint32_t k = 0; k < 1; k++) {
+        P.pushBack(mesh->vtx[i] + sigma * Vec3f(normalDistRand(),
+                                                normalDistRand(),
+                                                normalDistRand()));
+      }
+    }
+#else
+
+    for (uint32_t i = 0; i < 8; i++) {
+      for (uint32_t k = 0; k < 1; k++) {
+        P.pushBack(cubeVtx[i] + sigma * Vec3f(normalDistRand(),
+                                                normalDistRand(),
+                                                normalDistRand()));
+      }
+
+    }
+#endif
+
+    for (unsigned l = 0; l < 2; l++) {
+
+      logger(0, "KdTree built %s", l == 0 ? "spatially balanced" : "for minimal depth");
+
+      KdTree::R3StaticTree kdTree(logger, P.data(), P.size32(), l==0);
+      kdTree.assertInvariants();
+
+      logger(0, "Find k-nearest neighbours test.");
+      float avgRadius = 0.f;  // to be used in next test.
+      auto K = 7u;
+      assert(K < P.size32());
+      Vector<KdTree::QueryResult> queryResult;
+      std::vector<std::pair<float, uint32_t>> distances(P.size());
+      for (unsigned j = 0; j < P.size32(); j++) {
+
+        kdTree.getNearestNeighbours(queryResult, P[j], 7);
+
+        for (unsigned i = 0; i < P.size32(); i++) {
+          distances[i] = std::make_pair(distanceSquared(P[i], P[j]), i);
+        }
+        std::sort(distances.begin(), distances.end(), [](auto&a, auto&b) { return a.first < b.first; });
+        for (unsigned i = 0; i < K; i++) {
+          if (i != 0) {
+            assert(distances[i - 1].first < distances[i].first);
+          }
+          bool found = false;
+          for (auto k : queryResult) {
+            if (k.ix == distances[i].second) found = true;
+          }
+          assert(found);
+        }
+        avgRadius += std::sqrt(queryResult[K - 1].distanceSquared);
+      }
+      avgRadius *= 1.f / P.size32();
+
+
+      logger(0, "Find points within radius test.");
+      for (unsigned j = 0; j < P.size32(); j++) {
+
+        kdTree.getPointsWithinRadius(queryResult, P[j], avgRadius);
+
+        for (unsigned i = 0; i < P.size32(); i++) {
+          distances[i] = std::make_pair(distanceSquared(P[i], P[j]), i);
+        }
+        std::sort(distances.begin(), distances.end(), [](auto&a, auto&b) { return a.first < b.first; });
+
+        unsigned n;
+        auto d2 = avgRadius * avgRadius;
+        for (n = 0; n < P.size32() && distances[n].first <= d2; n++) {
+
+          bool found = false;
+          for (auto k : queryResult) {
+            if (k.ix == distances[n].second) found = true;
+          }
+          assert(found);
+        }
+        assert(n == queryResult.size32());
+      }
+    }
+
+    logger(0, "KD-tree checks OK");
+  }
+
+
 
   return 0;
 }
