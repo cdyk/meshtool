@@ -286,15 +286,27 @@ int main(int argc, char** argv)
     P.reserve(10 * mesh->vtxCount);
 
     auto sigma = 1.f;
+#if 1
     for (uint32_t i = 0; i < mesh->vtxCount; i++) {
-      for (uint32_t k = 0; k < 3; k++) {
+      for (uint32_t k = 0; k < 1; k++) {
         P.pushBack(mesh->vtx[i] + sigma * Vec3f(normalDistRand(),
                                                 normalDistRand(),
                                                 normalDistRand()));
       }
     }
+#else
 
-    R3PointKDTree kdTree(P.data(), P.size32());
+    for (uint32_t i = 0; i < 8; i++) {
+      for (uint32_t k = 0; k < 1; k++) {
+        P.pushBack(cubeVtx[i] + sigma * Vec3f(normalDistRand(),
+                                                normalDistRand(),
+                                                normalDistRand()));
+      }
+
+    }
+#endif
+
+    KdTree::R3StaticTree kdTree(logger, P.data(), P.size32());
 
 
     logger(0, "KD-tree checks OK");
