@@ -103,17 +103,14 @@ namespace {
 }
 
 
-uint32_t KdTree::R3StaticTree::buildRecurse(uint32_t parent, const BBox3f& nodeBBox, R3Point* P, uint32_t N, uint32_t level)
+uint32_t KdTree::R3StaticTree::buildRecurse(const BBox3f& nodeBBox, R3Point* P, uint32_t N, uint32_t level, bool preferSpatialSplit)
 {
   assert(0 < N);
   if (maxLevel < level) {
     maxLevel = level;
   }
-
-  auto nodeIx = nodes.size32();
-  nodes.pushBack(Node{});
-  auto & node = nodes[nodeIx];
-  node.parent = parent;
+  auto nodeIx = uint32_t(nodes.size());
+  nodes.resize(nodes.size() + 1);
 
   if (5 <= N) {
     uint32_t axes[3];
@@ -121,10 +118,14 @@ uint32_t KdTree::R3StaticTree::buildRecurse(uint32_t parent, const BBox3f& nodeB
 
     for (unsigned a = 0; a < 3; a++) {
       auto axis = axes[a];
-      auto splitVal = 0.5f*(nodeBBox.min[axis] + nodeBBox.max[axis]);
-      auto splitIdx = partition(P, N, axis, splitVal);
+      uint32_t splitIdx;
+      float splitVal;
 
-      if (splitIdx == 0 || splitIdx == N) {
+      if (preferSpatialSplit) {
+        splitVal = 0.5f*(nodeBBox.min[axis] + nodeBBox.max[axis]);
+        splitIdx = partition(P, N, axis, splitVal);
+      }
+      if (!preferSpatialSplit || splitIdx == 0 || splitIdx == N) {
         // all points in one child, try approximate median
         float values[5];
         values[0] = points[0].p[axis];
@@ -154,17 +155,21 @@ uint32_t KdTree::R3StaticTree::buildRecurse(uint32_t parent, const BBox3f& nodeB
         auto bboxRight = nodeBBox;
         bboxRight.min[axis] = splitVal;
 
+        auto & node = nodes[nodeIx];
         node.kind = NodeKind::Inner;
         node.inner.axis = axis;
         node.inner.split = splitVal;
-        node.inner.left = buildRecurse(nodeIx, bboxLeft, P, splitIdx, level + 1);
-        node.inner.right = buildRecurse(nodeIx, bboxRight, P + splitIdx, N - splitIdx, level + 1);
+        node.inner.left = buildRecurse(bboxLeft, P, splitIdx, level + 1, preferSpatialSplit);
+        node.inner.right = buildRecurse(bboxRight, P + splitIdx, N - splitIdx, level + 1, preferSpatialSplit);
+        assert(node.inner.left != nodeIx);
+        assert(node.inner.right != nodeIx);
 
         return nodeIx;
       }
     }
   }
 
+  auto & node = nodes[nodeIx];
   node.kind = NodeKind::Leaf;
   node.leaf.rangeBegin = uint32_t(P - points.data());
   node.leaf.rangeEnd = node.leaf.rangeBegin + N;
@@ -172,7 +177,7 @@ uint32_t KdTree::R3StaticTree::buildRecurse(uint32_t parent, const BBox3f& nodeB
 }
 
 
-KdTree::R3StaticTree::R3StaticTree(Logger logger, Vec3f* P, uint32_t N)
+KdTree::R3StaticTree::R3StaticTree(Logger logger, Vec3f* P, uint32_t N, bool preferSpatialSplit)
 {
   points.resize(N);
   nodes.resize(0);
@@ -186,9 +191,56 @@ KdTree::R3StaticTree::R3StaticTree(Logger logger, Vec3f* P, uint32_t N)
   //uint32_t log2_N = log2(N);
   nodes.reserve(N);
   calcBounds(bbox, points.data(), N);
-  buildRecurse(~0u, bbox, points.data(), N, 0);
+  buildRecurse(bbox, points.data(), N, 0, preferSpatialSplit);
 
   logger(0, "log2=%d, maxLevel=%d, N=%d", log2(N), maxLevel, N);
+}
+
+void KdTree::R3StaticTree::assertInvariantsRecurse(std::vector<unsigned>& touched, const BBox3f& domain, uint32_t nodeIx)
+{
+  assert(nodeIx < uint32_t(nodes.size()));
+  const auto & node = nodes[nodeIx];
+  if (node.kind == NodeKind::Inner) {
+    assert(node.inner.left != nodeIx);
+    assert(node.inner.right != nodeIx);
+
+    auto leftDomain = domain;
+    leftDomain.max[node.inner.axis] = node.inner.split;
+    assertInvariantsRecurse(touched, leftDomain, node.inner.left);
+
+    auto rightDomain = domain;
+    leftDomain.min[node.inner.axis] = node.inner.split;
+    assertInvariantsRecurse(touched, leftDomain, node.inner.right);
+  }
+  else {
+    assert(node.kind == NodeKind::Leaf);
+    assert(node.leaf.rangeBegin < node.leaf.rangeEnd);
+    assert(node.leaf.rangeBegin < uint32_t(points.size()));
+    assert(node.leaf.rangeEnd <= uint32_t(points.size()));
+    for (uint32_t i = node.leaf.rangeBegin; i < node.leaf.rangeEnd; i++) {
+      touched[i]++;
+      for (unsigned k = 0; k < 3; k++) {
+        assert(bbox.min[k] <= points[i].p[k]);
+        assert(points[i].p[k] <= bbox.max[k]);  // should work on strict less than..?
+      }
+    }
+  }
+}
+
+void KdTree::R3StaticTree::assertInvariants()
+{
+  if (nodes.empty()) return;
+
+  std::vector<unsigned> touched(points.size());
+
+  BBox3f range;
+  range.min = Vec3f(-FLT_MAX);
+  range.max = Vec3f(FLT_MAX);
+  assertInvariantsRecurse(touched, range, 0);
+
+  for (size_t i = 0; i < touched.size(); i++) {
+    assert(touched[i] == 1);
+  }
 }
 
 

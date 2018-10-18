@@ -306,8 +306,8 @@ int main(int argc, char** argv)
     }
 #endif
 
-    KdTree::R3StaticTree kdTree(logger, P.data(), P.size32());
-
+    KdTree::R3StaticTree kdTree(logger, P.data(), P.size32(), false);
+    kdTree.assertInvariants();
 
     logger(0, "KD-tree checks OK");
   }
