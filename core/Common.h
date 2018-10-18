@@ -139,7 +139,7 @@ public:
 
   void reserve(size_t size)
   {
-    if (size < allocated()) {
+    if (allocated() < size) {
       _accommodate(sizeof(T), 2 * fill < 16 ? 16 : 2 * fill, true);
     }
   }

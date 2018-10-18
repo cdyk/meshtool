@@ -109,7 +109,7 @@ uint32_t KdTree::R3StaticTree::buildRecurse(const BBox3f& nodeBBox, R3Point* P, 
   if (maxLevel < level) {
     maxLevel = level;
   }
-  auto nodeIx = uint32_t(nodes.size());
+  auto nodeIx = nodes.size32();
   nodes.resize(nodes.size() + 1);
 
   if (5 <= N) {
@@ -155,15 +155,15 @@ uint32_t KdTree::R3StaticTree::buildRecurse(const BBox3f& nodeBBox, R3Point* P, 
         auto bboxRight = nodeBBox;
         bboxRight.min[axis] = splitVal;
 
+        auto childIx0 = buildRecurse(bboxLeft, P, splitIdx, level + 1, preferSpatialSplit);
+        auto childIx1 = buildRecurse(bboxRight, P + splitIdx, N - splitIdx, level + 1, preferSpatialSplit);
+
         auto & node = nodes[nodeIx];
         node.kind = NodeKind::Inner;
         node.inner.axis = axis;
         node.inner.split = splitVal;
-        node.inner.left = buildRecurse(bboxLeft, P, splitIdx, level + 1, preferSpatialSplit);
-        node.inner.right = buildRecurse(bboxRight, P + splitIdx, N - splitIdx, level + 1, preferSpatialSplit);
-        assert(node.inner.left != nodeIx);
-        assert(node.inner.right != nodeIx);
-
+        node.inner.left = childIx0;
+        node.inner.right = childIx1;
         return nodeIx;
       }
     }
@@ -198,7 +198,7 @@ KdTree::R3StaticTree::R3StaticTree(Logger logger, Vec3f* P, uint32_t N, bool pre
 
 void KdTree::R3StaticTree::assertInvariantsRecurse(std::vector<unsigned>& touched, const BBox3f& domain, uint32_t nodeIx)
 {
-  assert(nodeIx < uint32_t(nodes.size()));
+  assert(nodeIx < nodes.size32());
   const auto & node = nodes[nodeIx];
   if (node.kind == NodeKind::Inner) {
     assert(node.inner.left != nodeIx);
@@ -215,8 +215,8 @@ void KdTree::R3StaticTree::assertInvariantsRecurse(std::vector<unsigned>& touche
   else {
     assert(node.kind == NodeKind::Leaf);
     assert(node.leaf.rangeBegin < node.leaf.rangeEnd);
-    assert(node.leaf.rangeBegin < uint32_t(points.size()));
-    assert(node.leaf.rangeEnd <= uint32_t(points.size()));
+    assert(node.leaf.rangeBegin < points.size32());
+    assert(node.leaf.rangeEnd <= points.size32());
     for (uint32_t i = node.leaf.rangeBegin; i < node.leaf.rangeEnd; i++) {
       touched[i]++;
       for (unsigned k = 0; k < 3; k++) {

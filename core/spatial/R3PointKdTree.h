@@ -49,8 +49,8 @@ namespace KdTree
 
     void getNearestNeighbours(Vector<uint32_t>& result, const Vec3f& origin, uint32_t maximum);
 
-    std::vector<R3Point> points;
-    std::vector<Node> nodes;
+    Vector<R3Point> points;
+    Vector<Node> nodes;
     BBox3f bbox;
     uint32_t maxLevel = 0;
 
