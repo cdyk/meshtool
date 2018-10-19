@@ -21,10 +21,16 @@ struct Mat3f;
 class Renderer
 {
 public:
-  bool outlines = true;
-  bool solid = true;
-  bool textured = true;
+  enum struct Texturing {
+    None,
+    Checker,
+    ColorGradient
+  };
 
+  bool outlines = false;
+  bool solid = true;
+  Texturing texturing = Texturing::ColorGradient;
+  
   Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h);
   ~Renderer();
 
@@ -54,8 +60,12 @@ private:
   uint32_t viewport[4];
   uint32_t frameCount;
 
-  ImageHandle texImage;
-  ImageViewHandle texImageView;
+  ImageHandle checkerTexImage;
+  ImageViewHandle checkerTexImageView;
+
+  ImageHandle colorGradientTexImage;
+  ImageViewHandle colorGradientTexImageView;
+
   SamplerHandle texSampler;
 
   struct Rename {

@@ -108,7 +108,13 @@ namespace {
     else if (mods == 0) {
       if (key == GLFW_KEY_W && action == GLFW_PRESS)  app->vulkanManager->renderer->outlines = !app->vulkanManager->renderer->outlines;
       if (key == GLFW_KEY_S && action == GLFW_PRESS)  app->vulkanManager->renderer->solid = !app->vulkanManager->renderer->solid;
-      if (key == GLFW_KEY_T && action == GLFW_PRESS)  app->vulkanManager->renderer->textured = !app->vulkanManager->renderer->textured;
+      if (key == GLFW_KEY_T && action == GLFW_PRESS) {
+        switch (app->vulkanManager->renderer->texturing) {
+        case Renderer::Texturing::None: app->vulkanManager->renderer->texturing = Renderer::Texturing::Checker; break;
+        case Renderer::Texturing::Checker: app->vulkanManager->renderer->texturing = Renderer::Texturing::ColorGradient; break;
+        case Renderer::Texturing::ColorGradient: app->vulkanManager->renderer->texturing = Renderer::Texturing::None; break;
+        }
+      }
       if (key == GLFW_KEY_F && action == GLFW_PRESS) {
         if (glfwGetWindowAttrib(window, GLFW_MAXIMIZED)) {
           glfwRestoreWindow(window);
@@ -209,16 +215,35 @@ namespace {
         ImGui::Separator();
         if (ImGui::MenuItem("Solid", "S", &app->vulkanManager->renderer->solid)) {}
         if (ImGui::MenuItem("Outlines", "W", &app->vulkanManager->renderer->outlines)) {}
-        ImGui::Separator();
-        if (ImGui::MenuItem("Overlay texcoords", "T", &app->vulkanManager->renderer->textured)) {}
-        ImGui::Separator();
-        if (ImGui::MenuItem("Color from smoothing group", nullptr, &app->colorFromSmoothingGroup)) {
-          app->colorFromObjectId = false;
-          app->updateColor = true;
+        if (ImGui::BeginMenu("Colorize using")) {
+          bool a = app->colorFromSmoothingGroup == false && app->colorFromObjectId == false;
+          if (ImGui::MenuItem("Nothing", nullptr, &a)) {
+            app->colorFromSmoothingGroup = false;
+            app->colorFromObjectId = false;
+            app->updateColor = true;
+          }
+          if (ImGui::MenuItem("Object id", nullptr, &app->colorFromObjectId)) {
+            app->colorFromSmoothingGroup = false;
+            app->colorFromObjectId = true;
+            app->updateColor = true;
+          }
+          if (ImGui::MenuItem("Smoothing group", nullptr, &app->colorFromSmoothingGroup)) {
+            app->colorFromSmoothingGroup = true;
+            app->colorFromObjectId = false;
+            app->updateColor = true;
+          }
+          ImGui::EndMenu();
         }
-        if (ImGui::MenuItem("Color from object id", nullptr, &app->colorFromObjectId)) {
-          app->colorFromSmoothingGroup = false;
-          app->updateColor = true;
+        if (ImGui::BeginMenu("Texturing")) {
+          bool sel[3] = {
+            app->vulkanManager->renderer->texturing == Renderer::Texturing::None,
+            app->vulkanManager->renderer->texturing == Renderer::Texturing::Checker,
+            app->vulkanManager->renderer->texturing == Renderer::Texturing::ColorGradient,
+          };
+          if (ImGui::MenuItem("None", "T", &sel[0])) app->vulkanManager->renderer->texturing = Renderer::Texturing::None;
+          if (ImGui::MenuItem("Checker", "T", &sel[1])) app->vulkanManager->renderer->texturing = Renderer::Texturing::Checker;
+          if (ImGui::MenuItem("Color gradient", "T", &sel[2])) app->vulkanManager->renderer->texturing = Renderer::Texturing::ColorGradient;
+          ImGui::EndMenu();
         }
         ImGui::EndMenu();
       }

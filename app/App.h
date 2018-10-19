@@ -35,7 +35,7 @@ public:
   bool moveToSelection = false;
   bool picking = false;
 
-  bool colorFromSmoothingGroup = true;
+  bool colorFromSmoothingGroup = false;
   bool colorFromObjectId = false;
 
   VulkanManager* vulkanManager = nullptr;

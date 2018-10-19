@@ -140,15 +140,31 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
   uint32_t texW = 500;
   uint32_t texH = 500;
 
-  auto stagingBuffer = vCtx->resources->createBuffer(texW*texH * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+
+  auto checkerStagingBuffer = vCtx->resources->createBuffer(texW*texH * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
   {
-    MappedBuffer<uint8_t> map(vCtx, stagingBuffer);
+    MappedBuffer<uint8_t> map(vCtx, checkerStagingBuffer);
     for (unsigned j = 0; j < texH; j++) {
       for (unsigned i = 0; i < texW; i++) {
         auto g = ((i / (texW / 10) + j / (texH / 10))) & 1 ? 0 : 20;
         auto f = ((i / (texW / 2) + j / (texH / 2))) & 1 ? 150 : 235;
         map.mem[4 * (texW*j + i) + 0] = f + g;
         map.mem[4 * (texW*j + i) + 1] = f + g;
+        map.mem[4 * (texW*j + i) + 2] = f + g;
+        map.mem[4 * (texW*j + i) + 3] = 255;
+      }
+    }
+  }
+
+  auto colorGradientStagingBuffer = vCtx->resources->createBuffer(texW*texH * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+  {
+    MappedBuffer<uint8_t> map(vCtx, colorGradientStagingBuffer);
+    for (unsigned j = 0; j < texH; j++) {
+      for (unsigned i = 0; i < texW; i++) {
+        auto g = ((i / (texW / 10) + j / (texH / 10))) & 1 ? 0 : 20;
+        auto f = ((i / (texW / 2) + j / (texH / 2))) & 1 ? 150 : 235;
+        map.mem[4 * (texW*j + i) + 0] = (255 * (i)) / (texW);
+        map.mem[4 * (texW*j + i) + 1] = (255 * (j)) / (texH);
         map.mem[4 * (texW*j + i) + 2] = f + g;
         map.mem[4 * (texW*j + i) + 3] = 255;
       }
@@ -171,18 +187,26 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
     info.samples = VK_SAMPLE_COUNT_1_BIT;
     info.flags = 0;
 
-    texImage = vCtx->resources->createImage(info);
     auto viewInfo = vCtx->infos->imageView.baseLevel2D;
     viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    texImageView = vCtx->resources->createImageView(texImage, viewInfo);
-    texSampler = vCtx->resources->createSampler(vCtx->infos->samplers.triLlinearRepeat);
+
+    checkerTexImage = vCtx->resources->createImage(info);
+    checkerTexImageView = vCtx->resources->createImageView(checkerTexImage, viewInfo);
+
+    vCtx->frameManager->transitionImageLayout(checkerTexImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    vCtx->frameManager->copyBufferToImage(checkerTexImage, checkerStagingBuffer, texW, texH);
+    vCtx->frameManager->transitionImageLayout(checkerTexImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+
+    colorGradientTexImage = vCtx->resources->createImage(info);
+    colorGradientTexImageView = vCtx->resources->createImageView(colorGradientTexImage, viewInfo);
+
+    vCtx->frameManager->transitionImageLayout(colorGradientTexImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    vCtx->frameManager->copyBufferToImage(colorGradientTexImage, colorGradientStagingBuffer, texW, texH);
+    vCtx->frameManager->transitionImageLayout(colorGradientTexImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+     texSampler = vCtx->resources->createSampler(vCtx->infos->samplers.triLlinearRepeat);
   }
-
-
-  vCtx->frameManager->transitionImageLayout(texImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-  vCtx->frameManager->copyBufferToImage(texImage, stagingBuffer, texW, texH);
-  vCtx->frameManager->transitionImageLayout(texImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
 }
 
 Renderer::~Renderer()
@@ -403,7 +427,7 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     // Fixme: this is only needed once    
     VkDescriptorImageInfo imageInfo{};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo.imageView = texImageView.resource->view;
+    imageInfo.imageView = texturing == Texturing::Checker ? checkerTexImageView.resource->view : colorGradientTexImageView.resource->view;
     imageInfo.sampler = texSampler.resource->sampler;
 
     writes[1] = {};
@@ -445,7 +469,7 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
   }
 
   if(solid) {
-    if (textured) {
+    if (texturing != Texturing::None) {
       vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipe);
       vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipeLayout, 0, 1, &rename.objBufSamplerDescSet.resource->descSet, 0, NULL);
 
