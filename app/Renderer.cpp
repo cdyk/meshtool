@@ -141,7 +141,7 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
   uint32_t texH = 500;
 
 
-  auto checkerStagingBuffer = vCtx->resources->createBuffer(texW*texH * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+  auto checkerStagingBuffer = vCtx->resources->createStagingBuffer(texW*texH * 4);
   {
     MappedBuffer<uint8_t> map(vCtx, checkerStagingBuffer);
     for (unsigned j = 0; j < texH; j++) {
@@ -156,7 +156,7 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
     }
   }
 
-  auto colorGradientStagingBuffer = vCtx->resources->createBuffer(texW*texH * 4, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+  auto colorGradientStagingBuffer = vCtx->resources->createStagingBuffer(texW*texH * 4);
   {
     MappedBuffer<uint8_t> map(vCtx, colorGradientStagingBuffer);
     for (unsigned j = 0; j < texH; j++) {
@@ -240,55 +240,59 @@ RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
   renderMesh->mesh = mesh;
   renderMesh->tri_n = mesh->triCount;
   
-  renderMesh->vtxNrmTex = vCtx->resources->createVertexBuffer(sizeof(VtxNrmTex) * 3 * renderMesh->tri_n);
+  renderMesh->vtxNrmTex = vCtx->resources->createVertexDeviceBuffer(sizeof(VtxNrmTex) * 3 * renderMesh->tri_n);
 
   {
-    MappedBuffer<VtxNrmTex> map(vCtx, renderMesh->vtxNrmTex);
-    if (mesh->nrmCount) {
-      if (mesh->texCount) {
-        for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
-          map.mem[i].vtx = mesh->vtx[mesh->triVtxIx[i]];
-          map.mem[i].nrm = mesh->nrm[mesh->triNrmIx[i]];
-          map.mem[i].tex = mesh->tex[mesh->triTexIx[i]];
+    auto stagingBuf = vCtx->resources->createStagingBuffer(renderMesh->vtxNrmTex.resource->requestedSize);
+    {
+      MappedBuffer<VtxNrmTex> map(vCtx, stagingBuf);
+      if (mesh->nrmCount) {
+        if (mesh->texCount) {
+          for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
+            map.mem[i].vtx = mesh->vtx[mesh->triVtxIx[i]];
+            map.mem[i].nrm = mesh->nrm[mesh->triNrmIx[i]];
+            map.mem[i].tex = mesh->tex[mesh->triTexIx[i]];
+          }
         }
-      }
-      else {
-        for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
-          map.mem[i].vtx = mesh->vtx[mesh->triVtxIx[i]];
-          map.mem[i].nrm = mesh->nrm[mesh->triNrmIx[i]];
-          map.mem[i].tex = Vec2f(0.5f);
-        }
-      }
-    }
-    else {
-      if (mesh->texCount) {
-        for (unsigned i = 0; i < mesh->triCount; i++) {
-          Vec3f p[3];
-          for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
-          auto n = cross(p[1] - p[0], p[2] - p[0]);
-          for (unsigned k = 0; k < 3; k++) {
-            map.mem[3 * i + k].vtx = p[k];
-            map.mem[3 * i + k].nrm = n;
-            map.mem[3 * i + k].tex = 10.f*mesh->tex[mesh->triTexIx[3 * i + k]];
+        else {
+          for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
+            map.mem[i].vtx = mesh->vtx[mesh->triVtxIx[i]];
+            map.mem[i].nrm = mesh->nrm[mesh->triNrmIx[i]];
+            map.mem[i].tex = Vec2f(0.5f);
           }
         }
       }
       else {
-        for (unsigned i = 0; i < mesh->triCount; i++) {
-          Vec3f p[3];
-          for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
-          auto n = cross(p[1] - p[0], p[2] - p[0]);
-          for (unsigned k = 0; k < 3; k++) {
-            map.mem[3 * i + k].vtx = p[k];
-            map.mem[3 * i + k].nrm = n;
-            map.mem[3 * i + k].tex = Vec2f(0.5f);
+        if (mesh->texCount) {
+          for (unsigned i = 0; i < mesh->triCount; i++) {
+            Vec3f p[3];
+            for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
+            auto n = cross(p[1] - p[0], p[2] - p[0]);
+            for (unsigned k = 0; k < 3; k++) {
+              map.mem[3 * i + k].vtx = p[k];
+              map.mem[3 * i + k].nrm = n;
+              map.mem[3 * i + k].tex = 10.f*mesh->tex[mesh->triTexIx[3 * i + k]];
+            }
+          }
+        }
+        else {
+          for (unsigned i = 0; i < mesh->triCount; i++) {
+            Vec3f p[3];
+            for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
+            auto n = cross(p[1] - p[0], p[2] - p[0]);
+            for (unsigned k = 0; k < 3; k++) {
+              map.mem[3 * i + k].vtx = p[k];
+              map.mem[3 * i + k].nrm = n;
+              map.mem[3 * i + k].tex = Vec2f(0.5f);
+            }
           }
         }
       }
+      vCtx->frameManager->copyBuffer(renderMesh->vtxNrmTex, stagingBuf, renderMesh->vtxNrmTex.resource->requestedSize);
     }
   }
 
-  renderMesh->color = vCtx->resources->createVertexBuffer(sizeof(uint32_t) * 3 * renderMesh->tri_n);
+  renderMesh->color = vCtx->resources->createVertexDeviceBuffer(sizeof(uint32_t) * 3 * renderMesh->tri_n);
   updateRenderMeshColor(renderMesh);
 
   logger(0, "CreateRenderMesh");
@@ -298,13 +302,17 @@ RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
 void Renderer::updateRenderMeshColor(RenderMeshHandle renderMesh)
 {
   auto * rm = renderMesh.resource;
-  MappedBuffer<uint32_t> map(vCtx, rm->color);
-  for (unsigned i = 0; i < rm->mesh->triCount; i++) {
-    auto color = rm->mesh->currentColor[i];
-    map.mem[3 * i + 0] = color;
-    map.mem[3 * i + 1] = color;
-    map.mem[3 * i + 2] = color;
+  auto stagingBuf = vCtx->resources->createStagingBuffer(rm->color.resource->requestedSize);
+  {
+    MappedBuffer<uint32_t> map(vCtx, stagingBuf);
+    for (unsigned i = 0; i < rm->mesh->triCount; i++) {
+      auto color = rm->mesh->currentColor[i];
+      map.mem[3 * i + 0] = color;
+      map.mem[3 * i + 1] = color;
+      map.mem[3 * i + 2] = color;
+    }
   }
+  vCtx->frameManager->copyBuffer(rm->color, stagingBuf, rm->color.resource->requestedSize);
   logger(0, "Updated mesh color");
 }
 

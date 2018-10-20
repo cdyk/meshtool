@@ -295,7 +295,7 @@ void VulkanResources::destroyPipeline(Pipeline* pipe)
 }
 
 
-RenderBufferHandle VulkanResources::createBuffer(size_t requestedSize, VkImageUsageFlags usageFlags)
+RenderBufferHandle VulkanResources::createBuffer(size_t requestedSize, VkImageUsageFlags usageFlags, VkMemoryPropertyFlags properties)
 {
   auto bufHandle = bufferResources.createResource();
   auto * buf = bufHandle.resource;
