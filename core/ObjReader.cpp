@@ -36,6 +36,7 @@ namespace {
   {
     Object* next = nullptr;
     const char* str;
+    uint32_t id;
   };
 
   struct Context
@@ -47,7 +48,6 @@ namespace {
     uint32_t currentColor = 0x888888;
     Arena arena;
     StringInterning strings;
-    Map objectId;
 
     ListHeader<Block<Vec3f>> vertices;
     ListHeader<Block<Vec3f>> normals;
@@ -327,20 +327,12 @@ namespace {
   {
     a = skipSpacing(a, b);
     auto * m = skipNonSpacing(a, b);
-    auto * str = context->strings.intern(a, m);
 
-    uint64_t id;
-    if (context->objectId.get(id, uint64_t(str))) {
-    }
-    else {
-      id = context->objects_n++;
-      context->objectId.insert(uint64_t(str), id);
-
-      auto * obj = context->arena.alloc<Object>();
-      obj->str = str;
-      context->objects.append(obj);
-    }
-    context->currentObject = uint32_t(id);
+    auto * obj = context->arena.alloc<Object>();
+    obj->str = context->strings.intern(a, m);;
+    obj->id = 1 + context->objects_n++;
+    context->objects.append(obj);
+    context->currentObject = obj->id;
   }
 
 }
