@@ -34,6 +34,7 @@ public:
   bool viewAll = false;
   bool moveToSelection = false;
   bool picking = false;
+  unsigned scrollToItem = ~0u;
 
   bool colorFromSmoothingGroup = false;
   bool colorFromObjectId = false;

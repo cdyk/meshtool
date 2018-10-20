@@ -285,6 +285,10 @@ namespace {
               app->updateColor = true;
               //moveToSelection = true;
             }
+            if (app->scrollToItem == o) {
+              ImGui::SetScrollHereY();
+              app->scrollToItem = ~0u;
+            }
           }
           ImGui::TreePop();
         }
@@ -463,6 +467,7 @@ int main(int argc, char** argv)
         auto * m = app->items.meshes[hit.mesh];
         auto o = m->TriObjIx[hit.triangle];
         m->selected[o] = !m->selected[o];
+        app->scrollToItem = o;
         app->updateColor = true;
         logger(0, "Hit mesh %d triangle %d at %f", hit.mesh, hit.triangle, hit.depth);
       }
