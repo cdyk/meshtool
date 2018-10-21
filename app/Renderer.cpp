@@ -214,12 +214,41 @@ RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
 
       if (mesh->nrmCount) {
         if (mesh->texCount) {
+
+          for (unsigned i = 0; i < mesh->triCount; i++) {
+            Vec3f p[3]; Vec2f t[3];
+            for (unsigned k = 0; k < 3; k++) {
+              p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
+              t[k] = mesh->tex[mesh->triTexIx[3 * i + k]];
+            }
+
+            auto tex01 = t[1] - t[0];
+            auto tex02 = t[2] - t[0];
+
+            for (unsigned k = 0; k < 3; k++) {
+              auto n = normalize(mesh->nrm[mesh->triNrmIx[i]]);
+
+              auto vtx01 = p[1] - p[0];
+              vtx01 = vtx01 - dot(vtx01, n)*n;
+
+              auto vtx02 = p[2] - p[0];
+              vtx02 = vtx02 - dot(vtx02, n)*n;
+
+
+              auto den = 1.f / (tex01.x * tex02.y - tex01.y * tex02.x);
+              auto tan = normalize(tex02.y*den * vtx01 - tex01.y*den * vtx02);
+
+              tanMap.mem[3 * i + k] = tan;
+              bnmMap.mem[3 * i + k] = cross(n, tan);
+            }
+          }
+
           for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
             vtxMap.mem[i] = mesh->vtx[mesh->triVtxIx[i]];
             nrmMap.mem[i] = mesh->nrm[mesh->triNrmIx[i]];
             texMap.mem[i] = mesh->tex[mesh->triTexIx[i]];
-            tanMap.mem[i] = Vec3f(0.f);
-            bnmMap.mem[i] = Vec3f(0.f);
+            //tanMap.mem[i] = Vec3f(0.f);
+            //bnmMap.mem[i] = Vec3f(0.f);
           }
         }
         else {

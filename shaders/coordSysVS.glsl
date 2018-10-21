@@ -17,7 +17,7 @@ layout(location = 5) in vec3 inInstanceNormal;
 layout(location = 0) out vec4 color;
 
 void main() {
-  float l = 0.1f;
+  float l = 0.02f;
 
   vec3 p = inInstancePos +
     l * inPos.x * inInstanceTan +
