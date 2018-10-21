@@ -334,10 +334,13 @@ void VulkanManager::resize(uint32_t w, uint32_t h)
     rendererPass = vCtx->resources->createRenderPass(attachments, 2, &subpass, 1, nullptr);
   }
 
+  auto depthImage = vCtx->resources->createImage(w, h, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_FORMAT_D32_SFLOAT);
+  vCtx->frameManager->transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
+
   Vector<ImageViewHandle> attachments(2);
   auto viewInfo = vCtx->infos->imageView.baseLevel2D;
   viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-  attachments[1] = vCtx->resources->createImageView(vCtx->resources->createImage(w, h, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_FORMAT_D32_SFLOAT), viewInfo);
+  attachments[1] = vCtx->resources->createImageView(depthImage, viewInfo);
 
   rendererFrameBuffers.resize(wd->BackBufferCount);
   for (uint32_t i = 0; i < wd->BackBufferCount; i++) {
