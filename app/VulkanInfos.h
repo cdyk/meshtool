@@ -16,6 +16,7 @@ struct VulkanInfos
   } vertexInput;
 
   struct {
+    VkPipelineRasterizationStateCreateInfo cullNoneSolid;
     VkPipelineRasterizationStateCreateInfo cullBack;
     VkPipelineRasterizationStateCreateInfo cullBackLine;
     VkPipelineRasterizationStateCreateInfo cullNoneLine;

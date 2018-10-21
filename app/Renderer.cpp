@@ -15,6 +15,10 @@ struct ObjectBuffer
 
 namespace {
 
+  uint32_t coordSysVS[]
+#include "coordSysVS.glsl.h"
+    ;
+
   uint32_t flatVS[]
 #include "flatVS.glsl.h"
     ;
@@ -62,14 +66,34 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
     texturedShader = vCtx->resources->createShader(stages);
   }
 
+  {
+    Vector<ShaderInputSpec> stages(2);
+    stages[0] = { coordSysVS, sizeof(coordSysVS), VK_SHADER_STAGE_VERTEX_BIT };
+    stages[1] = { flatPS, sizeof(flatPS), VK_SHADER_STAGE_FRAGMENT_BIT };
+    coordSys.shader = vCtx->resources->createShader(stages);
+  }
+
+
   renaming.resize(10);
   for (size_t i = 0; i < renaming.size(); i++) {
     renaming[i].ready = vCtx->resources->createFence(true);
     renaming[i].objectBuffer = vCtx->resources->createUniformBuffer(sizeof(ObjectBuffer));
   }
   
-
-
+  coordSys.vtxCol = vCtx->resources->createVertexDeviceBuffer(2*sizeof(Vec3f) * 6);
+  {
+    auto coordSysStaging = vCtx->resources->createStagingBuffer(coordSys.vtxCol.resource->requestedSize);
+    {
+      MappedBuffer<Vec3f> vtxMap(vCtx, coordSysStaging);
+      vtxMap.mem[0] = Vec3f(0, 0, 0); vtxMap.mem[1] = Vec3f(1, 0, 0);
+      vtxMap.mem[2] = Vec3f(1, 0, 0); vtxMap.mem[3] = Vec3f(1, 0, 0);
+      vtxMap.mem[4] = Vec3f(0, 0, 0); vtxMap.mem[5] = Vec3f(0, 1, 0);
+      vtxMap.mem[6] = Vec3f(0, 1, 0); vtxMap.mem[7] = Vec3f(0, 1, 0);
+      vtxMap.mem[8] = Vec3f(0, 0, 0); vtxMap.mem[9] = Vec3f(0.3f, 0.3f, 1);
+      vtxMap.mem[10] = Vec3f(0, 0, 1); vtxMap.mem[11] = Vec3f(0.3f, 0.3f, 1);
+    }
+    vCtx->frameManager->copyBuffer(coordSys.vtxCol, coordSysStaging, coordSys.vtxCol.resource->requestedSize);
+  }
 
   uint32_t texW = 500;
   uint32_t texH = 500;
@@ -178,10 +202,14 @@ RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
   {
     auto vtxStaging = vCtx->resources->createStagingBuffer(renderMesh->vtx.resource->requestedSize);
     auto nrmStaging = vCtx->resources->createStagingBuffer(renderMesh->nrm.resource->requestedSize);
+    auto tanStaging = vCtx->resources->createStagingBuffer(renderMesh->tan.resource->requestedSize);
+    auto bnmStaging = vCtx->resources->createStagingBuffer(renderMesh->bnm.resource->requestedSize);
     auto texStaging = vCtx->resources->createStagingBuffer(renderMesh->tex.resource->requestedSize);
     {
       MappedBuffer<Vec3f> vtxMap(vCtx, vtxStaging);
       MappedBuffer<Vec3f> nrmMap(vCtx, nrmStaging);
+      MappedBuffer<Vec3f> tanMap(vCtx, tanStaging);
+      MappedBuffer<Vec3f> bnmMap(vCtx, bnmStaging);
       MappedBuffer<Vec2f> texMap(vCtx, texStaging);
 
       if (mesh->nrmCount) {
@@ -190,12 +218,16 @@ RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
             vtxMap.mem[i] = mesh->vtx[mesh->triVtxIx[i]];
             nrmMap.mem[i] = mesh->nrm[mesh->triNrmIx[i]];
             texMap.mem[i] = mesh->tex[mesh->triTexIx[i]];
+            tanMap.mem[i] = Vec3f(0.f);
+            bnmMap.mem[i] = Vec3f(0.f);
           }
         }
         else {
           for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
             vtxMap.mem[i] = mesh->vtx[mesh->triVtxIx[i]];
             nrmMap.mem[i] = mesh->nrm[mesh->triNrmIx[i]];
+            tanMap.mem[i] = Vec3f(0.f);
+            bnmMap.mem[i] = Vec3f(0.f);
             texMap.mem[i] = Vec2f(0.5f);
           }
         }
@@ -210,6 +242,8 @@ RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
               vtxMap.mem[3 * i + k] = p[k];
               nrmMap.mem[3 * i + k] = n;
               texMap.mem[3 * i + k] = 10.f*mesh->tex[mesh->triTexIx[3 * i + k]];
+              tanMap.mem[3 * i + k] = Vec3f(0.f);
+              bnmMap.mem[3 * i + k] = Vec3f(0.f);
             }
           }
         }
@@ -222,12 +256,16 @@ RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
               vtxMap.mem[3 * i + k] = p[k];
               nrmMap.mem[3 * i + k] = n;
               texMap.mem[3 * i + k] = Vec2f(0.5f);
+              tanMap.mem[3 * i + k] = Vec3f(0.f);
+              bnmMap.mem[3 * i + k] = Vec3f(0.f);
             }
           }
         }
       }
       vCtx->frameManager->copyBuffer(renderMesh->vtx, vtxStaging, renderMesh->vtx.resource->requestedSize);
       vCtx->frameManager->copyBuffer(renderMesh->nrm, nrmStaging, renderMesh->nrm.resource->requestedSize);
+      vCtx->frameManager->copyBuffer(renderMesh->tan, tanStaging, renderMesh->tan.resource->requestedSize);
+      vCtx->frameManager->copyBuffer(renderMesh->bnm, bnmStaging, renderMesh->bnm.resource->requestedSize);
       vCtx->frameManager->copyBuffer(renderMesh->tex, texStaging, renderMesh->tex.resource->requestedSize);
     }
   }
@@ -393,6 +431,41 @@ void Renderer::buildPipelines(RenderPassHandle pass)
                                                             vCtx->infos->pipelineRasterization.cullNoneLine);
   }
 
+  {
+    Vector<VkVertexInputAttributeDescription> inputAttrib(6);
+    inputAttrib[0] = { 0 };
+    inputAttrib[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    inputAttrib[1] = { 0 };
+    inputAttrib[1].location = 1;
+    inputAttrib[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    inputAttrib[1].offset = sizeof(Vec3f);
+    for (unsigned i = 2; i < inputAttrib.size(); i++) {
+      inputAttrib[i] = { 0 };
+      inputAttrib[i].location = i;
+      inputAttrib[i].binding = i - 1;
+      inputAttrib[i].format = VK_FORMAT_R32G32B32_SFLOAT;
+    }
+
+    Vector<VkVertexInputBindingDescription> inputBind(5);
+    inputBind[0] = { 0 };
+    inputBind[0].stride = sizeof(Vec3f) + sizeof(Vec3f);
+    inputBind[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    for (unsigned i = 1; i < inputBind.size(); i++) {
+      inputBind[i] = { 0 };
+      inputBind[i].binding = i;
+      inputBind[i].stride = sizeof(Vec3f);
+      inputBind[i].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
+    }
+    coordSys.pipeline = vCtx->resources->createPipeline(inputBind,
+                                                        inputAttrib,
+                                                        pipeLayoutInfo,
+                                                        objBufLayoutInfo,
+                                                        pass,
+                                                        coordSys.shader,
+                                                        vCtx->infos->pipelineRasterization.cullNoneSolid,
+                                                        VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
+  }
+
 
   for (size_t i = 0; i < renaming.size(); i++) {
     renaming[i].objBufDescSet = vCtx->resources->createDescriptorSet(vanillaPipeline.resource->descLayout);
@@ -510,6 +583,24 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     }
     vkCmdDraw(cmdBuf, 3 * rm->tri_n, 1, 0, 0);
   }
+
+  if(true) {
+    VkBuffer buffers[5] = {
+      coordSys.vtxCol.resource->buffer,
+      rm->vtx.resource->buffer,
+      rm->tan.resource->buffer,
+      rm->bnm.resource->buffer,
+      rm->nrm.resource->buffer,
+    };
+    VkDeviceSize offsets[5] = { 0, 0, 0, 0, 0 };
+    vkCmdBindVertexBuffers(cmdBuf, 0, 5, buffers, offsets);
+
+    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, coordSys.pipeline.resource->pipe);
+    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, coordSys.pipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
+    vkCmdDraw(cmdBuf, 6, 3 * rm->tri_n, 0, 0);
+
+  }
+
 
 
   renamingCurr = (renamingCurr + 1);

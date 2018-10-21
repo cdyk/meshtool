@@ -123,4 +123,9 @@
       <Filter>shaders</Filter>
     </CustomBuild>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="..\shaders\coordSys.glsl">
+      <Filter>shaders</Filter>
+    </None>
+  </ItemGroup>
 </Project>

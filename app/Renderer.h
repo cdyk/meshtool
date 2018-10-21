@@ -53,10 +53,18 @@ private:
 
   ResourceManager<RenderMesh> renderMeshResources;
 
+  struct {
+    RenderBufferHandle vtxCol;
+    ShaderHandle shader;
+    PipelineHandle pipeline;
+  } coordSys;
+
+
   PipelineHandle vanillaPipeline;
   PipelineHandle texturedPipeline;
   PipelineHandle wireFrontFacePipeline;
   PipelineHandle wireBothFacesPipeline;
+
 
   ShaderHandle vanillaShader;
   ShaderHandle flatShader;

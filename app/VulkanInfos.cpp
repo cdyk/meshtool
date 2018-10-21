@@ -49,6 +49,18 @@ VulkanInfos::VulkanInfos()
     info.offset = 0;
   }
 
+  {
+    auto & info = pipelineRasterization.cullNoneSolid;
+    info = {};
+    info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    info.polygonMode = VK_POLYGON_MODE_FILL;
+    info.cullMode = VK_CULL_MODE_NONE;
+    info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    info.depthClampEnable = VK_FALSE;
+    info.rasterizerDiscardEnable = VK_FALSE;
+    info.depthBiasEnable = VK_FALSE;
+    info.lineWidth = 1.0f;
+  }
 
   {
     auto & info = pipelineRasterization.cullBackLine;
