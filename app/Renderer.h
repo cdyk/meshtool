@@ -8,8 +8,12 @@ struct RenderMesh : ResourceBase
 {
   RenderMesh(ResourceManagerBase& manager) : ResourceBase(manager) {}
   Mesh* mesh = nullptr;
-  RenderBufferHandle vtxNrmTex;
-  RenderBufferHandle color;
+  RenderBufferHandle vtx;
+  RenderBufferHandle nrm;
+  RenderBufferHandle tan;
+  RenderBufferHandle bnm;
+  RenderBufferHandle tex;
+  RenderBufferHandle col;
   uint32_t tri_n = 0;
 };
 typedef ResourceHandle<RenderMesh> RenderMeshHandle;
@@ -39,6 +43,7 @@ public:
   void houseKeep();
 
   void updateRenderMeshColor(RenderMeshHandle renderMesh);
+
 
   void drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMeshHandle renderMesh, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP);
 
@@ -76,4 +81,7 @@ private:
   };
   Vector<Rename> renaming;
   unsigned renamingCurr = 0;
+
+  void buildPipelines(RenderPassHandle pass);
+
 };

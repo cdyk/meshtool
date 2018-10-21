@@ -13,9 +13,6 @@ struct ObjectBuffer
   Vec4f Ncol2;
 };
 
-
-
-
 namespace {
 
   uint32_t flatVS[]
@@ -37,69 +34,6 @@ namespace {
   uint32_t texturedPS[]
 #include "texturedPS.glsl.h"
     ;
-
-
-  void vanillaPipelineInfo(VulkanContext* vCtx,
-                           Vector<VkVertexInputBindingDescription>& inputBind,
-                           Vector<VkVertexInputAttributeDescription>& inputAttrib,
-                           VkPipelineLayoutCreateInfo& pipeLayoutCI)
-  {
-    {
-      inputBind.resize(2);
-      inputBind[0] = vCtx->infos->vertexInput.v32b;
-      inputBind[0].binding = 0;
-      inputBind[1] = vCtx->infos->vertexInput.v4b;
-      inputBind[1].binding = 1;
-
-      inputAttrib.resize(4);
-      inputAttrib[0] = vCtx->infos->vertexInput.v3f_0_0b;
-      inputAttrib[0].location = 0;
-      inputAttrib[1] = vCtx->infos->vertexInput.v3f_1_12b;
-      inputAttrib[1].location = 1;
-      inputAttrib[2] = vCtx->infos->vertexInput.v2f_2_24b;
-      inputAttrib[2].location = 2;
-      inputAttrib[3] = vCtx->infos->vertexInput.v4u8_0b;
-      inputAttrib[3].location = 3;
-      inputAttrib[3].binding = 1;
-    }
-    {
-      pipeLayoutCI = {};
-      pipeLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-      pipeLayoutCI.pNext = NULL;
-      pipeLayoutCI.pushConstantRangeCount = 0;
-      pipeLayoutCI.pPushConstantRanges = NULL;
-    }
-  }
-
-  void wirePipelineInfo(VulkanContext* vCtx, 
-                        Vector<VkVertexInputBindingDescription>& inputBind,
-                        Vector<VkVertexInputAttributeDescription>& inputAttrib,
-                        VkPipelineLayoutCreateInfo& pipeLayoutCI)
-  {
-    {
-      inputBind.resize(2);
-      inputBind[0] = vCtx->infos->vertexInput.v32b;
-      inputBind[0].binding = 0;
-      inputBind[1] = vCtx->infos->vertexInput.v4b;
-      inputBind[1].binding = 1;
-
-      inputAttrib.resize(2);
-      inputAttrib[0] = vCtx->infos->vertexInput.v3f_0_0b;
-      inputAttrib[0].location = 0;
-      inputAttrib[1] = vCtx->infos->vertexInput.v4u8_0b;
-      inputAttrib[1].location = 1;
-      inputAttrib[1].binding = 1;
-    }
-    
-    {
-      pipeLayoutCI = {};
-      pipeLayoutCI.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-      pipeLayoutCI.pNext = NULL;
-      pipeLayoutCI.pushConstantRangeCount = 0;
-      pipeLayoutCI.pPushConstantRanges = NULL;
-    }
-  }
-
 
 }
 
@@ -227,12 +161,6 @@ void Renderer::houseKeep()
 
 RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
 {
-  struct VtxNrmTex
-  {
-    Vec3f vtx;
-    Vec3f nrm;
-    Vec2f tex;
-  };
 
   auto renderMeshHandle = renderMeshResources.createResource();
   auto * renderMesh = renderMeshHandle.resource;
@@ -240,25 +168,35 @@ RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
   renderMesh->mesh = mesh;
   renderMesh->tri_n = mesh->triCount;
   
-  renderMesh->vtxNrmTex = vCtx->resources->createVertexDeviceBuffer(sizeof(VtxNrmTex) * 3 * renderMesh->tri_n);
+  renderMesh->vtx = vCtx->resources->createVertexDeviceBuffer(sizeof(Vec3f) * 3 * renderMesh->tri_n);
+  renderMesh->nrm = vCtx->resources->createVertexDeviceBuffer(sizeof(Vec3f) * 3 * renderMesh->tri_n);
+  renderMesh->tan = vCtx->resources->createVertexDeviceBuffer(sizeof(Vec3f) * 3 * renderMesh->tri_n);
+  renderMesh->bnm = vCtx->resources->createVertexDeviceBuffer(sizeof(Vec3f) * 3 * renderMesh->tri_n);
+  renderMesh->tex = vCtx->resources->createVertexDeviceBuffer(sizeof(Vec2f) * 3 * renderMesh->tri_n);
+  renderMesh->col = vCtx->resources->createVertexDeviceBuffer(sizeof(uint32_t) * 3 * renderMesh->tri_n);
 
   {
-    auto stagingBuf = vCtx->resources->createStagingBuffer(renderMesh->vtxNrmTex.resource->requestedSize);
+    auto vtxStaging = vCtx->resources->createStagingBuffer(renderMesh->vtx.resource->requestedSize);
+    auto nrmStaging = vCtx->resources->createStagingBuffer(renderMesh->nrm.resource->requestedSize);
+    auto texStaging = vCtx->resources->createStagingBuffer(renderMesh->tex.resource->requestedSize);
     {
-      MappedBuffer<VtxNrmTex> map(vCtx, stagingBuf);
+      MappedBuffer<Vec3f> vtxMap(vCtx, vtxStaging);
+      MappedBuffer<Vec3f> nrmMap(vCtx, nrmStaging);
+      MappedBuffer<Vec2f> texMap(vCtx, texStaging);
+
       if (mesh->nrmCount) {
         if (mesh->texCount) {
           for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
-            map.mem[i].vtx = mesh->vtx[mesh->triVtxIx[i]];
-            map.mem[i].nrm = mesh->nrm[mesh->triNrmIx[i]];
-            map.mem[i].tex = mesh->tex[mesh->triTexIx[i]];
+            vtxMap.mem[i] = mesh->vtx[mesh->triVtxIx[i]];
+            nrmMap.mem[i] = mesh->nrm[mesh->triNrmIx[i]];
+            texMap.mem[i] = mesh->tex[mesh->triTexIx[i]];
           }
         }
         else {
           for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
-            map.mem[i].vtx = mesh->vtx[mesh->triVtxIx[i]];
-            map.mem[i].nrm = mesh->nrm[mesh->triNrmIx[i]];
-            map.mem[i].tex = Vec2f(0.5f);
+            vtxMap.mem[i] = mesh->vtx[mesh->triVtxIx[i]];
+            nrmMap.mem[i] = mesh->nrm[mesh->triNrmIx[i]];
+            texMap.mem[i] = Vec2f(0.5f);
           }
         }
       }
@@ -269,9 +207,9 @@ RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
             for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
             auto n = cross(p[1] - p[0], p[2] - p[0]);
             for (unsigned k = 0; k < 3; k++) {
-              map.mem[3 * i + k].vtx = p[k];
-              map.mem[3 * i + k].nrm = n;
-              map.mem[3 * i + k].tex = 10.f*mesh->tex[mesh->triTexIx[3 * i + k]];
+              vtxMap.mem[3 * i + k] = p[k];
+              nrmMap.mem[3 * i + k] = n;
+              texMap.mem[3 * i + k] = 10.f*mesh->tex[mesh->triTexIx[3 * i + k]];
             }
           }
         }
@@ -281,18 +219,19 @@ RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
             for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
             auto n = cross(p[1] - p[0], p[2] - p[0]);
             for (unsigned k = 0; k < 3; k++) {
-              map.mem[3 * i + k].vtx = p[k];
-              map.mem[3 * i + k].nrm = n;
-              map.mem[3 * i + k].tex = Vec2f(0.5f);
+              vtxMap.mem[3 * i + k] = p[k];
+              nrmMap.mem[3 * i + k] = n;
+              texMap.mem[3 * i + k] = Vec2f(0.5f);
             }
           }
         }
       }
-      vCtx->frameManager->copyBuffer(renderMesh->vtxNrmTex, stagingBuf, renderMesh->vtxNrmTex.resource->requestedSize);
+      vCtx->frameManager->copyBuffer(renderMesh->vtx, vtxStaging, renderMesh->vtx.resource->requestedSize);
+      vCtx->frameManager->copyBuffer(renderMesh->nrm, nrmStaging, renderMesh->nrm.resource->requestedSize);
+      vCtx->frameManager->copyBuffer(renderMesh->tex, texStaging, renderMesh->tex.resource->requestedSize);
     }
   }
 
-  renderMesh->color = vCtx->resources->createVertexDeviceBuffer(sizeof(uint32_t) * 3 * renderMesh->tri_n);
   updateRenderMeshColor(renderMesh);
 
   logger(0, "CreateRenderMesh");
@@ -302,7 +241,7 @@ RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
 void Renderer::updateRenderMeshColor(RenderMeshHandle renderMesh)
 {
   auto * rm = renderMesh.resource;
-  auto stagingBuf = vCtx->resources->createStagingBuffer(rm->color.resource->requestedSize);
+  auto stagingBuf = vCtx->resources->createStagingBuffer(rm->col.resource->requestedSize);
   {
     MappedBuffer<uint32_t> map(vCtx, stagingBuf);
     for (unsigned i = 0; i < rm->mesh->triCount; i++) {
@@ -312,74 +251,134 @@ void Renderer::updateRenderMeshColor(RenderMeshHandle renderMesh)
       map.mem[3 * i + 2] = color;
     }
   }
-  vCtx->frameManager->copyBuffer(rm->color, stagingBuf, rm->color.resource->requestedSize);
+  vCtx->frameManager->copyBuffer(rm->col, stagingBuf, rm->col.resource->requestedSize);
   logger(0, "Updated mesh color");
 }
 
-
-void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMeshHandle renderMesh, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP)
+void Renderer::buildPipelines(RenderPassHandle pass)
 {
-  auto * rm = renderMesh.resource;
-  if(!vanillaPipeline || vanillaPipeline.resource->pass != pass)
+  VkDescriptorSetLayoutBinding objBufLayoutBinding[1];
+  objBufLayoutBinding[0] = {};
+  objBufLayoutBinding[0].binding = 0;
+  objBufLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  objBufLayoutBinding[0].descriptorCount = 1;
+  objBufLayoutBinding[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+  VkDescriptorSetLayoutCreateInfo objBufLayoutInfo{};
+  objBufLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  objBufLayoutInfo.bindingCount = 1;
+  objBufLayoutInfo.pBindings = objBufLayoutBinding;
+
+  VkDescriptorSetLayoutBinding objBufSamplerLayoutBinding[2];
+  objBufSamplerLayoutBinding[0] = {};
+  objBufSamplerLayoutBinding[0].binding = 0;
+  objBufSamplerLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  objBufSamplerLayoutBinding[0].descriptorCount = 1;
+  objBufSamplerLayoutBinding[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+  objBufSamplerLayoutBinding[1].binding = 1;
+  objBufSamplerLayoutBinding[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  objBufSamplerLayoutBinding[1].descriptorCount = 1;
+  objBufSamplerLayoutBinding[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+  objBufSamplerLayoutBinding[1].pImmutableSamplers = NULL;
+
+  VkDescriptorSetLayoutCreateInfo objBufSamplerLayoutInfo{};
+  objBufSamplerLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+  objBufSamplerLayoutInfo.bindingCount = 2;
+  objBufSamplerLayoutInfo.pBindings = objBufSamplerLayoutBinding;
+
+
+
+  
+  VkPipelineLayoutCreateInfo pipeLayoutInfo{};
+  pipeLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+  pipeLayoutInfo.pNext = NULL;
+  pipeLayoutInfo.pushConstantRangeCount = 0;
+  pipeLayoutInfo.pPushConstantRanges = NULL;
+
   {
-    VkDescriptorSetLayoutBinding objBufLayoutBinding[1];
-    objBufLayoutBinding[0] = {};
-    objBufLayoutBinding[0].binding = 0;
-    objBufLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    objBufLayoutBinding[0].descriptorCount = 1;
-    objBufLayoutBinding[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    Vector<VkVertexInputAttributeDescription> inputAttrib(4);
+    for (unsigned i = 0; i < inputAttrib.size(); i++) {
+      inputAttrib[i] = { 0 };
+      inputAttrib[i].location = i;
+      inputAttrib[i].binding = i;
+    }
+    inputAttrib[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    inputAttrib[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    inputAttrib[2].format = VK_FORMAT_R32G32_SFLOAT;
+    inputAttrib[3].format = VK_FORMAT_R8G8B8A8_UNORM;
 
-    VkDescriptorSetLayoutCreateInfo objBufLayoutInfo{};
-    objBufLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    objBufLayoutInfo.bindingCount = 1;
-    objBufLayoutInfo.pBindings = objBufLayoutBinding;
-
-    VkDescriptorSetLayoutBinding objBufSamplerLayoutBinding[2];
-    objBufSamplerLayoutBinding[0] = {};
-    objBufSamplerLayoutBinding[0].binding = 0;
-    objBufSamplerLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    objBufSamplerLayoutBinding[0].descriptorCount = 1;
-    objBufSamplerLayoutBinding[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    objBufSamplerLayoutBinding[1].binding = 1;
-    objBufSamplerLayoutBinding[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    objBufSamplerLayoutBinding[1].descriptorCount = 1;
-    objBufSamplerLayoutBinding[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-    objBufSamplerLayoutBinding[1].pImmutableSamplers = NULL;
-
-    VkDescriptorSetLayoutCreateInfo objBufSamplerLayoutInfo{};
-    objBufSamplerLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    objBufSamplerLayoutInfo.bindingCount = 2;
-    objBufSamplerLayoutInfo.pBindings = objBufSamplerLayoutBinding;
-
-
-
-    Vector<VkVertexInputBindingDescription> inputBind;
-    Vector<VkVertexInputAttributeDescription> inputAttrib;
-    VkPipelineLayoutCreateInfo pipeLayoutCI;
-    vanillaPipelineInfo(vCtx, inputBind, inputAttrib, pipeLayoutCI);
-
+    Vector<VkVertexInputBindingDescription> inputBind(4);
+    for (unsigned i = 0; i < inputBind.size(); i++) {
+      inputBind[i] = { 0 };
+      inputBind[i].binding = i;
+      inputBind[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    }
+    inputBind[0].stride = sizeof(Vec3f);
+    inputBind[1].stride = sizeof(Vec3f);
+    inputBind[2].stride = sizeof(Vec2f);
+    inputBind[3].stride = sizeof(uint32_t);
     vanillaPipeline = vCtx->resources->createPipeline(inputBind,
                                                       inputAttrib,
-                                                      pipeLayoutCI,
+                                                      pipeLayoutInfo,
                                                       objBufLayoutInfo,
                                                       pass,
                                                       vanillaShader,
                                                       vCtx->infos->pipelineRasterization.cullBackDepthBias);
+  }
 
+  {
+    Vector<VkVertexInputAttributeDescription> inputAttrib(4);
+    for (unsigned i = 0; i < inputAttrib.size(); i++) {
+      inputAttrib[i] = { 0 };
+      inputAttrib[i].location = i;
+      inputAttrib[i].binding = i;
+    }
+    inputAttrib[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    inputAttrib[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    inputAttrib[2].format = VK_FORMAT_R32G32_SFLOAT;
+    inputAttrib[3].format = VK_FORMAT_R8G8B8A8_UNORM;
+
+    Vector<VkVertexInputBindingDescription> inputBind(4);
+    for (unsigned i = 0; i < inputBind.size(); i++) {
+      inputBind[i] = { 0 };
+      inputBind[i].binding = i;
+      inputBind[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    }
+    inputBind[0].stride = sizeof(Vec3f);
+    inputBind[1].stride = sizeof(Vec3f);
+    inputBind[2].stride = sizeof(Vec2f);
+    inputBind[3].stride = sizeof(uint32_t);
     texturedPipeline = vCtx->resources->createPipeline(inputBind,
                                                        inputAttrib,
-                                                       pipeLayoutCI,
+                                                       pipeLayoutInfo,
                                                        objBufSamplerLayoutInfo,
                                                        pass,
                                                        texturedShader,
                                                        vCtx->infos->pipelineRasterization.cullBackDepthBias);
+  }
 
+  {
+    Vector<VkVertexInputAttributeDescription> inputAttrib(2);
+    for (unsigned i = 0; i < inputAttrib.size(); i++) {
+      inputAttrib[i] = { 0 };
+      inputAttrib[i].location = i;
+      inputAttrib[i].binding = i;
+    }
+    inputAttrib[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    inputAttrib[1].format = VK_FORMAT_R8G8B8A8_UNORM;
 
+    Vector<VkVertexInputBindingDescription> inputBind(2);
+    for (unsigned i = 0; i < inputBind.size(); i++) {
+      inputBind[i] = { 0 };
+      inputBind[i].binding = i;
+      inputBind[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    }
+    inputBind[0].stride = sizeof(Vec3f);
+    inputBind[1].stride = sizeof(uint32_t);
 
-    wirePipelineInfo(vCtx, inputBind, inputAttrib, pipeLayoutCI);
     wireFrontFacePipeline = vCtx->resources->createPipeline(inputBind,
                                                             inputAttrib,
-                                                            pipeLayoutCI,
+                                                            pipeLayoutInfo,
                                                             objBufLayoutInfo,
                                                             pass,
                                                             flatShader,
@@ -387,20 +386,27 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
 
     wireBothFacesPipeline = vCtx->resources->createPipeline(inputBind,
                                                             inputAttrib,
-                                                            pipeLayoutCI,
+                                                            pipeLayoutInfo,
                                                             objBufLayoutInfo,
                                                             pass,
                                                             flatShader,
                                                             vCtx->infos->pipelineRasterization.cullNoneLine);
-
-
-    for (size_t i = 0; i < renaming.size(); i++) {
-      renaming[i].objBufDescSet = vCtx->resources->createDescriptorSet(vanillaPipeline.resource->descLayout);
-      renaming[i].objBufSamplerDescSet = vCtx->resources->createDescriptorSet(texturedPipeline.resource->descLayout);
-    }
   }
-  auto & rename = renaming[renamingCurr];
 
+
+  for (size_t i = 0; i < renaming.size(); i++) {
+    renaming[i].objBufDescSet = vCtx->resources->createDescriptorSet(vanillaPipeline.resource->descLayout);
+    renaming[i].objBufSamplerDescSet = vCtx->resources->createDescriptorSet(texturedPipeline.resource->descLayout);
+  }
+
+}
+
+void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMeshHandle renderMesh, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP)
+{
+  auto * rm = renderMesh.resource;
+  if (!vanillaPipeline || vanillaPipeline.resource->pass != pass) buildPipelines(pass);
+
+  auto & rename = renaming[renamingCurr];
   {
     MappedBuffer<ObjectBuffer> map(vCtx, rename.objectBuffer);
     map.mem->MVP = MVP;
@@ -471,9 +477,13 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
   }
 
   {
-    VkBuffer buffers[2] = { rm->vtxNrmTex.resource->buffer, rm->color.resource->buffer };
-    VkDeviceSize offsets[2] = { 0, 0 };
-    vkCmdBindVertexBuffers(cmdBuf, 0, 2, buffers, offsets);
+    VkBuffer buffers[4] = {
+      rm->vtx.resource->buffer,
+      rm->nrm.resource->buffer,
+      rm->tex.resource->buffer,
+      rm->col.resource->buffer };
+    VkDeviceSize offsets[4] = { 0, 0, 0, 0 };
+    vkCmdBindVertexBuffers(cmdBuf, 0, 4, buffers, offsets);
   }
 
   if(solid) {

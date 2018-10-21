@@ -149,7 +149,7 @@ void VulkanResources::houseKeep()
 
 PipelineHandle VulkanResources::createPipeline(Vector<VkVertexInputBindingDescription>& inputBind,
                                                      Vector<VkVertexInputAttributeDescription>& inputAttrib,
-                                                     VkPipelineLayoutCreateInfo& pipelineLayoutInfo,
+                                                     VkPipelineLayoutCreateInfo& pipelineLayoutInfo_,
                                                      VkDescriptorSetLayoutCreateInfo& descLayoutInfo,
                                                      RenderPassHandle renderPass,
                                                      ShaderHandle shader,
@@ -169,6 +169,7 @@ PipelineHandle VulkanResources::createPipeline(Vector<VkVertexInputBindingDescri
   auto rv = vkCreateDescriptorSetLayout(vCtx->device, &descLayoutInfo, nullptr, &pipe->descLayout);
   assert(rv == VK_SUCCESS);
 
+  VkPipelineLayoutCreateInfo& pipelineLayoutInfo = pipelineLayoutInfo_;
   pipelineLayoutInfo.setLayoutCount = 1;// uint32_t(descSetLayout.getCount());
   pipelineLayoutInfo.pSetLayouts = &pipe->descLayout;
   rv = vkCreatePipelineLayout(vCtx->device, &pipelineLayoutInfo, nullptr, &pipe->pipeLayout);
