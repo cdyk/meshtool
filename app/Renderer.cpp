@@ -4,6 +4,7 @@
 #include "Mesh.h"
 #include "VulkanContext.h"
 #include "LinAlgOps.h"
+#include "RenderTextureManager.h"
 
 struct ObjectBuffer
 {
@@ -55,7 +56,9 @@ namespace {
 
 Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h) :
   logger(logger),
-  vCtx(vCtx)
+  vCtx(vCtx),
+  textureManager(new RenderTextureManager(vCtx))
+
 {
 
   {
@@ -106,86 +109,21 @@ Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers,
     vCtx->frameManager->copyBuffer(coordSys.vtxCol, coordSysStaging, coordSys.vtxCol.resource->requestedSize);
   }
 
-  uint32_t texW = 500;
-  uint32_t texH = 500;
-
-
-  auto checkerStagingBuffer = vCtx->resources->createStagingBuffer(texW*texH * 4);
-  {
-    MappedBuffer<uint8_t> map(vCtx, checkerStagingBuffer);
-    for (unsigned j = 0; j < texH; j++) {
-      for (unsigned i = 0; i < texW; i++) {
-        auto g = ((i / (texW / 10) + j / (texH / 10))) & 1 ? 0 : 20;
-        auto f = ((i / (texW / 2) + j / (texH / 2))) & 1 ? 150 : 235;
-        map.mem[4 * (texW*j + i) + 0] = f + g;
-        map.mem[4 * (texW*j + i) + 1] = f + g;
-        map.mem[4 * (texW*j + i) + 2] = f + g;
-        map.mem[4 * (texW*j + i) + 3] = 255;
-      }
-    }
-  }
-
-  auto colorGradientStagingBuffer = vCtx->resources->createStagingBuffer(texW*texH * 4);
-  {
-    MappedBuffer<uint8_t> map(vCtx, colorGradientStagingBuffer);
-    for (unsigned j = 0; j < texH; j++) {
-      for (unsigned i = 0; i < texW; i++) {
-        auto g = ((i / (texW / 10) + j / (texH / 10))) & 1 ? 0 : 20;
-        auto f = ((i / (texW / 2) + j / (texH / 2))) & 1 ? 150 : 235;
-        map.mem[4 * (texW*j + i) + 0] = (255 * (i)) / (texW);
-        map.mem[4 * (texW*j + i) + 1] = (255 * (j)) / (texH);
-        map.mem[4 * (texW*j + i) + 2] = f + g;
-        map.mem[4 * (texW*j + i) + 3] = 255;
-      }
-    }
-  }
-
-  {
-    VkImageCreateInfo info{};
-    info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    info.imageType = VK_IMAGE_TYPE_2D;
-    info.extent.width = static_cast<uint32_t>(texW);
-    info.extent.height = static_cast<uint32_t>(texH);
-    info.extent.depth = 1;
-    info.mipLevels = 1;
-    info.arrayLayers = 1;
-    info.format = VK_FORMAT_R8G8B8A8_UNORM;
-    info.tiling = VK_IMAGE_TILING_OPTIMAL;
-    info.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-    info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    info.samples = VK_SAMPLE_COUNT_1_BIT;
-    info.flags = 0;
-
-    auto viewInfo = vCtx->infos->imageView.baseLevel2D;
-    viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-
-    checkerTexImage = vCtx->resources->createImage(info);
-    checkerTexImageView = vCtx->resources->createImageView(checkerTexImage, viewInfo);
-
-    vCtx->frameManager->transitionImageLayout(checkerTexImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    vCtx->frameManager->copyBufferToImage(checkerTexImage, checkerStagingBuffer, texW, texH);
-    vCtx->frameManager->transitionImageLayout(checkerTexImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-
-    colorGradientTexImage = vCtx->resources->createImage(info);
-    colorGradientTexImageView = vCtx->resources->createImageView(colorGradientTexImage, viewInfo);
-
-    vCtx->frameManager->transitionImageLayout(colorGradientTexImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    vCtx->frameManager->copyBufferToImage(colorGradientTexImage, colorGradientStagingBuffer, texW, texH);
-    vCtx->frameManager->transitionImageLayout(colorGradientTexImage, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-     texSampler = vCtx->resources->createSampler(vCtx->infos->samplers.triLlinearRepeat);
-  }
+  checkerTex = textureManager->loadTexture(TextureSource::Checker);
+  colorGradientTex = textureManager->loadTexture(TextureSource::ColorGradient);
+  texSampler = vCtx->resources->createSampler(vCtx->infos->samplers.triLlinearRepeat);
 }
 
 Renderer::~Renderer()
 {
-  houseKeep();
+  startFrame();
   logger(0, "%d unreleased buffers", renderMeshResources.getCount());
 }
 
-void Renderer::houseKeep()
+void Renderer::startFrame()
 {
+  textureManager->startFrame();
+
   Vector<RenderMesh*> orphans;
   renderMeshResources.getOrphans(orphans);
   for (auto * r : orphans) {
@@ -585,7 +523,7 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     // Fixme: this is only needed once    
     VkDescriptorImageInfo imageInfo{};
     imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo.imageView = texturing == Texturing::Checker ? checkerTexImageView.resource->view : colorGradientTexImageView.resource->view;
+    imageInfo.imageView = texturing == Texturing::Checker ? checkerTex.resource->view.resource->view : colorGradientTex.resource->view.resource->view;
     imageInfo.sampler = texSampler.resource->sampler;
 
     writes[1] = {};

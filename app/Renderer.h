@@ -3,6 +3,7 @@
 #include "Common.h"
 #include "VulkanContext.h"
 #include "ResourceManager.h"
+#include "RenderTextureManager.h"
 
 struct RenderMesh : ResourceBase
 {
@@ -25,6 +26,9 @@ struct Vec4f;
 struct Mat4f;
 struct Mat3f;
 
+
+class RenderTextureManager;
+
 class Renderer
 {
 public:
@@ -44,7 +48,7 @@ public:
 
   RenderMeshHandle createRenderMesh(Mesh* mesh);
 
-  void houseKeep();
+  void startFrame();
 
   void updateRenderMeshColor(RenderMeshHandle renderMesh);
 
@@ -54,6 +58,7 @@ public:
 private:
   Logger logger;
   VulkanContext* vCtx = nullptr;
+  RenderTextureManager* textureManager = nullptr;
 
   ResourceManager<RenderMesh> renderMeshResources;
 
@@ -78,11 +83,9 @@ private:
   uint32_t viewport[4];
   uint32_t frameCount;
 
-  ImageHandle checkerTexImage;
-  ImageViewHandle checkerTexImageView;
+  RenderTextureHandle checkerTex;
+  RenderTextureHandle colorGradientTex;
 
-  ImageHandle colorGradientTexImage;
-  ImageViewHandle colorGradientTexImageView;
 
   SamplerHandle texSampler;
 

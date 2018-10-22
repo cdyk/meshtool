@@ -14,6 +14,8 @@ public:
 };
 
 
+class VulkanTextureManager;
+
 class VulkanContext
 {
 public:
@@ -46,6 +48,7 @@ public:
   VulkanInfos* infos = nullptr;
   VulkanResources* resources = nullptr;
   VulkanFrameManager* frameManager = nullptr;
+  VulkanTextureManager* textureManager = nullptr;
 
 private:
   bool debugLayer = true;

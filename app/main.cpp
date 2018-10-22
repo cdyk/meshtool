@@ -440,7 +440,7 @@ int main(int argc, char** argv)
 
     app->tasks.update();
     checkQueues();
-    app->vulkanManager->renderer->houseKeep();
+    app->vulkanManager->renderer->startFrame();
 
     app->vulkanManager->startFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -558,7 +558,7 @@ int main(int argc, char** argv)
   }
   app->items.meshes.resize(0);
   app->items.renderMeshes.resize(0);
-  app->vulkanManager->renderer->houseKeep();
+  app->vulkanManager->renderer->startFrame();
 
   delete app->vulkanManager;
   ImGui_ImplGlfw_Shutdown();

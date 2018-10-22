@@ -245,6 +245,7 @@ void VulkanContext::houseKeep()
 
 VulkanContext::~VulkanContext()
 {
+
   vkDestroyDevice(device, nullptr);
 
   if (debugLayer) {
