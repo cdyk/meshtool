@@ -26,6 +26,7 @@ struct Mesh
   uint32_t triCount = 0;
 
   uint32_t* lineVtxIx = nullptr;
+  uint32_t* lineColor = nullptr;
   uint32_t lineCount = 0;
 
   const char** obj = nullptr;

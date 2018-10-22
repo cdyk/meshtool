@@ -249,6 +249,7 @@ namespace {
     Triangle t;
     t.smoothingGroup = context->currentSmoothingGroup;
     t.object = context->currentObject;
+    t.color = context->currentColor;
 
     unsigned k = 0;
     for (; a < b && k < 3; k++) {
@@ -311,7 +312,7 @@ namespace {
 
     Line l;
     l.object = context->currentObject;
-    l.color = 0xffff00;
+    l.color = context->currentColor;
 
     unsigned k = 0;
     for (; a < b && k < 2; k++) {
@@ -357,6 +358,32 @@ namespace {
     }
     if (context->currentSmoothingGroup) context->useSmoothingGroups = true;
   }
+
+  void parseUseMtl(Context* context, const char* a, const char* b)
+  {
+    a = skipSpacing(a, b);
+    auto * m = skipNonSpacing(a, b);
+    if ((m - a == 8) && a[0] == '0' && (a[1] == 'x' || a[1] == 'X')) {
+      auto aa = a + 2;
+      uint32_t color = 0;
+      for (unsigned i = 0; i < 6; i++) {
+        auto c = aa[i];
+        color = color << 4;
+        if (c < '0') goto notHexInline;
+        if (c <= '9') { color |= c - '0'; continue; }
+        if (c < 'A') goto notHexInline;
+        if (c <= 'F') { color |= c - 'A' + 10; continue; }
+        if (c < 'a') goto notHexInline;
+        if (c <= 'f') { color |= c - 'a' + 10; continue; }
+        else goto notHexInline;
+      }
+      context->currentColor = color;
+      return;
+    }
+  notHexInline:
+    context->currentColor = 0x888888;
+  }
+
 
   void parseO(Context* context, const char* a, const char* b)
   {
@@ -450,19 +477,22 @@ Mesh*  readObj(Logger logger, const void * ptr, size_t size)
         }
       }
       else {
-        if (l == 5 && std::memcmp(p, "curv2", 5)) recognized = true;
-        else if (l == 5 && std::memcmp(p, "ctech", 5)) recognized = true;
-        else if (l == 5 && std::memcmp(p, "stech", 5)) recognized = true;
-        else if (l == 5 && std::memcmp(p, "bevel", 5)) recognized = true;
-        else if (l == 6 && std::memcmp(p, "cstype", 6)) recognized = true;
-        else if (l == 6 && std::memcmp(p, "maplib", 6)) recognized = true;
-        else if (l == 6 && std::memcmp(p, "usemap", 6)) recognized = true;
-        else if (l == 6 && std::memcmp(p, "usemtl", 6)) recognized = true;
-        else if (l == 6 && std::memcmp(p, "mtllib", 6)) recognized = true;
-        else if (l == 8 && std::memcmp(p, "c_interp", 8)) recognized = true;
-        else if (l == 8 && std::memcmp(p, "d_interp", 8)) recognized = true;
-        else if (l == 9 && std::memcmp(p, "trace_obj", 9)) recognized = true;
-        else if (l == 10 && std::memcmp(p, "shadow_obj", 10)) recognized = true;
+        if (l == 5 && std::memcmp(p, "curv2", 5) == 0) recognized = true;
+        else if (l == 5 && std::memcmp(p, "ctech", 5) == 0) recognized = true;
+        else if (l == 5 && std::memcmp(p, "stech", 5) == 0) recognized = true;
+        else if (l == 5 && std::memcmp(p, "bevel", 5) == 0) recognized = true;
+        else if (l == 6 && std::memcmp(p, "cstype", 6) == 0) recognized = true;
+        else if (l == 6 && std::memcmp(p, "maplib", 6) == 0) recognized = true;
+        else if (l == 6 && std::memcmp(p, "usemap", 6) == 0) recognized = true;
+        else if (l == 6 && std::memcmp(p, "usemtl", 6) == 0) {
+          parseUseMtl(&context, r, q);
+          recognized = true;
+        }
+        else if (l == 6 && std::memcmp(p, "mtllib", 6) == 0) recognized = true;
+        else if (l == 8 && std::memcmp(p, "c_interp", 8) == 0) recognized = true;
+        else if (l == 8 && std::memcmp(p, "d_interp", 8) == 0) recognized = true;
+        else if (l == 9 && std::memcmp(p, "trace_obj", 9) == 0) recognized = true;
+        else if (l == 10 && std::memcmp(p, "shadow_obj", 10) == 0) recognized = true;
       }
 
       if (recognized == false) {
@@ -516,6 +546,7 @@ Mesh*  readObj(Logger logger, const void * ptr, size_t size)
   if(context.lines_n) {
     mesh->lineCount = context.lines_n;
     mesh->lineVtxIx = (uint32_t*)mesh->arena.alloc(sizeof(uint32_t) * 3 * mesh->lineCount);
+    mesh->lineColor = (uint32_t*)mesh->arena.alloc(sizeof(uint32_t) * mesh->lineCount);
     unsigned o = 0;
     for (auto * block = context.lines.first; block; block = block->next) {
       for (unsigned i = 0; i < block->fill; i++) {
@@ -524,6 +555,7 @@ Mesh*  readObj(Logger logger, const void * ptr, size_t size)
           assert(0 <= ix && ix < context.vertices_n);
           mesh->lineVtxIx[2 * o + k] = ix;
         }
+        mesh->lineColor[o] = block->data[i].color;
         o++;
       }
     }

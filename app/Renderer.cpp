@@ -40,12 +40,15 @@ namespace {
     ;
 
 
-  struct Vec3fUint32
+  struct Vec3fRGBA8
   {
-    Vec3f a;
-    uint32_t b;
+    Vec3f p;
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+    uint8_t a;
   };
-  static_assert(sizeof(Vec3fUint32) == 4 * sizeof(uint32_t));
+  static_assert(sizeof(Vec3fRGBA8) == 4 * sizeof(uint32_t));
 
 }
 
@@ -299,13 +302,17 @@ RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
 
   if (mesh->lineCount) {
     renderMesh->lineCount = mesh->lineCount;
-    renderMesh->lines = vCtx->resources->createVertexDeviceBuffer(sizeof(Vec3fUint32) * 2 * renderMesh->lineCount);
+    renderMesh->lines = vCtx->resources->createVertexDeviceBuffer(sizeof(Vec3fRGBA8) * 2 * renderMesh->lineCount);
     auto lineVtxStaging = vCtx->resources->createStagingBuffer(renderMesh->lines.resource->requestedSize);
     {
-      MappedBuffer<Vec3fUint32> map(vCtx, lineVtxStaging);
+      MappedBuffer<Vec3fRGBA8> map(vCtx, lineVtxStaging);
       for (unsigned i = 0; i  < 2*renderMesh->lineCount; i++) {
-        map.mem[i].a = mesh->vtx[mesh->lineVtxIx[i]];
-        map.mem[i].b = 0xffff00u;
+        auto c = mesh->lineColor[i / 2];
+        map.mem[i].p = mesh->vtx[mesh->lineVtxIx[i]];
+        map.mem[i].r = (c >> 16) & 0xffu;
+        map.mem[i].g = (c >> 8) & 0xffu;
+        map.mem[i].b = (c >> 0) & 0xffu;
+        map.mem[i].a = 255u;
       }
     }
     vCtx->frameManager->copyBuffer(renderMesh->lines, lineVtxStaging, renderMesh->lines.resource->requestedSize);
@@ -515,11 +522,11 @@ void Renderer::buildPipelines(RenderPassHandle pass)
     inputAttrib[1] = { 0 };
     inputAttrib[1].location = 1;
     inputAttrib[1].format = VK_FORMAT_R8G8B8A8_UNORM;
-    inputAttrib[1].offset = offsetof(Vec3fUint32, Vec3fUint32::b);
+    inputAttrib[1].offset = offsetof(Vec3fRGBA8, Vec3fRGBA8::r);
 
     Vector<VkVertexInputBindingDescription> inputBind(1);
     inputBind[0] = { 0 };
-    inputBind[0].stride = sizeof(Vec3fUint32);
+    inputBind[0].stride = sizeof(Vec3fRGBA8);
     inputBind[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     linePipeline = vCtx->resources->createPipeline(inputBind,
                                                    inputAttrib,
