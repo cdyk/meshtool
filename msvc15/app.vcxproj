@@ -94,6 +94,7 @@
     <ClCompile Include="..\app\App.cpp" />
     <ClCompile Include="..\app\main.cpp" />
     <ClCompile Include="..\app\Renderer.cpp" />
+    <ClCompile Include="..\app\RenderMeshManager.cpp" />
     <ClCompile Include="..\app\RenderTextureManager.cpp" />
     <ClCompile Include="..\app\VulkanContext.cpp" />
     <ClCompile Include="..\app\VulkanFrameManager.cpp" />
@@ -110,6 +111,8 @@
   <ItemGroup>
     <ClInclude Include="..\app\App.h" />
     <ClInclude Include="..\app\Renderer.h" />
+    <ClInclude Include="..\app\RenderMeshManager.h" />
+    <ClInclude Include="..\app\RenderResource.h" />
     <ClInclude Include="..\app\RenderTextureManager.h" />
     <ClInclude Include="..\app\VulkanContext.h" />
     <ClInclude Include="..\app\VulkanFrameManager.h" />

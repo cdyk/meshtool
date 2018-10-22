@@ -61,6 +61,9 @@
     <ClCompile Include="..\app\RenderTextureManager.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\app\RenderMeshManager.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\libs\imgui\examples\imgui_impl_glfw.h">
@@ -109,6 +112,12 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\app\RenderTextureManager.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\app\RenderResource.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\app\RenderMeshManager.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

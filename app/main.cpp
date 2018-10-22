@@ -325,7 +325,7 @@ namespace {
         app->updateColor = true;
 
         app->items.meshes.pushBack(m);
-        app->items.renderMeshes.pushBack(app->vulkanManager->renderer->createRenderMesh(m));
+        app->items.renderMeshes.pushBack(app->vulkanManager->renderer->meshManager->createRenderMesh(m));
       }
       auto bbox = createEmptyBBox3f();
       for (auto * m : app->items.meshes) {
@@ -548,7 +548,7 @@ int main(int argc, char** argv)
     size_t i = 0; 
     for (auto & renderMesh : app->items.renderMeshes) {
       if (app->updateColor) {
-        app->vulkanManager->renderer->updateRenderMeshColor(renderMesh);
+        app->vulkanManager->renderer->meshManager->updateRenderMeshColor(renderMesh);
       }
     }
     app->updateColor = false;

@@ -1,12 +1,6 @@
 #pragma once
 #include "VulkanResources.h"
-
-enum struct RenderResourceState
-{
-  Uninitialized,
-  Loading,
-  Ready
-};
+#include "RenderResource.h"
 
 enum struct TextureSource
 {
@@ -15,11 +9,10 @@ enum struct TextureSource
 };
 
 
-struct RenderTextureResource : ResourceBase
+struct RenderTextureResource : RenderResourceBase
 {
-  RenderTextureResource(ResourceManagerBase& manager) : ResourceBase(manager) {}
+  RenderTextureResource(ResourceManagerBase& manager) : RenderResourceBase(manager) {}
 
-  RenderResourceState state = RenderResourceState::Uninitialized;
   TextureSource source = TextureSource::Checker;
   RenderBufferHandle stagingBuffer;
   ImageHandle image;
