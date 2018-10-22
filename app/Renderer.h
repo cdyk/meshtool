@@ -15,6 +15,9 @@ struct RenderMesh : ResourceBase
   RenderBufferHandle tex;
   RenderBufferHandle col;
   uint32_t tri_n = 0;
+
+  RenderBufferHandle lines;
+  uint32_t lineCount = 0;
 };
 typedef ResourceHandle<RenderMesh> RenderMeshHandle;
 
@@ -33,6 +36,7 @@ public:
 
   bool outlines = false;
   bool solid = true;
+  bool tangentSpaceCoordSys = true;
   Texturing texturing = Texturing::ColorGradient;
   
   Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h);
@@ -64,6 +68,7 @@ private:
   PipelineHandle texturedPipeline;
   PipelineHandle wireFrontFacePipeline;
   PipelineHandle wireBothFacesPipeline;
+  PipelineHandle linePipeline;
 
 
   ShaderHandle vanillaShader;

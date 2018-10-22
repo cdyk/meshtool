@@ -108,6 +108,7 @@ namespace {
     else if (mods == 0) {
       if (key == GLFW_KEY_W && action == GLFW_PRESS)  app->vulkanManager->renderer->outlines = !app->vulkanManager->renderer->outlines;
       if (key == GLFW_KEY_S && action == GLFW_PRESS)  app->vulkanManager->renderer->solid = !app->vulkanManager->renderer->solid;
+      if (key == GLFW_KEY_C && action == GLFW_PRESS) app->vulkanManager->renderer->tangentSpaceCoordSys = !app->vulkanManager->renderer->tangentSpaceCoordSys;
       if (key == GLFW_KEY_T && action == GLFW_PRESS) {
         switch (app->vulkanManager->renderer->texturing) {
         case Renderer::Texturing::None: app->vulkanManager->renderer->texturing = Renderer::Texturing::Checker; break;
@@ -215,6 +216,7 @@ namespace {
         ImGui::Separator();
         if (ImGui::MenuItem("Solid", "S", &app->vulkanManager->renderer->solid)) {}
         if (ImGui::MenuItem("Outlines", "W", &app->vulkanManager->renderer->outlines)) {}
+        if (ImGui::MenuItem("Tangent coordsys", "C", &app->vulkanManager->renderer->tangentSpaceCoordSys)) {}
         if (ImGui::BeginMenu("Colorize using")) {
           bool a = app->colorFromSmoothingGroup == false && app->colorFromObjectId == false;
           if (ImGui::MenuItem("Nothing", nullptr, &a)) {

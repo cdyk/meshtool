@@ -62,6 +62,7 @@ namespace {
     uint32_t normals_n = 0;
     uint32_t texcoords_n = 0;
     uint32_t triangles_n = 0;
+    uint32_t lines_n = 0;
     uint32_t objects_n = 0;
 
     bool useNormals = false;
@@ -304,6 +305,40 @@ namespace {
     }
   }
 
+  void parseL(Context* context, const char* a, const char* b)
+  {
+    int ix;
+
+    Line l;
+    l.object = context->currentObject;
+    l.color = 0xffff00;
+
+    unsigned k = 0;
+    for (; a < b && k < 2; k++) {
+      a = skipSpacing(a, b);
+      a = parseInt(context, ix, a, b);
+      if (ix < 0) ix += context->vertices_n;
+      else --ix;
+      if (ix < 0 || context->vertices_n <= uint32_t(ix)) {
+        context->logger(2, "Illegal vertex index %d at line %d.", ix, context->line);
+        return;
+      }
+      l.vtx[k] = ix;
+    }
+    if (k == 2) {
+      auto & T = context->lines;
+      if (T.empty() || T.last->capacity <= T.last->fill + 1) {
+        T.append(context->arena.alloc<Block<Line>>());
+      }
+      T.last->data[T.last->fill++] = l;
+      context->lines_n++;
+    }
+    else {
+      context->logger(2, "Skipped malformed line at line %d", context->line);
+    }
+  }
+
+
   void parseS(Context* context, const char* a, const char* b)
   {
     a = skipSpacing(a, b);
@@ -388,9 +423,12 @@ Mesh*  readObj(Logger logger, const void * ptr, size_t size)
           parseS(&context, r, q);
           recognized = true;
           break;
+        case key('l'):        // line primitive
+          parseL(&context, r, q);
+          recognized = true;
+          break;
 
         case key('p'):        // point primitive
-        case key('l'):        // line primitive
         case key('g'):        // g group_name1 group_name2
 
         case key('m', 'g'):
@@ -473,6 +511,22 @@ Mesh*  readObj(Logger logger, const void * ptr, size_t size)
       }
     }
     assert(o == mesh->triCount);
+  }
+
+  if(context.lines_n) {
+    mesh->lineCount = context.lines_n;
+    mesh->lineVtxIx = (uint32_t*)mesh->arena.alloc(sizeof(uint32_t) * 3 * mesh->lineCount);
+    unsigned o = 0;
+    for (auto * block = context.lines.first; block; block = block->next) {
+      for (unsigned i = 0; i < block->fill; i++) {
+        for (unsigned k = 0; k < 2; k++) {
+          auto ix = block->data[i].vtx[k];
+          assert(0 <= ix && ix < context.vertices_n);
+          mesh->lineVtxIx[2 * o + k] = ix;
+        }
+        o++;
+      }
+    }
   }
 
   if (context.useSmoothingGroups) {

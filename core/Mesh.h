@@ -25,6 +25,8 @@ struct Mesh
   uint32_t* triSmoothGroupIx = nullptr;
   uint32_t triCount = 0;
 
+  uint32_t* lineVtxIx = nullptr;
+  uint32_t lineCount = 0;
 
   const char** obj = nullptr;
   uint32_t obj_n = 0;

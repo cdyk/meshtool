@@ -39,6 +39,14 @@ namespace {
 #include "texturedPS.glsl.h"
     ;
 
+
+  struct Vec3fUint32
+  {
+    Vec3f a;
+    uint32_t b;
+  };
+  static_assert(sizeof(Vec3fUint32) == 4 * sizeof(uint32_t));
+
 }
 
 
@@ -183,6 +191,7 @@ void Renderer::houseKeep()
 }
 
 
+
 RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
 {
 
@@ -286,6 +295,20 @@ RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
       vCtx->frameManager->copyBuffer(renderMesh->bnm, bnmStaging, renderMesh->bnm.resource->requestedSize);
       vCtx->frameManager->copyBuffer(renderMesh->tex, texStaging, renderMesh->tex.resource->requestedSize);
     }
+  }
+
+  if (mesh->lineCount) {
+    renderMesh->lineCount = mesh->lineCount;
+    renderMesh->lines = vCtx->resources->createVertexDeviceBuffer(sizeof(Vec3fUint32) * 2 * renderMesh->lineCount);
+    auto lineVtxStaging = vCtx->resources->createStagingBuffer(renderMesh->lines.resource->requestedSize);
+    {
+      MappedBuffer<Vec3fUint32> map(vCtx, lineVtxStaging);
+      for (unsigned i = 0; i  < 2*renderMesh->lineCount; i++) {
+        map.mem[i].a = mesh->vtx[mesh->lineVtxIx[i]];
+        map.mem[i].b = 0xffff00u;
+      }
+    }
+    vCtx->frameManager->copyBuffer(renderMesh->lines, lineVtxStaging, renderMesh->lines.resource->requestedSize);
   }
 
   updateRenderMeshColor(renderMesh);
@@ -484,6 +507,29 @@ void Renderer::buildPipelines(RenderPassHandle pass)
                                                         VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
   }
 
+  // Line pipeline
+  {
+    Vector<VkVertexInputAttributeDescription> inputAttrib(2);
+    inputAttrib[0] = { 0 };
+    inputAttrib[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    inputAttrib[1] = { 0 };
+    inputAttrib[1].location = 1;
+    inputAttrib[1].format = VK_FORMAT_R8G8B8A8_UNORM;
+    inputAttrib[1].offset = offsetof(Vec3fUint32, Vec3fUint32::b);
+
+    Vector<VkVertexInputBindingDescription> inputBind(1);
+    inputBind[0] = { 0 };
+    inputBind[0].stride = sizeof(Vec3fUint32);
+    inputBind[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    linePipeline = vCtx->resources->createPipeline(inputBind,
+                                                   inputAttrib,
+                                                   pipeLayoutInfo,
+                                                   objBufLayoutInfo,
+                                                   pass,
+                                                   flatShader,
+                                                   vCtx->infos->pipelineRasterization.cullNoneSolid,
+                                                   VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
+  }
 
   for (size_t i = 0; i < renaming.size(); i++) {
     renaming[i].objBufDescSet = vCtx->resources->createDescriptorSet(vanillaPipeline.resource->descLayout);
@@ -602,7 +648,7 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     vkCmdDraw(cmdBuf, 3 * rm->tri_n, 1, 0, 0);
   }
 
-  if(true) {
+  if(tangentSpaceCoordSys) {
     VkBuffer buffers[5] = {
       coordSys.vtxCol.resource->buffer,
       rm->vtx.resource->buffer,
@@ -612,13 +658,19 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     };
     VkDeviceSize offsets[5] = { 0, 0, 0, 0, 0 };
     vkCmdBindVertexBuffers(cmdBuf, 0, 5, buffers, offsets);
-
     vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, coordSys.pipeline.resource->pipe);
     vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, coordSys.pipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
     vkCmdDraw(cmdBuf, 6, 3 * rm->tri_n, 0, 0);
-
   }
 
+  if (rm->lineCount) {
+    VkBuffer buffers[1] = { rm->lines.resource->buffer };
+    VkDeviceSize offsets[1] = { 0 };
+    vkCmdBindVertexBuffers(cmdBuf, 0, 1, buffers, offsets);
+    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.resource->pipe);
+    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
+    vkCmdDraw(cmdBuf, 2 * rm->lineCount, 1, 0, 0);
+  }
 
 
   renamingCurr = (renamingCurr + 1);
