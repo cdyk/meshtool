@@ -216,30 +216,19 @@ RenderMeshHandle Renderer::createRenderMesh(Mesh* mesh)
         if (mesh->texCount) {
 
           for (unsigned i = 0; i < mesh->triCount; i++) {
-            Vec3f p[3]; Vec2f t[3];
-            for (unsigned k = 0; k < 3; k++) {
-              p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
-              t[k] = mesh->tex[mesh->triTexIx[3 * i + k]];
-            }
-
-            auto tex01 = t[1] - t[0];
-            auto tex02 = t[2] - t[0];
+            Vec3f u, v;
+            tangentSpaceBasis(u, v,
+                              mesh->vtx[mesh->triVtxIx[3 * i + 0]], mesh->vtx[mesh->triVtxIx[3 * i + 1]], mesh->vtx[mesh->triVtxIx[3 * i + 2]],
+                              mesh->tex[mesh->triTexIx[3 * i + 0]], mesh->tex[mesh->triTexIx[3 * i + 1]], mesh->tex[mesh->triTexIx[3 * i + 2]]);
 
             for (unsigned k = 0; k < 3; k++) {
               auto n = normalize(mesh->nrm[mesh->triNrmIx[i]]);
 
-              auto vtx01 = p[1] - p[0];
-              vtx01 = vtx01 - dot(vtx01, n)*n;
+              auto uu = normalize(u - dot(u, n)*n);
+              auto vv = normalize(v - dot(v, n)*n);
 
-              auto vtx02 = p[2] - p[0];
-              vtx02 = vtx02 - dot(vtx02, n)*n;
-
-
-              auto den = 1.f / (tex01.x * tex02.y - tex01.y * tex02.x);
-              auto tan = normalize(tex02.y*den * vtx01 - tex01.y*den * vtx02);
-
-              tanMap.mem[3 * i + k] = tan;
-              bnmMap.mem[3 * i + k] = cross(n, tan);
+              tanMap.mem[3 * i + k] = uu;
+              bnmMap.mem[3 * i + k] = vv;
             }
           }
 

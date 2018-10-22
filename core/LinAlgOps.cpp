@@ -84,6 +84,22 @@ float getScale(const Mat3f& M)
   return sz > t ? sz : t;
 }
 
+void tangentSpaceBasis(Vec3f& u, Vec3f& v, const Vec3f& p0, const Vec3f& p1, const Vec3f& p2, const Vec2f& t0, const Vec2f& t1, const Vec2f& t2)
+{
+  auto p01 = p1 - p0;
+  auto p02 = p2 - p0;
+
+  auto t01 = t1 - t0;
+  auto t02 = t2 - t0;
+
+  auto oneOverDet = 1.f/(t01.x * t02.y - t01.y*t02.x);
+
+  for (unsigned k = 0; k < 3; k++) {
+    u[k] = oneOverDet * (t01.y * p01[k] - t01.y * p02[k]);
+    v[k] = oneOverDet * (-t02.x * p01[k] + t01.x * p02[k]);
+  }
+}
+
 
 BBox3f transform(const Mat3x4f& M, const BBox3f& bbox)
 {

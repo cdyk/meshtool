@@ -61,6 +61,8 @@ inline Vec3f min(const Vec3f& a, const Vec3f& b)
                a.z < b.z ? a.z : b.z);
 }
 
+void tangentSpaceBasis(Vec3f& u, Vec3f& v, const Vec3f& p0, const Vec3f& p1, const Vec3f& p2, const Vec2f& t0, const Vec2f& t1, const Vec2f& t2);
+
 // Quatf
 
 inline Quatf creatUnitQuatf() { return Quatf(0, 0, 0, 1); }
