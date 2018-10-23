@@ -4,6 +4,7 @@
 #include "Mesh.h"
 #include "VulkanContext.h"
 #include "RenderTextureManager.h"
+#include "VulkanManager.h"
 
 struct ObjectBuffer
 {
@@ -41,13 +42,18 @@ namespace {
 
 }
 
-
-Renderer::Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h) :
+Renderer::Renderer(Logger logger, VulkanManager* vulkanManager) :
   logger(logger),
-  vCtx(vCtx),
-  textureManager(new RenderTextureManager(vCtx)),
-  meshManager(new RenderMeshManager(vCtx, logger))
+  vulkanManager(vulkanManager),
+  textureManager(new RenderTextureManager(vulkanManager->vCtx)),
+  meshManager(new RenderMeshManager(vulkanManager->vCtx, logger))
 {
+
+}
+
+void Renderer::init()
+{
+  auto * vCtx = vulkanManager->vCtx;
 
   {
     Vector<ShaderInputSpec> stages(2);
@@ -115,6 +121,8 @@ void Renderer::startFrame()
 
 void Renderer::buildPipelines(RenderPassHandle pass)
 {
+  auto * vCtx = vulkanManager->vCtx;
+
   VkDescriptorSetLayoutBinding objBufLayoutBinding[1];
   objBufLayoutBinding[0] = {};
   objBufLayoutBinding[0].binding = 0;
@@ -319,6 +327,8 @@ void Renderer::buildPipelines(RenderPassHandle pass)
 
 void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMeshHandle renderMesh, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP)
 {
+  auto * vCtx = vulkanManager->vCtx;
+
   auto * rm = renderMesh.resource;
   if (!vanillaPipeline || vanillaPipeline.resource->pass != pass) buildPipelines(pass);
 

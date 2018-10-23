@@ -98,6 +98,7 @@
     <ClCompile Include="..\app\RenderTextureManager.cpp" />
     <ClCompile Include="..\app\VulkanContext.cpp" />
     <ClCompile Include="..\app\VulkanFrameManager.cpp" />
+    <ClCompile Include="..\app\ImGuiRenderer.cpp" />
     <ClCompile Include="..\app\VulkanInfos.cpp" />
     <ClCompile Include="..\app\VulkanManager.cpp" />
     <ClCompile Include="..\app\VulkanResources.cpp" />
@@ -116,6 +117,7 @@
     <ClInclude Include="..\app\RenderTextureManager.h" />
     <ClInclude Include="..\app\VulkanContext.h" />
     <ClInclude Include="..\app\VulkanFrameManager.h" />
+    <ClInclude Include="..\app\ImGuiRenderer.h" />
     <ClInclude Include="..\app\VulkanInfos.h" />
     <ClInclude Include="..\app\VulkanManager.h" />
     <ClInclude Include="..\app\VulkanResources.h" />

@@ -6,6 +6,7 @@
 #include "Common.h"
 #include "VulkanContext.h"
 #include "Renderer.h"
+#include "ImGuiRenderer.h"
 #include "LinAlgOps.h"
 
 #include <imgui.h>
@@ -47,33 +48,6 @@ namespace
     fprintf(stderr, "VkResult %d", err);
     if (err < 0)
       abort();
-  }
-
-  bool initSwapChain(GLFWwindow* window, VkInstance instance, VkPhysicalDevice physicalDevice, uint32_t queueFamilyIndex)
-  {
-    VkSurfaceKHR surface;
-    auto rv = glfwCreateWindowSurface(instance, window, nullptr, &surface);
-    assert(rv == VK_SUCCESS);
-    imguiWindowData.Surface = surface;
-
-    VkBool32 supportsPresent = VK_FALSE;
-    vkGetPhysicalDeviceSurfaceSupportKHR(physicalDevice, queueFamilyIndex, surface, &supportsPresent);
-    assert(supportsPresent == VK_TRUE);
-
-    uint32_t formatCount = 0;
-    rv = vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, NULL);
-    assert(rv == VK_SUCCESS);
-    std::vector<VkSurfaceFormatKHR> formats(formatCount);
-    rv = vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &formatCount, formats.data());
-    assert(rv == VK_SUCCESS);
-
-    const VkFormat requestSurfaceImageFormat[] = { VK_FORMAT_B8G8R8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_B8G8R8_UNORM, VK_FORMAT_R8G8B8_UNORM };
-    const VkColorSpaceKHR requestSurfaceColorSpace = VK_COLORSPACE_SRGB_NONLINEAR_KHR;
-    imguiWindowData.SurfaceFormat = ImGui_ImplVulkanH_SelectSurfaceFormat(physicalDevice, surface, requestSurfaceImageFormat, (size_t)IM_ARRAYSIZE(requestSurfaceImageFormat), requestSurfaceColorSpace);
-
-    VkPresentModeKHR present_modes[] = { VK_PRESENT_MODE_FIFO_KHR };
-    imguiWindowData.PresentMode = ImGui_ImplVulkanH_SelectPresentMode(physicalDevice, surface, present_modes, IM_ARRAYSIZE(present_modes));
-    return true;
   }
 
   void uploadFonts(VkDevice device, VkQueue queue)
@@ -135,7 +109,10 @@ VulkanManager::VulkanManager(Logger l, GLFWwindow* window, uint32_t w, uint32_t 
 
   resize(w, h);
 
-  renderer = new Renderer(logger, vCtx, imguiWindowData.BackBufferView, imguiWindowData.BackBufferCount, w, h);
+  renderer = new Renderer(logger, this);
+  renderer->init();
+  imGuiRenderer = new ImGuiRenderer(logger, this);
+  imGuiRenderer->init();
 
 
   ImGui_ImplVulkan_InitInfo init_info = {};

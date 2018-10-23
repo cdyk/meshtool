@@ -10,7 +10,7 @@ struct Vec4f;
 struct Mat4f;
 struct Mat3f;
 
-
+class VulkanManager;
 class RenderTextureManager;
 
 class Renderer
@@ -27,9 +27,10 @@ public:
   bool tangentSpaceCoordSys = true;
   Texturing texturing = Texturing::ColorGradient;
   
-  Renderer(Logger logger, VulkanContext* vCtx, VkImageView* backBuffers, uint32_t backBufferCount, uint32_t w, uint32_t h);
+  Renderer(Logger logger, VulkanManager* vulkanManager);
   ~Renderer();
 
+  void init();
 
   void startFrame();
 
@@ -40,7 +41,7 @@ public:
 
 private:
   Logger logger;
-  VulkanContext* vCtx = nullptr;
+  VulkanManager* vulkanManager = nullptr;
 
   struct {
     RenderBufferHandle vtxCol;

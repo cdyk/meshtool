@@ -2,12 +2,17 @@
 #include <list>
 #include "Common.h"
 #include "VulkanResources.h"
-#include "Renderer.h"
+#include "RenderMeshManager.h"
 
 struct RenderMesh;
 struct Vec4f;
 struct Mat4f;
 struct Mat3f;
+
+class Renderer;
+class ImGuiRenderer;
+
+struct GLFWwindow;
 
 class VulkanManager
 {
@@ -25,6 +30,7 @@ public:
 
   Logger logger;
   Renderer* renderer = nullptr;
+  ImGuiRenderer* imGuiRenderer = nullptr;
   VulkanContext* vCtx = nullptr;
 
   RenderPassHandle rendererPass;
