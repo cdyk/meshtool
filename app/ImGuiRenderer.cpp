@@ -8,7 +8,6 @@
 
 namespace
 {
-  ImGui_ImplVulkanH_WindowData imguiWindowData;
 
   void check_vk_result(VkResult err)
   {
@@ -18,58 +17,18 @@ namespace
       abort();
   }
 
-  void uploadFonts(VkDevice device, VkQueue queue)
-  {
-    VkCommandPool command_pool = imguiWindowData.Frames[imguiWindowData.FrameIndex].CommandPool;
-    VkCommandBuffer command_buffer = imguiWindowData.Frames[imguiWindowData.FrameIndex].CommandBuffer;
-
-    auto rv = vkResetCommandPool(device, command_pool, 0);
-    assert(rv == VK_SUCCESS);
-
-    VkCommandBufferBeginInfo begin_info = {};
-    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    rv = vkBeginCommandBuffer(command_buffer, &begin_info);
-    assert(rv == VK_SUCCESS);
-
-    ImGui_ImplVulkan_CreateFontsTexture(command_buffer);
-
-    VkSubmitInfo end_info = {};
-    end_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    end_info.commandBufferCount = 1;
-    end_info.pCommandBuffers = &command_buffer;
-    rv = vkEndCommandBuffer(command_buffer);
-    assert(rv == VK_SUCCESS);
-
-    rv = vkQueueSubmit(queue, 1, &end_info, VK_NULL_HANDLE);
-    assert(rv == VK_SUCCESS);
-
-    rv = vkDeviceWaitIdle(device);
-    assert(rv == VK_SUCCESS);
-
-    ImGui_ImplVulkan_InvalidateFontUploadObjects();
-  }
-
 }
 
 
 void ImGuiRenderer::init()
 {
   auto * vCtx = vulkanManager->vCtx;
+  auto & frame = vCtx->frameManager->frame();
+  auto cmdPool = frame.commandPool.resource->cmdPool;
+  auto cmdBuf = frame.commandBuffer.resource->cmdBuf;
 
   ImGui_ImplGlfw_InitForVulkan(vulkanManager->window, true);
 
-  imguiWindowData.Surface = vCtx->frameManager->surface;
-  imguiWindowData.SurfaceFormat = vCtx->frameManager->surfaceFormat;
-  imguiWindowData.PresentMode = vCtx->frameManager->presentMode;
-  for (int i = 0; i < IMGUI_VK_QUEUED_FRAMES; i++) {
-    auto& fd = imguiWindowData.Frames[i];
-    fd.CommandPool = vCtx->frameManager->frameData[i].commandPool.resource->cmdPool;
-    fd.CommandBuffer = vCtx->frameManager->frameData[i].commandBuffer.resource->cmdBuf;
-    fd.Fence = vCtx->frameManager->frameData[i].fence.resource->fence;
-    fd.ImageAcquiredSemaphore = vCtx->frameManager->frameData[i].imageAcquiredSemaphore.resource->semaphore;
-    fd.RenderCompleteSemaphore = vCtx->frameManager->frameData[i].renderCompleteSemaphore.resource->semaphore;
-  }
   ImGui_ImplVulkan_InitInfo init_info = {};
   init_info.Instance = vCtx->instance;
   init_info.PhysicalDevice = vCtx->physicalDevice;
@@ -81,6 +40,38 @@ void ImGuiRenderer::init()
   init_info.Allocator = nullptr;
   init_info.CheckVkResultFn = check_vk_result;
   ImGui_ImplVulkan_Init(&init_info, vulkanManager->imguiRenderPass.resource->pass);
-  uploadFonts(vCtx->device, vCtx->queue);
+
+  CHECK_VULKAN(vkResetCommandPool(vCtx->device, cmdPool, 0));
+
+  VkCommandBufferBeginInfo begin_info{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+  begin_info.flags |= VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  CHECK_VULKAN(vkBeginCommandBuffer(cmdBuf, &begin_info));
+
+  ImGui_ImplVulkan_CreateFontsTexture(cmdBuf);
+
+  VkSubmitInfo end_info = {};
+  end_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  end_info.commandBufferCount = 1;
+  end_info.pCommandBuffers = &cmdBuf;
+
+  CHECK_VULKAN(vkEndCommandBuffer(cmdBuf));
+  CHECK_VULKAN(vkQueueSubmit(vCtx->queue, 1, &end_info, VK_NULL_HANDLE));
+  CHECK_VULKAN(vkDeviceWaitIdle(vCtx->device));
+
+  ImGui_ImplVulkan_InvalidateFontUploadObjects();
 }
 
+void ImGuiRenderer::startFrame()
+{
+  ImGui_ImplVulkan_NewFrame();
+}
+
+void ImGuiRenderer::recordRendering(CommandBufferHandle commandBuffer)
+{
+  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer.resource->cmdBuf);
+}
+
+void ImGuiRenderer::shutdown()
+{
+  ImGui_ImplVulkan_Shutdown();
+}

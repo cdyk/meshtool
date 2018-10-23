@@ -10,6 +10,9 @@ public:
   ImGuiRenderer(Logger logger, VulkanManager* vulkanManager) : logger(logger), vulkanManager(vulkanManager) {}
 
   void init();
+  void startFrame();
+  void recordRendering(CommandBufferHandle commandBuffer);
+  void shutdown();
 
 
 private:

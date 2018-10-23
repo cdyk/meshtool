@@ -278,3 +278,4 @@ void VulkanFrameManager::submitGraphics(CommandBufferHandle cmdBuf, bool wait)
   vkQueueSubmit(vCtx->queue, 1, &submitInfo, VK_NULL_HANDLE);
   if (wait) vkQueueWaitIdle(vCtx->queue);
 }
+

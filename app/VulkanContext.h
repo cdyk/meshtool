@@ -28,6 +28,7 @@ public:
 
   void init();
   void houseKeep();
+  void shutdown();
 
   VkInstance instance = VK_NULL_HANDLE;
   VkDebugReportCallbackEXT debugCallback = VK_NULL_HANDLE;

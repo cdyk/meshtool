@@ -242,10 +242,20 @@ void VulkanContext::houseKeep()
   frameManager->houseKeep();
 }
 
-
-VulkanContext::~VulkanContext()
+void VulkanContext::shutdown()
 {
 
+  CHECK_VULKAN(vkDeviceWaitIdle(device));
+
+  frameManager->houseKeep();
+  delete frameManager;
+  frameManager = nullptr;
+
+  resources->houseKeep();
+  delete resources;
+  resources = nullptr;
+
+  delete infos; infos = nullptr;
   vkDestroyDevice(device, nullptr);
 
   if (debugLayer) {
@@ -254,4 +264,11 @@ VulkanContext::~VulkanContext()
     destroyDebugMessenger(instance, debugCallbackHandle, nullptr);
   }
   vkDestroyInstance(instance, nullptr);
+}
+
+
+VulkanContext::~VulkanContext()
+{
+
+  
 }

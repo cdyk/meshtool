@@ -11,8 +11,6 @@
 
 #include <imgui.h>
 #include <imgui_internal.h>
-#include <examples/imgui_impl_glfw.h>
-#include <examples/imgui_impl_vulkan.h>
 
 namespace
 {
@@ -49,7 +47,7 @@ VulkanManager::VulkanManager(Logger l, GLFWwindow* window, uint32_t w, uint32_t 
 
   uint32_t extensions_count = 0;
   const char** extensions = glfwGetRequiredInstanceExtensions(&extensions_count);
-  vCtx = new VulkanContext(logger, extensions, extensions_count, IMGUI_VK_QUEUED_FRAMES, new GLFWPresentationSupport(window));
+  vCtx = new VulkanContext(logger, extensions, extensions_count, 3, new GLFWPresentationSupport(window));
   vCtx->init();
 
   resize(w, h);
@@ -62,15 +60,19 @@ VulkanManager::VulkanManager(Logger l, GLFWwindow* window, uint32_t w, uint32_t 
 
 VulkanManager::~VulkanManager()
 {
-  rendererPass.release();
-  rendererFrameBuffers.resize(0);
+  imGuiRenderer->shutdown();
+  delete imGuiRenderer;
 
   delete renderer;
 
-  auto rv = vkDeviceWaitIdle(vCtx->device);
-  assert(rv == VK_SUCCESS);
+  rendererPass = RenderPassHandle();
+  rendererFrameBuffers.resize(0);
 
-  ImGui_ImplVulkan_Shutdown();
+  imguiRenderPass = RenderPassHandle();
+  imguiFrameBuffers.resize(0);
+
+  vCtx->shutdown();
+
   delete vCtx;
 }
 
@@ -78,8 +80,7 @@ VulkanManager::~VulkanManager()
 void VulkanManager::startFrame()
 {
   vCtx->houseKeep();
-  ImGui_ImplVulkan_NewFrame();
-
+  imGuiRenderer->startFrame();
 }
 
 void VulkanManager::resize(uint32_t w, uint32_t h)
@@ -246,7 +247,7 @@ void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& ren
   beginInfo.pClearValues = clearValues;
   
   vkCmdBeginRenderPass(cmdBuf, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
-  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmdBuf);
+  imGuiRenderer->recordRendering(frame.commandBuffer);
   vkCmdEndRenderPass(cmdBuf);
 
   VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
