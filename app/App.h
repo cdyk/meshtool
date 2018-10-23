@@ -14,6 +14,14 @@ struct Mesh;
 class VulkanManager;
 class Viewer;
 
+enum TriangleColor
+{
+  Single,
+  ModelColor,
+  ObjectId,
+  SmoothingGroup
+};
+
 class App
 {
 public:
@@ -28,6 +36,7 @@ public:
   float thickness = 8;
   float menuHeight = 0.f;
 
+  TriangleColor triangleColor = TriangleColor::ModelColor;
   bool updateColor = true;
   bool selectAll = false;
   bool selectNone = false;
@@ -35,9 +44,6 @@ public:
   bool moveToSelection = false;
   bool picking = false;
   unsigned scrollToItem = ~0u;
-
-  bool colorFromSmoothingGroup = false;
-  bool colorFromObjectId = false;
 
   VulkanManager* vulkanManager = nullptr;
 

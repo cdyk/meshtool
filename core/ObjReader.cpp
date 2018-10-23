@@ -527,6 +527,7 @@ Mesh*  readObj(Logger logger, const void * ptr, size_t size)
     mesh->triCount = context.triangles_n;
     mesh->triVtxIx = (uint32_t*)mesh->arena.alloc(sizeof(uint32_t) * 3 * mesh->triCount);
     mesh->TriObjIx = (uint32_t*)mesh->arena.alloc(sizeof(uint32_t) * mesh->triCount);
+    mesh->triColor = (uint32_t*)mesh->arena.alloc(sizeof(uint32_t) * mesh->triCount);
 
     unsigned o = 0;
     for (auto * block = context.triangles.first; block; block = block->next) {
@@ -537,6 +538,7 @@ Mesh*  readObj(Logger logger, const void * ptr, size_t size)
           mesh->triVtxIx[3 * o + k] = ix;
         }
         mesh->TriObjIx[o] = block->data[i].object;
+        mesh->triColor[o] = block->data[i].color;
         o++;
       }
     }

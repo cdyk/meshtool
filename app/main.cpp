@@ -108,7 +108,17 @@ namespace {
     else if (mods == 0) {
       if (key == GLFW_KEY_W && action == GLFW_PRESS)  app->vulkanManager->renderer->outlines = !app->vulkanManager->renderer->outlines;
       if (key == GLFW_KEY_S && action == GLFW_PRESS)  app->vulkanManager->renderer->solid = !app->vulkanManager->renderer->solid;
-      if (key == GLFW_KEY_C && action == GLFW_PRESS) app->vulkanManager->renderer->tangentSpaceCoordSys = !app->vulkanManager->renderer->tangentSpaceCoordSys;
+      if (key == GLFW_KEY_A && action == GLFW_PRESS) app->vulkanManager->renderer->tangentSpaceCoordSys = !app->vulkanManager->renderer->tangentSpaceCoordSys;
+      if (key == GLFW_KEY_C && action == GLFW_PRESS) {
+        switch (app->triangleColor)
+        {
+        case TriangleColor::Single: app->triangleColor = TriangleColor::ModelColor; break;
+        case TriangleColor::ModelColor: app->triangleColor = TriangleColor::ObjectId; break;
+        case TriangleColor::ObjectId: app->triangleColor = TriangleColor::SmoothingGroup; break;
+        case TriangleColor::SmoothingGroup: app->triangleColor = TriangleColor::Single; break;
+        }
+        app->updateColor = true;
+      }
       if (key == GLFW_KEY_T && action == GLFW_PRESS) {
         switch (app->vulkanManager->renderer->texturing) {
         case Renderer::Texturing::None: app->vulkanManager->renderer->texturing = Renderer::Texturing::Checker; break;
@@ -217,23 +227,17 @@ namespace {
         if (ImGui::MenuItem("Solid", "S", &app->vulkanManager->renderer->solid)) {}
         if (ImGui::MenuItem("Outlines", "W", &app->vulkanManager->renderer->outlines)) {}
         if (ImGui::MenuItem("Tangent coordsys", "C", &app->vulkanManager->renderer->tangentSpaceCoordSys)) {}
-        if (ImGui::BeginMenu("Colorize using")) {
-          bool a = app->colorFromSmoothingGroup == false && app->colorFromObjectId == false;
-          if (ImGui::MenuItem("Nothing", nullptr, &a)) {
-            app->colorFromSmoothingGroup = false;
-            app->colorFromObjectId = false;
-            app->updateColor = true;
-          }
-          if (ImGui::MenuItem("Object id", nullptr, &app->colorFromObjectId)) {
-            app->colorFromSmoothingGroup = false;
-            app->colorFromObjectId = true;
-            app->updateColor = true;
-          }
-          if (ImGui::MenuItem("Smoothing group", nullptr, &app->colorFromSmoothingGroup)) {
-            app->colorFromSmoothingGroup = true;
-            app->colorFromObjectId = false;
-            app->updateColor = true;
-          }
+        if (ImGui::BeginMenu("Color")) {
+          bool sel[4] = {
+            app->triangleColor == TriangleColor::Single,
+            app->triangleColor == TriangleColor::ModelColor,
+            app->triangleColor == TriangleColor::ObjectId,
+            app->triangleColor == TriangleColor::SmoothingGroup,
+          };
+          if (ImGui::MenuItem("Nothing", nullptr, &sel[0])) { app->triangleColor = TriangleColor::Single; app->updateColor = true; }
+          if (ImGui::MenuItem("Model color", nullptr, &sel[1])) { app->triangleColor = TriangleColor::ModelColor; app->updateColor = true; }
+          if (ImGui::MenuItem("Object id", nullptr, &sel[2])) { app->triangleColor = TriangleColor::ObjectId; app->updateColor = true; }
+          if (ImGui::MenuItem("Smoothing group", nullptr, &sel[3])) { app->triangleColor = TriangleColor::SmoothingGroup; app->updateColor = true; }
           ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Texturing")) {
@@ -512,27 +516,18 @@ int main(int argc, char** argv)
 
     if (app->updateColor) {
       for (auto * m : app->items.meshes) {
-        if (app->colorFromSmoothingGroup && m->triSmoothGroupIx) {
-          for (uint32_t i = 0; i < m->triCount; i++) {
-            if (m->selected[m->TriObjIx[i]]) {
-              m->currentColor[i] = 0xffddffff;
-            }
-            else {
-              m->currentColor[i] = colors[m->triSmoothGroupIx[i] % (sizeof(colors) / sizeof(uint32_t))];
-            }
-          }
+        auto color = app->triangleColor;
+        switch (color) {
+        case TriangleColor::ObjectId:
+          if (!m->TriObjIx) color = TriangleColor::Single;
+          break;
+        case TriangleColor::SmoothingGroup:
+          if (!m->triSmoothGroupIx) color = TriangleColor::Single;
+          break;
         }
-        else if (app->colorFromObjectId && m->TriObjIx) {
-          for (uint32_t i = 0; i < m->triCount; i++) {
-            if (m->selected[m->TriObjIx[i]]) {
-              m->currentColor[i] = 0xffddffff;
-            }
-            else {
-              m->currentColor[i] = colors[m->TriObjIx[i] % (sizeof(colors) / sizeof(uint32_t))];
-            }
-          }
-        }
-        else {
+
+        switch (color) {
+        case TriangleColor::Single:
           for (uint32_t i = 0; i < m->triCount; i++) {
             if (m->selected[m->TriObjIx[i]]) {
               m->currentColor[i] = 0xffddffff;
@@ -541,6 +536,38 @@ int main(int argc, char** argv)
               m->currentColor[i] = 0xffff8888;
             }
           }
+          break;
+        case TriangleColor::ModelColor:
+          for (uint32_t i = 0; i < m->triCount; i++) {
+            if (m->selected[m->TriObjIx[i]]) {
+              m->currentColor[i] = 0xffddffff;
+            }
+            else {
+              m->currentColor[i] = m->triColor[i];
+            }
+          }
+          break;
+          break;
+        case TriangleColor::ObjectId:
+          for (uint32_t i = 0; i < m->triCount; i++) {
+            if (m->selected[m->TriObjIx[i]]) {
+              m->currentColor[i] = 0xffddffff;
+            }
+            else {
+              m->currentColor[i] = colors[m->TriObjIx[i] % (sizeof(colors) / sizeof(uint32_t))];
+            }
+          }
+          break;
+        case TriangleColor::SmoothingGroup:
+          for (uint32_t i = 0; i < m->triCount; i++) {
+            if (m->selected[m->TriObjIx[i]]) {
+              m->currentColor[i] = 0xffddffff;
+            }
+            else {
+              m->currentColor[i] = colors[m->triSmoothGroupIx[i] % (sizeof(colors) / sizeof(uint32_t))];
+            }
+          }
+          break;
         }
       }
     }

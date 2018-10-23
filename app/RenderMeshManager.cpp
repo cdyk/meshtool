@@ -6,6 +6,15 @@
 
 namespace {
 
+  struct RGBA8
+  {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+    uint8_t a;
+  };
+  static_assert(sizeof(RGBA8) == sizeof(uint32_t));
+
   struct Vec3fRGBA8
   {
     Vec3f p;
@@ -169,12 +178,19 @@ void RenderMeshManager::updateRenderMeshColor(RenderMeshHandle renderMesh)
   auto * rm = renderMesh.resource;
   auto stagingBuf = vCtx->resources->createStagingBuffer(rm->col.resource->requestedSize);
   {
-    MappedBuffer<uint32_t> map(vCtx, stagingBuf);
+    MappedBuffer<RGBA8> map(vCtx, stagingBuf);
     for (unsigned i = 0; i < rm->mesh->triCount; i++) {
       auto color = rm->mesh->currentColor[i];
-      map.mem[3 * i + 0] = color;
-      map.mem[3 * i + 1] = color;
-      map.mem[3 * i + 2] = color;
+
+      RGBA8 col;
+      col.r = (color >> 16) & 0xff;
+      col.g = (color >> 8) & 0xff;
+      col.b = (color) & 0xff;
+      col.a = 255;
+
+      map.mem[3 * i + 0] = col;
+      map.mem[3 * i + 1] = col;
+      map.mem[3 * i + 2] = col;
     }
   }
   vCtx->frameManager->copyBuffer(rm->col, stagingBuf, rm->col.resource->requestedSize);

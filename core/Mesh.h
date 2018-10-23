@@ -22,6 +22,7 @@ struct Mesh
   uint32_t* triNrmIx = nullptr;
   uint32_t* triTexIx = nullptr;
   uint32_t* TriObjIx = nullptr;   // Triangle object index, one uint32_t per triangle.
+  uint32_t* triColor = nullptr;
   uint32_t* triSmoothGroupIx = nullptr;
   uint32_t triCount = 0;
 
