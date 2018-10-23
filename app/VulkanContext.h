@@ -6,6 +6,8 @@
 #include "VulkanResources.h"
 #include "VulkanFrameManager.h"
 
+#define CHECK_VULKAN(a) do { VkResult rv = (a); assert(rv == VK_SUCCESS && #a);} while(0)
+
 class ISurfaceManager
 {
 public:

@@ -87,6 +87,85 @@ void VulkanFrameManager::resize(uint32_t w, uint32_t h)
   auto rv = vkDeviceWaitIdle(vCtx->device);
   assert(rv == VK_SUCCESS);
 
+  SwapChainHandle oldSwapChain = swapChain;
+  CHECK_VULKAN(vkDeviceWaitIdle(vCtx->device));
+
+  uint32_t minImageCount = 0;
+  switch (presentMode) {
+  case VK_PRESENT_MODE_MAILBOX_KHR: minImageCount = 3; break;
+  case VK_PRESENT_MODE_FIFO_KHR: minImageCount = 2; break;
+  case VK_PRESENT_MODE_FIFO_RELAXED_KHR: minImageCount = 2; break;
+  case VK_PRESENT_MODE_IMMEDIATE_KHR: minImageCount = 1; break;
+  default: assert(false && "Unhandled present mode");
+  }
+
+  VkSurfaceCapabilitiesKHR cap;
+  CHECK_VULKAN(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vCtx->physicalDevice, vCtx->frameManager->surface, &cap));
+  if (minImageCount < cap.minImageCount) minImageCount = cap.minImageCount;
+  if (cap.maxImageCount && cap.maxImageCount < minImageCount) minImageCount = cap.maxImageCount;
+
+  if (cap.currentExtent.width == 0xffffffff) {
+    width = w;
+    height = h;
+  }
+  else {
+    width = cap.currentExtent.width;
+    height = cap.currentExtent.height;
+  }
+
+ 
+  VkSwapchainCreateInfoKHR swapChainInfo = { VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR };
+  swapChainInfo.surface = surface;
+  swapChainInfo.minImageCount = minImageCount;
+  swapChainInfo.imageFormat = surfaceFormat.format;
+  swapChainInfo.imageColorSpace = surfaceFormat.colorSpace;
+  swapChainInfo.imageArrayLayers = 1;
+  swapChainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  swapChainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;           // Assume that graphics family == present family
+  swapChainInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
+  swapChainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+  swapChainInfo.presentMode = presentMode;
+  swapChainInfo.clipped = VK_TRUE;
+  swapChainInfo.imageExtent.width = width;
+  swapChainInfo.imageExtent.height = height;
+
+  swapChain = vCtx->resources->createSwapChain(swapChain, swapChainInfo);
+
+  uint32_t backBufferCount = 0;
+  Vector<VkImage> backBufferImages;
+  CHECK_VULKAN(vkGetSwapchainImagesKHR(vCtx->device, swapChain.resource->swapChain, &backBufferCount, NULL));
+  backBufferImages.resize(backBufferCount);
+  CHECK_VULKAN(vkGetSwapchainImagesKHR(vCtx->device, swapChain.resource->swapChain, &backBufferCount, backBufferImages.data()));
+
+  backBufferViews.resize(backBufferCount);
+  for (uint32_t i = 0; i < backBufferCount; i++) {
+    backBufferViews[i] = vCtx->resources->createImageView(backBufferImages[i], surfaceFormat.format, { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 });
+  }
+}
+
+void VulkanFrameManager::startFrame()
+{
+  frameIndex = frameIndex + 1;
+  if (frameIndex < framesInFlight) frameIndex = 0;
+
+  CHECK_VULKAN(vkAcquireNextImageKHR(vCtx->device,
+                                     swapChain.resource->swapChain, UINT64_MAX,
+                                     frame().imageAcquiredSemaphore.resource->semaphore, VK_NULL_HANDLE, &swapChainIndex));
+  CHECK_VULKAN(vkWaitForFences(vCtx->device, 1, &frame().fence.resource->fence, VK_TRUE, UINT64_MAX));
+  CHECK_VULKAN(vkResetFences(vCtx->device, 1, &frame().fence.resource->fence));
+  CHECK_VULKAN(vkResetCommandPool(vCtx->device, frame().commandPool.resource->cmdPool, 0));
+}
+
+void VulkanFrameManager::presentFrame()
+{
+  VkPresentInfoKHR info = {};
+  info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+  info.waitSemaphoreCount = 1;
+  info.pWaitSemaphores = &frame().renderCompleteSemaphore.resource->semaphore;
+  info.swapchainCount = 1;
+  info.pSwapchains = &swapChain.resource->swapChain;
+  info.pImageIndices = &swapChainIndex;
+  CHECK_VULKAN(vkQueuePresentKHR(vCtx->queue, &info));
 }
 
 

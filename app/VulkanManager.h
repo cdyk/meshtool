@@ -29,6 +29,7 @@ public:
   void present();
 
   Logger logger;
+  GLFWwindow* window = nullptr;
   Renderer* renderer = nullptr;
   ImGuiRenderer* imGuiRenderer = nullptr;
   VulkanContext* vCtx = nullptr;
@@ -36,7 +37,7 @@ public:
   RenderPassHandle rendererPass;
   RenderPassHandle imguiRenderPass;
 
-  Vector<ImageViewHandle> backBufferViews;
+  //Vector<ImageViewHandle> backBufferViews;
 
   Vector<FrameBufferHandle> rendererFrameBuffers;
   Vector<FrameBufferHandle> imguiFrameBuffers;

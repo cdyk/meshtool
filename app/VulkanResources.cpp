@@ -707,12 +707,18 @@ void VulkanResources::destroySemaphore(Semaphore* semaphore)
 
 SwapChainHandle VulkanResources::createSwapChain(SwapChainHandle oldSwapChain, VkSwapchainCreateInfoKHR& swapChainInfo)
 {
-  return SwapChainHandle();
+  auto info = swapChainInfo;
+  info.oldSwapchain = oldSwapChain ? oldSwapChain.resource->swapChain : nullptr;
+
+  auto handle = swapChainResources.createResource();
+  CHECK_VULKAN(vkCreateSwapchainKHR(vCtx->device, &info, nullptr, &handle.resource->swapChain));
+
+  return handle;
 }
 
 void VulkanResources::destroySwapChain(SwapChain* swapChain)
 {
-
+  vkDestroySwapchainKHR(vCtx->device, swapChain->swapChain, nullptr);
 }
 
 

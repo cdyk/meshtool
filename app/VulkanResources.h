@@ -120,6 +120,7 @@ typedef ResourceHandle<Semaphore> SemaphoreHandle;
 
 struct SwapChain : public ResourceBase
 {
+  SwapChain(ResourceManagerBase& manager) : ResourceBase(manager) {}
   VkSwapchainKHR swapChain = VK_NULL_HANDLE;
 };
 typedef ResourceHandle<SwapChain> SwapChainHandle;

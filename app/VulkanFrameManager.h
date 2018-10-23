@@ -14,6 +14,9 @@ public:
 
   void houseKeep();
 
+  void startFrame();
+  void presentFrame();
+
   void resize(uint32_t w, uint32_t h);
 
   void copyBuffer(RenderBufferHandle dst, RenderBufferHandle src, VkDeviceSize size);
@@ -25,6 +28,7 @@ public:
   VkSurfaceFormatKHR surfaceFormat;
   VkPresentModeKHR presentMode;
 
+
   struct FrameData
   {
     CommandPoolHandle commandPool;
@@ -35,13 +39,19 @@ public:
   };
   Vector<FrameData> frameData;
 
+  FrameData& frame() { return frameData[frameIndex]; }
+
+  uint32_t width = 0;
+  uint32_t height = 0;
   uint32_t frameIndex = 0;
   uint32_t framesInFlight = 0;
   FrameData& currentFrameData() { return frameData[frameIndex]; }
 
-
   SwapChainHandle swapChain;
   VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
+
+  uint32_t swapChainIndex = ~0u;
+  Vector<ImageViewHandle> backBufferViews;
 
 private:
   VulkanContext* vCtx = nullptr;
