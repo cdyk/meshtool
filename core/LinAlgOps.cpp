@@ -1,6 +1,5 @@
 #include "LinAlgOps.h"
 
-
 Mat3f inverse(const Mat3f& M)
 {
   const auto & c0 = M.cols[0];
@@ -95,7 +94,7 @@ void tangentSpaceBasis(Vec3f& u, Vec3f& v, const Vec3f& p0, const Vec3f& p1, con
   auto oneOverDet = 1.f/(t01.x * t02.y - t01.y*t02.x);
 
   for (unsigned k = 0; k < 3; k++) {
-    u[k] = oneOverDet * (t01.y * p01[k] - t01.y * p02[k]);
+    u[k] = oneOverDet * (t02.y * p01[k] - t01.y * p02[k]);
     v[k] = oneOverDet * (-t02.x * p01[k] + t01.x * p02[k]);
   }
 }
