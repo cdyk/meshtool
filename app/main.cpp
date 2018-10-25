@@ -533,7 +533,7 @@ int main(int argc, char** argv)
               m->currentColor[i] = 0xffddffff;
             }
             else {
-              m->currentColor[i] = 0xffff8888;
+              m->currentColor[i] = 0xff888888;
             }
           }
           break;
