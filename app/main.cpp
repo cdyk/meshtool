@@ -583,6 +583,7 @@ int main(int argc, char** argv)
     app->vulkanManager->render(app->width, app->height, app->items.renderMeshes, viewport, app->viewer->getProjectionMatrix(), app->viewer->getViewMatrix());
     app->vulkanManager->present();
   }
+  CHECK_VULKAN(vkDeviceWaitIdle(app->vulkanManager->vCtx->device));
   app->items.meshes.resize(0);
   app->items.renderMeshes.resize(0);
   app->vulkanManager->renderer->startFrame();

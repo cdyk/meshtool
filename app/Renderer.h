@@ -24,8 +24,8 @@ public:
 
   bool outlines = false;
   bool solid = true;
-  bool tangentSpaceCoordSys = true;
-  Texturing texturing = Texturing::ColorGradient;
+  bool tangentSpaceCoordSys = false;
+  Texturing texturing = Texturing::None;
   
   Renderer(Logger logger, VulkanManager* vulkanManager);
   ~Renderer();

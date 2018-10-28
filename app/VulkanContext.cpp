@@ -114,8 +114,10 @@ VulkanContext::VulkanContext(Logger logger,
 
     size_t chosenDevice = 0;
     VkPhysicalDeviceProperties chosenProps = { 0 };
-    vkGetPhysicalDeviceProperties(devices[0], &chosenProps);
+    Buffer<VkQueueFamilyProperties> queueProps;
     for (size_t i = 0; i < gpuCount; i++) {
+      physicalDevice = devices[i];
+
       VkPhysicalDeviceProperties props = { 0 };
       vkGetPhysicalDeviceProperties(devices[i], &props);
 
@@ -131,18 +133,64 @@ VulkanContext::VulkanContext(Logger logger,
         }
       }
       logger(0, "Device %d: name='%s', type=%d, mem=%lld, fillModeNonSolid=%d", i, props.deviceName, props.deviceType, vmem, features.fillModeNonSolid);
+
+      for (uint32_t k = 0; k < memProps.memoryHeapCount; k++) {
+        auto & h = memProps.memoryHeaps[k];
+        logger(0, "Device %d: Memory heap %d: size=%5dMB flags=%s%s%s", i, k, h.size / (1024 * 1024),
+               h.flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT ? "DEVICE_LOCAL " : "",
+               h.flags & VK_MEMORY_HEAP_MULTI_INSTANCE_BIT ? "MULTI_INSTANCE " : "",
+               h.flags ? "" : "NONE");
+      }
+      for (uint32_t k = 0; k < memProps.memoryTypeCount; k++) {
+        auto & t = memProps.memoryTypes[k];
+        logger(0, "Device %d: Memory type %2d: heap=%d, flags=%s%s%s%s%s%s%s%s", i, k, t.heapIndex,
+               t.propertyFlags & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT ? "DEVICE_LOCAL " : "",
+               t.propertyFlags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT ? "HOST_VISIBLE " : "",
+               t.propertyFlags & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT ? "HOST_COHERENT " : "",
+               t.propertyFlags & VK_MEMORY_PROPERTY_HOST_CACHED_BIT ? "HOST_CACHED " : "",
+               t.propertyFlags & VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT ? "LAZILY_ALLOCATED " : "",
+               t.propertyFlags & VK_MEMORY_PROPERTY_PROTECTED_BIT ? "PROTECTED " : "",
+               t.propertyFlags & ~(VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT | VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT | VK_MEMORY_PROPERTY_PROTECTED_BIT) ? "??? " : "",
+               t.propertyFlags ? "" : "NONE");
+      }
+      uint32_t queueFamilyCount = 0;
+      vkGetPhysicalDeviceQueueFamilyProperties(devices[i], &queueFamilyCount, nullptr);
+      queueProps.accommodate(queueFamilyCount);
+
+      vkGetPhysicalDeviceQueueFamilyProperties(devices[i], &queueFamilyCount, queueProps.data());
+      for (uint32_t k = 0; k < queueFamilyCount; k++) {
+        auto & qp = queueProps[k];
+        logger(0, "Device %d: Queue family %d: count=%2d, granularity=%dx%dx%d, flags=%s%s%s%s%s%s%s", i, k, qp.queueCount,
+               qp.minImageTransferGranularity.width, qp.minImageTransferGranularity.height, qp.minImageTransferGranularity.depth,
+               presentationSupport->hasPresentationSupport(this, k) ? "PRESENTATION " : "",
+               qp.queueFlags & VK_QUEUE_GRAPHICS_BIT ? "GRAPHICS " : "",
+               qp.queueFlags & VK_QUEUE_COMPUTE_BIT ? "COMPUTE " : "",
+               qp.queueFlags & VK_QUEUE_TRANSFER_BIT ? "TRANSFER " : "",
+               qp.queueFlags & VK_QUEUE_SPARSE_BINDING_BIT ? "SPARSE_BINDING " : "",
+               qp.queueFlags & VK_QUEUE_PROTECTED_BIT ? "PROTECTED " : "",
+               qp.queueFlags ? "" : "NONE");
+      }
+      logger(0, "----------");
     }
     physicalDevice = devices[chosenDevice];
+    logger(0, "Chose device %d.", chosenDevice);
+
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
+    vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
   }
   // create device and queue
   { 
-    VkDeviceQueueCreateInfo queueInfo = {};
 
     uint32_t queueFamilyCount = 0;
     Buffer<VkQueueFamilyProperties> queueProps;
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
     queueProps.accommodate(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueProps.data());
+
+    
+
+
+    VkDeviceQueueCreateInfo queueInfo = {};
 
     bool found = false;
     for (uint32_t queueFamilyIx = 0; queueFamilyIx < queueFamilyCount; queueFamilyIx++) {
@@ -219,8 +267,6 @@ VulkanContext::VulkanContext(Logger logger,
     auto rv = vkCreateDescriptorPool(device, &pool_info, nullptr, &descPool);
     assert(rv == VK_SUCCESS);
   }
-  vkGetPhysicalDeviceProperties(physicalDevice, &physicalDeviceProperties);
-  vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
 
 
   infos = new VulkanInfos();
@@ -244,9 +290,6 @@ void VulkanContext::houseKeep()
 
 void VulkanContext::shutdown()
 {
-
-  CHECK_VULKAN(vkDeviceWaitIdle(device));
-
   frameManager->houseKeep();
   delete frameManager;
   frameManager = nullptr;

@@ -87,7 +87,7 @@ RenderMeshHandle RenderMeshManager::createRenderMesh(Mesh* mesh)
           for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
             vtxMap.mem[i] = mesh->vtx[mesh->triVtxIx[i]];
             nrmMap.mem[i] = mesh->nrm[mesh->triNrmIx[i]];
-            texMap.mem[i] = mesh->tex[mesh->triTexIx[i]];
+            texMap.mem[i] = 10.f*mesh->tex[mesh->triTexIx[i]];
             //tanMap.mem[i] = Vec3f(0.f);
             //bnmMap.mem[i] = Vec3f(0.f);
           }
