@@ -139,6 +139,8 @@ public:
 
   void houseKeep();
 
+  PipelineHandle createPipeline();
+
   PipelineHandle createPipeline(Vector<VkVertexInputBindingDescription>& inputBind,
                                 Vector<VkVertexInputAttributeDescription>& inputAttrib,
                                 VkPipelineLayoutCreateInfo& pipelineLayoutInfo,

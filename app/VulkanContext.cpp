@@ -114,6 +114,7 @@ VulkanContext::VulkanContext(Logger logger,
 
     size_t chosenDevice = 0;
     VkPhysicalDeviceProperties chosenProps = { 0 };
+    Buffer<VkExtensionProperties> extensionProps;
     Buffer<VkQueueFamilyProperties> queueProps;
     for (size_t i = 0; i < gpuCount; i++) {
       physicalDevice = devices[i];
@@ -133,6 +134,20 @@ VulkanContext::VulkanContext(Logger logger,
         }
       }
       logger(0, "Device %d: name='%s', type=%d, mem=%lld, fillModeNonSolid=%d", i, props.deviceName, props.deviceType, vmem, features.fillModeNonSolid);
+
+      uint32_t extensionCount = 0;
+      vkEnumerateDeviceExtensionProperties(devices[i], nullptr, &extensionCount, nullptr);
+      extensionProps.accommodate(extensionCount);
+      vkEnumerateDeviceExtensionProperties(devices[i], nullptr, &extensionCount, extensionProps.data());
+      for (uint32_t k = 0; k < extensionCount; k++) {
+        auto &e = extensionProps[k];
+        logger(0, "Device %d: extension \"%s\", spec version=%d",i, e.extensionName, e.specVersion);
+
+        if (std::strcmp(e.extensionName, VK_NVX_RAYTRACING_EXTENSION_NAME) == 0) {
+          nvxRaytracing = true;
+        }
+      }
+
 
       for (uint32_t k = 0; k < memProps.memoryHeapCount; k++) {
         auto & h = memProps.memoryHeaps[k];
@@ -196,8 +211,6 @@ VulkanContext::VulkanContext(Logger logger,
     for (uint32_t queueFamilyIx = 0; queueFamilyIx < queueFamilyCount; queueFamilyIx++) {
       if (queueProps[queueFamilyIx].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
         if(presentationSupport->hasPresentationSupport(this, queueFamilyIx)) {
-        //if(glfwGetPhysicalDevicePresentationSupport(instance, physicalDevice, queueFamilyIx)) {
-        //if (hasPresentationSupport(queueFamilyIx)) {
           queueInfo.queueFamilyIndex = queueFamilyIx;
           found = true;
           break;
@@ -213,22 +226,26 @@ VulkanContext::VulkanContext(Logger logger,
     queueInfo.queueCount = 1;
     queueInfo.pQueuePriorities = queuePriorities;
 
-    const char* deviceExt[] = {
-      VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-      //VK_EXT_DEBUG_MARKER_EXTENSION_NAME
-    };
+    Vector<const char*> requestedDeviceExtensions;
+    requestedDeviceExtensions.pushBack(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    if (nvxRaytracing) {
+      requestedDeviceExtensions.pushBack(VK_NVX_RAYTRACING_EXTENSION_NAME);
+    }
 
     VkPhysicalDeviceFeatures enabledFeatures{};
     enabledFeatures.fillModeNonSolid = 1;
     enabledFeatures.samplerAnisotropy = 1;
+    if (nvxRaytracing) {
+      enabledFeatures.vertexPipelineStoresAndAtomics = 1;
+    }
 
     VkDeviceCreateInfo deviceInfo = {};
     deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     deviceInfo.pNext = nullptr;
     deviceInfo.queueCreateInfoCount = 1;
     deviceInfo.pQueueCreateInfos = &queueInfo;
-    deviceInfo.enabledExtensionCount = uint32_t(sizeof(deviceExt) / sizeof(const char*));
-    deviceInfo.ppEnabledExtensionNames = deviceExt;
+    deviceInfo.enabledExtensionCount = requestedDeviceExtensions.size32();
+    deviceInfo.ppEnabledExtensionNames = requestedDeviceExtensions.data();
     deviceInfo.enabledLayerCount = 0;
     deviceInfo.ppEnabledLayerNames = nullptr;
     deviceInfo.pEnabledFeatures = &enabledFeatures;
@@ -236,10 +253,34 @@ VulkanContext::VulkanContext(Logger logger,
     auto rv = vkCreateDevice(physicalDevice, &deviceInfo, NULL, &device);
     assert(rv == VK_SUCCESS);
 
-    //vkCmdDebugMarkerBeginEXT = (PFN_vkCmdDebugMarkerBeginEXT)vkGetInstanceProcAddr(instance, "vkCmdDebugMarkerBeginEXT");
-    //vkCmdDebugMarkerEndEXT = (PFN_vkCmdDebugMarkerEndEXT)vkGetInstanceProcAddr(instance, "vkCmdDebugMarkerEndEXT");
-    //vkDebugMarkerSetObjectNameEXT = (PFN_vkDebugMarkerSetObjectNameEXT)vkGetInstanceProcAddr(instance, "vkDebugMarkerSetObjectNameEXT");
-
+    if (nvxRaytracing) {
+      vkCreateAccelerationStructureNVX = (PFN_vkCreateAccelerationStructureNVX)vkGetInstanceProcAddr(instance, "vkCreateAccelerationStructureNVX");;
+      assert(vkCreateAccelerationStructureNVX);
+      vkDestroyAccelerationStructureNVX = (PFN_vkDestroyAccelerationStructureNVX)vkGetInstanceProcAddr(instance, "vkDestroyAccelerationStructureNVX");;
+      assert(vkDestroyAccelerationStructureNVX);
+      vkGetAccelerationStructureMemoryRequirementsNVX = (PFN_vkGetAccelerationStructureMemoryRequirementsNVX)vkGetInstanceProcAddr(instance, "vkGetAccelerationStructureMemoryRequirementsNVX");;
+      assert(vkGetAccelerationStructureMemoryRequirementsNVX);
+      vkGetAccelerationStructureScratchMemoryRequirementsNVX = (PFN_vkGetAccelerationStructureScratchMemoryRequirementsNVX)vkGetInstanceProcAddr(instance, "vkGetAccelerationStructureScratchMemoryRequirementsNVX");;
+      assert(vkGetAccelerationStructureScratchMemoryRequirementsNVX);
+      vkBindAccelerationStructureMemoryNVX = (PFN_vkBindAccelerationStructureMemoryNVX)vkGetInstanceProcAddr(instance, "vkBindAccelerationStructureMemoryNVX");;
+      assert(vkBindAccelerationStructureMemoryNVX);
+      vkCmdBuildAccelerationStructureNVX = (PFN_vkCmdBuildAccelerationStructureNVX)vkGetInstanceProcAddr(instance, "vkCmdBuildAccelerationStructureNVX");;
+      assert(vkCmdBuildAccelerationStructureNVX);
+      vkCmdCopyAccelerationStructureNVX = (PFN_vkCmdCopyAccelerationStructureNVX)vkGetInstanceProcAddr(instance, "vkCmdCopyAccelerationStructureNVX");;
+      assert(vkCmdCopyAccelerationStructureNVX);
+      vkCmdTraceRaysNVX = (PFN_vkCmdTraceRaysNVX)vkGetInstanceProcAddr(instance, "vkCmdTraceRaysNVX");;
+      assert(vkCmdTraceRaysNVX);
+      vkCreateRaytracingPipelinesNVX = (PFN_vkCreateRaytracingPipelinesNVX)vkGetInstanceProcAddr(instance, "vkCreateRaytracingPipelinesNVX");;
+      assert(vkCreateRaytracingPipelinesNVX);
+      vkGetRaytracingShaderHandlesNVX = (PFN_vkGetRaytracingShaderHandlesNVX)vkGetInstanceProcAddr(instance, "vkGetRaytracingShaderHandlesNVX");;
+      assert(vkGetRaytracingShaderHandlesNVX);
+      vkGetAccelerationStructureHandleNVX = (PFN_vkGetAccelerationStructureHandleNVX)vkGetInstanceProcAddr(instance, "vkGetAccelerationStructureHandleNVX");;
+      assert(vkGetAccelerationStructureHandleNVX);
+      vkCmdWriteAccelerationStructurePropertiesNVX = (PFN_vkCmdWriteAccelerationStructurePropertiesNVX)vkGetInstanceProcAddr(instance, "vkCmdWriteAccelerationStructurePropertiesNVX");;
+      assert(vkCmdWriteAccelerationStructurePropertiesNVX);
+      vkCompileDeferredNVX = (PFN_vkCompileDeferredNVX)vkGetInstanceProcAddr(instance, "vkCompileDeferredNVX");;
+      assert(vkCompileDeferredNVX);
+    }
     vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
   }
   // create descriptoor pool
@@ -268,6 +309,10 @@ VulkanContext::VulkanContext(Logger logger,
     assert(rv == VK_SUCCESS);
   }
 
+  {
+    VkPipelineCacheCreateInfo info = { VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO };
+    CHECK_VULKAN(vkCreatePipelineCache(device, &info, nullptr, &pipelineCache));
+  }
 
   infos = new VulkanInfos();
   resources = new VulkanResources(this, logger);

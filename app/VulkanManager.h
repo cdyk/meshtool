@@ -10,6 +10,7 @@ struct Mat4f;
 struct Mat3f;
 
 class Renderer;
+class Raycaster;
 class ImGuiRenderer;
 
 struct GLFWwindow;
@@ -31,6 +32,7 @@ public:
   Logger logger;
   GLFWwindow* window = nullptr;
   Renderer* renderer = nullptr;
+  Raycaster* raycaster = nullptr;
   ImGuiRenderer* imGuiRenderer = nullptr;
   VulkanContext* vCtx = nullptr;
 

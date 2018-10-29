@@ -67,6 +67,9 @@
     <ClCompile Include="..\app\ImGuiRenderer.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\app\Raycaster.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\libs\imgui\examples\imgui_impl_glfw.h">
@@ -126,6 +129,9 @@
     <ClInclude Include="..\app\ImGuiRenderer.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="..\app\Raycaster.h">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\shaders\vanillaVS.glsl">
@@ -144,5 +150,8 @@
       <Filter>shaders</Filter>
     </CustomBuild>
     <CustomBuild Include="..\shaders\coordSysVS.glsl" />
+    <CustomBuild Include="..\shaders\raytrace.rgen.glsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

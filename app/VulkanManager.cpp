@@ -6,6 +6,7 @@
 #include "Common.h"
 #include "VulkanContext.h"
 #include "Renderer.h"
+#include "Raycaster.h"
 #include "ImGuiRenderer.h"
 #include "LinAlgOps.h"
 
@@ -54,6 +55,11 @@ VulkanManager::VulkanManager(Logger l, GLFWwindow* window, uint32_t w, uint32_t 
 
   renderer = new Renderer(logger, this);
   renderer->init();
+  if (vCtx->nvxRaytracing) {
+    raycaster = new Raycaster(logger, this);
+    raycaster->init();
+  }
+
   imGuiRenderer = new ImGuiRenderer(logger, this);
   imGuiRenderer->init();
 }

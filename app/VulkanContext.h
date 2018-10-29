@@ -16,6 +16,7 @@ public:
 };
 
 
+
 class VulkanTextureManager;
 
 class VulkanContext
@@ -37,7 +38,22 @@ public:
   VkQueue queue = VK_NULL_HANDLE;
   uint32_t queueFamilyIndex = 0;
   VkDescriptorPool descPool = VK_NULL_HANDLE;
-  
+  VkPipelineCache pipelineCache = VK_NULL_HANDLE;
+
+  PFN_vkCreateAccelerationStructureNVX vkCreateAccelerationStructureNVX = nullptr;
+  PFN_vkDestroyAccelerationStructureNVX vkDestroyAccelerationStructureNVX = nullptr;
+  PFN_vkGetAccelerationStructureMemoryRequirementsNVX vkGetAccelerationStructureMemoryRequirementsNVX = nullptr;
+  PFN_vkGetAccelerationStructureScratchMemoryRequirementsNVX vkGetAccelerationStructureScratchMemoryRequirementsNVX = nullptr;
+  PFN_vkBindAccelerationStructureMemoryNVX vkBindAccelerationStructureMemoryNVX = nullptr;
+  PFN_vkCmdBuildAccelerationStructureNVX vkCmdBuildAccelerationStructureNVX = nullptr;
+  PFN_vkCmdCopyAccelerationStructureNVX vkCmdCopyAccelerationStructureNVX = nullptr;
+  PFN_vkCmdTraceRaysNVX vkCmdTraceRaysNVX = nullptr;
+  PFN_vkCreateRaytracingPipelinesNVX vkCreateRaytracingPipelinesNVX = nullptr;
+  PFN_vkGetRaytracingShaderHandlesNVX vkGetRaytracingShaderHandlesNVX = nullptr;
+  PFN_vkGetAccelerationStructureHandleNVX vkGetAccelerationStructureHandleNVX = nullptr;
+  PFN_vkCmdWriteAccelerationStructurePropertiesNVX vkCmdWriteAccelerationStructurePropertiesNVX = nullptr;
+  PFN_vkCompileDeferredNVX vkCompileDeferredNVX = nullptr;
+
 
   VkPhysicalDeviceProperties physicalDeviceProperties;
   VkPhysicalDeviceMemoryProperties memoryProperties;
@@ -53,6 +69,7 @@ public:
   VulkanFrameManager* frameManager = nullptr;
   VulkanTextureManager* textureManager = nullptr;
 
+  bool nvxRaytracing = false;
 private:
   bool debugLayer = true;
   VkDebugUtilsMessengerEXT debugCallbackHandle;

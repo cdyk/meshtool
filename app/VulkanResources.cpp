@@ -146,6 +146,11 @@ void VulkanResources::houseKeep()
   }
 }
 
+PipelineHandle VulkanResources::createPipeline()
+{
+  return pipelineResources.createResource();
+}
+
 
 PipelineHandle VulkanResources::createPipeline(Vector<VkVertexInputBindingDescription>& inputBind,
                                                      Vector<VkVertexInputAttributeDescription>& inputAttrib,
@@ -382,12 +387,13 @@ ShaderHandle VulkanResources::createShader(Vector<ShaderInputSpec>& spec, const 
 
   shader->stageCreateInfo.resize(spec.size());
   for (size_t i = 0; i < spec.size(); i++) {
-    shader->stageCreateInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    shader->stageCreateInfo[i].pNext = nullptr;
-    shader->stageCreateInfo[i].pSpecializationInfo = nullptr;
-    shader->stageCreateInfo[i].flags = 0;
-    shader->stageCreateInfo[i].pName = "main";
-    shader->stageCreateInfo[i].stage = spec[i].stage;
+    auto& info = shader->stageCreateInfo[i];
+    info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    info.pNext = nullptr;
+    info.pSpecializationInfo = nullptr;
+    info.flags = 0;
+    info.pName = "main";
+    info.stage = spec[i].stage;
 
     VkShaderModuleCreateInfo moduleCreateInfo;
     moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -395,7 +401,7 @@ ShaderHandle VulkanResources::createShader(Vector<ShaderInputSpec>& spec, const 
     moduleCreateInfo.flags = 0;
     moduleCreateInfo.codeSize = spec[i].siz;
     moduleCreateInfo.pCode = spec[i].spv;
-    auto rv = vkCreateShaderModule(vCtx->device, &moduleCreateInfo, nullptr, &shader->stageCreateInfo[i].module);
+    auto rv = vkCreateShaderModule(vCtx->device, &moduleCreateInfo, nullptr, &info.module);
     assert(rv == VK_SUCCESS);
 
     //if (name) {
