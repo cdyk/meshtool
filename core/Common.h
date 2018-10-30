@@ -73,8 +73,10 @@ public:
 protected:
   char* ptr = nullptr;
 
+  BufferBase() {}
   ~BufferBase() { free(); }
 
+  void _swap(BufferBase& other) { auto t = ptr; ptr = other.ptr; other.ptr = t; }
   void free();
 
   void _accommodate(size_t typeSize, size_t count, bool keep)
@@ -113,11 +115,40 @@ class Vector : BufferBase
 {
 public:
   Vector() = default;
-  Vector(const Vector&) = delete;   // haven't bothered yet
-  Vector& operator=(const Vector&) = delete;  //  haven't bothered yet
+  Vector(size_t size) { resize(size); }
   ~Vector() { resize(0); }
 
-  Vector(size_t size) { resize(size); }
+  Vector(const Vector& other) {
+    assert(fill == 0);
+    fill = other.size();
+    _accommodate(sizeof(T), fill, true);
+    for(size_t i=0; i<fill; i++) new(&(*this)[i]) T(other[i]);
+  }
+
+  Vector& operator=(const Vector& other) {
+    auto newSize = other.size();
+    if (newSize <= fill) {
+      for (size_t i = 0; i < newSize; i++) {
+        (*this)[i].~T();
+        new(&(*this)[i]) T(other[i]);
+      }
+      for (size_t i = newSize; i < fill; i++) (*this)[i].~T();
+    }
+    else {
+      for (size_t i = 0; i < fill; i++) (*this)[i].~T();
+      free();
+      _accommodate(sizeof(T), newSize, true);
+      for (size_t i = 0; i < newSize; i++) {
+        new(&(*this)[i]) T(other[i]);
+      }
+    }
+    fill = newSize;
+    assert(fill <= allocated());
+  }
+ 
+  Vector(Vector&& other) noexcept { swap(other); }
+  Vector& operator=(Vector&& other) noexcept { swap(other); return *this; }
+  void swap(Vector& other) noexcept { _swap(other); auto t = fill; fill = other.fill; other.fill = t; }
 
   T* begin() { return data(); }
   T* end() { return data() + fill; }
@@ -128,6 +159,8 @@ public:
   T& operator[](size_t ix) { return data()[ix]; }
   const T* data() const { return (T*)ptr; }
   const T& operator[](size_t ix) const { return data()[ix]; }
+
+  void clear() { resize(0); }
 
   void resize(size_t newSize)
   {
@@ -144,11 +177,15 @@ public:
     }
   }
 
-  void pushBack(T t)
+  void pushBack(const T & t)
   {
-    if (fill <= allocated()) {
-      _accommodate(sizeof(T), 2 * fill < 16 ? 16 : 2 * fill, true);
-    }
+    reserve(fill + 1);
+    new(data() + (fill++)) T(t);
+  }
+
+  void pushBack(T && t)
+  {
+    reserve(fill + 1);
     new(data() + (fill++)) T(t);
   }
 
@@ -168,6 +205,7 @@ public:
 
 private:
   size_t fill = 0;
+
 };
 
 
