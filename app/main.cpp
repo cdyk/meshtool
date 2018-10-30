@@ -32,17 +32,37 @@ namespace {
 
   void logger(unsigned level, const char* msg, ...)
   {
+#ifdef _WIN32
+    thread_local static char buf[256];
+    buf[0] = '[';
+    switch (level) {
+    case 0: buf[1] = 'I'; break;
+    case 1: buf[1] = 'W'; break;
+    case 2: buf[1] = 'E'; break;
+    default: buf[1] = '?'; break;
+    }
+    buf[2] = ']';
+    buf[3] = ' ';
+    va_list argptr;
+    va_start(argptr, msg);
+    auto l = vsnprintf(buf + 4, sizeof(buf) - 4 - 2, msg, argptr);
+    va_end(argptr);
+    buf[l + 4] = '\n';
+    buf[l + 4 + 1] = '\0';
+    OutputDebugStringA(buf);
+#else
     switch (level) {
     case 0: fprintf(stderr, "[I] "); break;
     case 1: fprintf(stderr, "[W] "); break;
     case 2: fprintf(stderr, "[E] "); break;
     }
-
     va_list argptr;
     va_start(argptr, msg);
     vfprintf(stderr, msg, argptr);
     va_end(argptr);
     fprintf(stderr, "\n");
+#endif
+
   }
 
   void glfw_error_callback(int error, const char* description)
