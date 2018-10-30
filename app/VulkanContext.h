@@ -9,6 +9,10 @@
 #define CHECK_VULKAN(a) do { VkResult rv = (a); assert(rv == VK_SUCCESS && #a);} while(0)
 #define CHECK_BOOL(a) do { bool rv = (a); assert(rv && #a);} while(0)
 
+#ifndef ARRAYSIZE
+#define ARRAYSIZE(a) (sizeof(a)/sizeof((a)[0]))
+#endif
+
 class ISurfaceManager
 {
 public:
@@ -35,7 +39,7 @@ public:
   VkInstance instance = VK_NULL_HANDLE;
   VkDebugReportCallbackEXT debugCallback = VK_NULL_HANDLE;
   VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-  VkDevice device = VK_NULL_HANDLE;;
+  VkDevice device = VK_NULL_HANDLE;
   VkQueue queue = VK_NULL_HANDLE;
   uint32_t queueFamilyIndex = 0;
   VkDescriptorPool descPool = VK_NULL_HANDLE;

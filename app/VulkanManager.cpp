@@ -50,15 +50,15 @@ VulkanManager::VulkanManager(Logger l, GLFWwindow* window, uint32_t w, uint32_t 
   const char** extensions = glfwGetRequiredInstanceExtensions(&extensions_count);
   vCtx = new VulkanContext(logger, extensions, extensions_count, 3, new GLFWPresentationSupport(window));
   vCtx->init();
+  if (vCtx->nvxRaytracing) {
+    raycaster = new Raycaster(logger, this);
+    raycaster->init();
+  }
 
   resize(w, h);
 
   renderer = new Renderer(logger, this);
   renderer->init();
-  if (vCtx->nvxRaytracing) {
-    raycaster = new Raycaster(logger, this);
-    raycaster->init();
-  }
 
   imGuiRenderer = new ImGuiRenderer(logger, this);
   imGuiRenderer->init();

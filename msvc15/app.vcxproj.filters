@@ -153,5 +153,14 @@
     <CustomBuild Include="..\shaders\raytrace.rgen.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
+    <CustomBuild Include="..\shaders\raytrace.rchit.glsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\shaders\raytrace.rmiss.glsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\shaders\raytrace.rahit.glsl">
+      <Filter>shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
 </Project>

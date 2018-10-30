@@ -28,6 +28,8 @@ private:
     uint32_t meshGen = 0u;
   };
 
+  RenderBufferHandle bindingTable;
+
   Vector<MeshData> meshData;
   Vector<MeshData> newMeshData;
 };

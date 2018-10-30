@@ -295,7 +295,7 @@ PipelineHandle VulkanResources::createPipeline(Vector<VkVertexInputBindingDescri
   pipelineCI.renderPass = renderPass.resource->pass;
   pipelineCI.subpass = 0;
 
-  rv = vkCreateGraphicsPipelines(vCtx->device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &pipe->pipe);
+  rv = vkCreateGraphicsPipelines(vCtx->device, vCtx->pipelineCache, 1, &pipelineCI, nullptr, &pipe->pipe);
   assert(rv == VK_SUCCESS);
 
   logger(0, "Built pipeline");
@@ -310,7 +310,12 @@ void VulkanResources::destroyPipeline(Pipeline* pipe)
 }
 
 
-RenderBufferHandle VulkanResources::createBuffer(size_t requestedSize, VkImageUsageFlags usageFlags, VkMemoryPropertyFlags properties)
+RenderBufferHandle VulkanResources::createBuffer()
+{
+  return bufferResources.createResource();
+}
+
+RenderBufferHandle VulkanResources::createBuffer(size_t requestedSize, VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags properties)
 {
   auto bufHandle = bufferResources.createResource();
   auto * buf = bufHandle.resource;
