@@ -33,7 +33,7 @@ namespace {
   void logger(unsigned level, const char* msg, ...)
   {
 #ifdef _WIN32
-    thread_local static char buf[256];
+    thread_local static char buf[512];
     buf[0] = '[';
     switch (level) {
     case 0: buf[1] = 'I'; break;
@@ -47,6 +47,7 @@ namespace {
     va_start(argptr, msg);
     auto l = vsnprintf(buf + 4, sizeof(buf) - 4 - 2, msg, argptr);
     va_end(argptr);
+    if (sizeof(buf) - 4 - 2 < l) l = sizeof(buf) - 4 - 2;
     buf[l + 4] = '\n';
     buf[l + 4 + 1] = '\0';
     OutputDebugStringA(buf);
