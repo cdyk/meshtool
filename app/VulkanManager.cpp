@@ -258,7 +258,11 @@ void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& ren
 
   vkCmdEndRenderPass(cmdBuf);
 
-  if (raycaster) raycaster->update(cmdBuf, renderMeshes);
+  if (raycaster) {
+    raycaster->update(cmdBuf, renderMeshes);
+    raycaster->draw(cmdBuf, viewerViewport, inverse(mul(P, M)));
+  }
+
 
   VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkSubmitInfo submitInfo = {};

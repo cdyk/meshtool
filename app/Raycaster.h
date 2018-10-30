@@ -2,6 +2,7 @@
 #include "Common.h"
 #include "VulkanResources.h"
 #include "RenderMeshManager.h"
+#include "LinAlg.h"
 
 class VulkanManager;
 
@@ -15,9 +16,13 @@ public:
 
   void update(VkCommandBuffer cmdBuf, Vector<RenderMeshHandle>& meshes);
 
+  void draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat4f& Pinv);
+
 private:
   Logger logger;
   VulkanManager* vulkanManager = nullptr;
+
+  VkPhysicalDeviceRaytracingPropertiesNVX rtProps;
 
   ShaderHandle shader;
   PipelineHandle pipeline;
@@ -27,6 +32,8 @@ private:
     AccelerationStructureHandle acc;
     uint32_t meshGen = 0u;
   };
+  AccelerationStructureHandle topLevel;
+  RenderBufferHandle topLevelInstances;
 
   RenderBufferHandle bindingTable;
 
