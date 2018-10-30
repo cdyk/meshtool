@@ -189,6 +189,8 @@ public:
     new(data() + (fill++)) T(t);
   }
 
+  T& back() { assert(fill); return (*this)[fill - 1]; }
+  const T& back() const { assert(fill); return (*this)[fill - 1]; }
   T popBack()
   {
     assert(fill);
