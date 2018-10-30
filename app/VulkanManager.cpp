@@ -209,6 +209,7 @@ void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& ren
   auto & frame = vCtx->frameManager->frame();
   auto & cmdBuf = frame.commandBuffer.resource->cmdBuf;
 
+  
   VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
   info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   CHECK_VULKAN(vkBeginCommandBuffer(cmdBuf, &info));
@@ -254,7 +255,10 @@ void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& ren
   
   vkCmdBeginRenderPass(cmdBuf, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
   imGuiRenderer->recordRendering(frame.commandBuffer);
+
   vkCmdEndRenderPass(cmdBuf);
+
+  if (raycaster) raycaster->update(cmdBuf, renderMeshes);
 
   VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkSubmitInfo submitInfo = {};

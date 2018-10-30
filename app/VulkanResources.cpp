@@ -144,6 +144,15 @@ void VulkanResources::houseKeep()
       delete r;
     }
   }
+  {
+    Vector<AccelerationStructure*> orphans;
+    accelerationStructures.getOrphans(orphans);
+    for (auto * r : orphans) {
+      if (!r->hasFlag(ResourceBase::Flags::External)) destroyAccelerationStructure(r);
+      delete r;
+    }
+  }
+
 }
 
 PipelineHandle VulkanResources::createPipeline()
@@ -727,6 +736,20 @@ void VulkanResources::destroySwapChain(SwapChain* swapChain)
   vkDestroySwapchainKHR(vCtx->device, swapChain->swapChain, nullptr);
 }
 
+
+AccelerationStructureHandle VulkanResources::createAccelerationStructure()
+{
+  return accelerationStructures.createResource();
+}
+
+void VulkanResources::destroyAccelerationStructure(AccelerationStructure* accStr)
+{
+  if (accStr->acc) {
+    logger(0, "Destroying acceleration structure.");
+    vCtx->vkDestroyAccelerationStructureNVX(vCtx->device, accStr->acc, nullptr);
+    accStr = nullptr;
+  }
+}
 
 
 bool VulkanResources::getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements)

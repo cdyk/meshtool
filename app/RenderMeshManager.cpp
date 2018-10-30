@@ -194,5 +194,9 @@ void RenderMeshManager::updateRenderMeshColor(RenderMeshHandle renderMesh)
     }
   }
   vCtx->frameManager->copyBuffer(rm->col, stagingBuf, rm->col.resource->requestedSize);
+
+  renderMesh.resource->generation++;
+  if (renderMesh.resource->generation == 0) renderMesh.resource->generation++;
+
   logger(0, "Updated mesh color");
 }

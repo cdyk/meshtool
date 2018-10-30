@@ -125,6 +125,16 @@ struct SwapChain : public ResourceBase
 };
 typedef ResourceHandle<SwapChain> SwapChainHandle;
 
+struct AccelerationStructure : public ResourceBase
+{
+  AccelerationStructure(ResourceManagerBase& manager) : ResourceBase(manager) {}
+  VkAccelerationStructureNVX acc = VK_NULL_HANDLE;
+  VkDeviceMemory structureMem = VK_NULL_HANDLE;
+  VkDeviceMemory scratchMem = VK_NULL_HANDLE;
+  VkBuffer scratchBuffer = VK_NULL_HANDLE;
+};
+typedef ResourceHandle<AccelerationStructure> AccelerationStructureHandle;
+
 
 class VulkanContext;
 
@@ -179,11 +189,13 @@ public:
   SemaphoreHandle createSemaphore();
   SwapChainHandle createSwapChain(SwapChainHandle oldSwapChain, VkSwapchainCreateInfoKHR& swapChainInfo);
 
+  AccelerationStructureHandle createAccelerationStructure();
+
+  bool getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements);
 
 private:
   VulkanContext* vCtx = nullptr;
   Logger logger = nullptr;
-  bool getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements);
 
   void destroyBuffer(RenderBuffer*);
   void destroyDescriptorSet(DescriptorSet*);
@@ -199,6 +211,7 @@ private:
   void destroyFence(Fence*);
   void destroySemaphore(Semaphore*);
   void destroySwapChain(SwapChain*);
+  void destroyAccelerationStructure(AccelerationStructure*);
 
 
   ResourceManager<RenderBuffer> bufferResources;
@@ -215,6 +228,7 @@ private:
   ResourceManager<Fence> fenceResources;
   ResourceManager<Semaphore> semaphoreResources;
   ResourceManager<SwapChain> swapChainResources;
+  ResourceManager<AccelerationStructure> accelerationStructures;
 
 };
 

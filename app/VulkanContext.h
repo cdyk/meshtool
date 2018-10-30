@@ -7,6 +7,7 @@
 #include "VulkanFrameManager.h"
 
 #define CHECK_VULKAN(a) do { VkResult rv = (a); assert(rv == VK_SUCCESS && #a);} while(0)
+#define CHECK_BOOL(a) do { bool rv = (a); assert(rv && #a);} while(0)
 
 class ISurfaceManager
 {
