@@ -7,13 +7,6 @@ struct RenderMeshResource : RenderResourceBase
   RenderMeshResource(ResourceManagerBase& manager) : RenderResourceBase(manager) {}
   Mesh* mesh = nullptr;
 
-  // indexed geometry
-  RenderBufferHandle vertices;
-  uint32_t vertexCount = 0;
-
-  RenderBufferHandle indices;
-
-  // unindexed geometry
   RenderBufferHandle vtx;
   RenderBufferHandle nrm;
   RenderBufferHandle tan;

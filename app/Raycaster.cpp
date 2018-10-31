@@ -2,6 +2,7 @@
 #include "VulkanManager.h"
 #include "VulkanContext.h"
 #include "LinAlgOps.h"
+#include "Mesh.h"
 
 namespace {
 
@@ -37,6 +38,14 @@ namespace {
     Mat4f Pinv;
   };
 
+  struct TriangleData
+  {
+    uint8_t n0x, n0y, n0z;
+    uint8_t n1x, n1y, n1z;
+    uint8_t n2x, n2y, n2z;
+    uint8_t r, g, b;
+  };
+
 
 }
 
@@ -52,8 +61,28 @@ Raycaster::~Raycaster()
 
 void Raycaster::init()
 {
-  auto * vCtx = vulkanManager->vCtx;
+  renames.resize(5);
 
+  auto * vCtx = vulkanManager->vCtx;
+  VkDescriptorPoolSize poolSizes[] = {
+        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, renames.size32()},
+        { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX, renames.size32() },
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,  10*renames.size32() }
+  };
+
+  VkDescriptorPoolCreateInfo descriptorPoolCreateInfo;
+  descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+  descriptorPoolCreateInfo.pNext = nullptr;
+  descriptorPoolCreateInfo.flags = 0;
+  descriptorPoolCreateInfo.maxSets = renames.size32();
+  descriptorPoolCreateInfo.poolSizeCount = ARRAYSIZE(poolSizes);
+  descriptorPoolCreateInfo.pPoolSizes = poolSizes;
+  CHECK_VULKAN(vkCreateDescriptorPool(vCtx->device, &descriptorPoolCreateInfo, nullptr, &descPool));
+}
+
+void Raycaster::buildPipeline()
+{
+  auto * vCtx = vulkanManager->vCtx;
 
   rtProps = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAYTRACING_PROPERTIES_NVX };
   VkPhysicalDeviceProperties2 props2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
@@ -144,22 +173,16 @@ void Raycaster::init()
     }
   }
 
+  
+}
 
-  renames.resize(5);
-  VkDescriptorPoolSize poolSizes[] = {
-      { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, renames.size32()},
-      { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX, renames.size32() },
-      { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,  renames.size32() }
-  };
 
-  VkDescriptorPoolCreateInfo descriptorPoolCreateInfo;
-  descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-  descriptorPoolCreateInfo.pNext = nullptr;
-  descriptorPoolCreateInfo.flags = 0;
-  descriptorPoolCreateInfo.maxSets = renames.size32();
-  descriptorPoolCreateInfo.poolSizeCount = ARRAYSIZE(poolSizes);
-  descriptorPoolCreateInfo.pPoolSizes = poolSizes;
-  CHECK_VULKAN(vkCreateDescriptorPool(vCtx->device, &descriptorPoolCreateInfo, nullptr, &descPool));
+void Raycaster::buildDescriptorSets()
+{
+  auto * vCtx = vulkanManager->vCtx;
+  auto * pipe = pipeline.resource;
+
+  
 
   for (auto & rename : renames) {
     rename.sceneBuffer = vCtx->resources->createUniformBuffer(sizeof(SceneBuffer));
@@ -184,7 +207,87 @@ void Raycaster::init()
     writes[0].dstBinding = 2;
     vkUpdateDescriptorSets(vCtx->device, 1, writes, 0, nullptr);
   }
+
 }
+
+
+bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, const RenderMeshHandle& renderMesh)
+{
+  auto * vCtx = vulkanManager->vCtx;
+  auto * res = vCtx->resources;
+
+  auto * rm = renderMesh.resource;
+  if (meshData.meshGen == rm->generation) return false;
+  meshData.meshGen = rm->generation;
+
+  logger(0, "Updating MeshData item.");
+  auto * mesh = rm->mesh;
+
+  meshData.vertexCount = mesh->vtxCount;
+  meshData.triangleCount = mesh->triCount;
+  meshData.vertices = res->createBuffer(sizeof(Vec3f)*meshData.vertexCount,
+                                        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  vCtx->resources->copyHostMemToBuffer(meshData.vertices, mesh->vtx, sizeof(Vec3f)*meshData.vertexCount);
+  meshData.indices = vCtx->resources->createBuffer(sizeof(uint32_t) * 3 * meshData.triangleCount,
+                                                   VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                                                   VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  vCtx->resources->copyHostMemToBuffer(meshData.indices, mesh->triVtxIx, sizeof(uint32_t) * 3 * meshData.triangleCount);
+
+  meshData.triangleData = res->createBuffer(sizeof(Vec3f)*meshData.vertexCount,
+                                            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  {
+    MappedBuffer<TriangleData> map(vCtx, meshData.triangleData);
+    for (uint32_t t = 0; t < meshData.triangleCount; t++) {
+      auto & data = map.mem[t];
+      auto n0 = normalize(mesh->nrm[mesh->triNrmIx[3 * t + 0]]);
+      auto n1 = normalize(mesh->nrm[mesh->triNrmIx[3 * t + 1]]);
+      auto n2 = normalize(mesh->nrm[mesh->triNrmIx[3 * t + 2]]);
+      data.n0x = uint8_t(127.f*n0.x + 127.f);
+      data.n0y = uint8_t(127.f*n0.y + 127.f);
+      data.n0z = uint8_t(127.f*n0.z + 127.f);
+      data.n1x = uint8_t(127.f*n1.x + 127.f);
+      data.n1y = uint8_t(127.f*n1.y + 127.f);
+      data.n1z = uint8_t(127.f*n1.z + 127.f);
+      data.n2x = uint8_t(127.f*n2.x + 127.f);
+      data.n2y = uint8_t(127.f*n2.y + 127.f);
+      data.n2z = uint8_t(127.f*n2.z + 127.f);
+      auto color = mesh->currentColor[t];
+      data.r = (color >> 16) & 0xff;
+      data.g = (color >> 8) & 0xff;
+      data.b = color & 0xff;
+    }
+  }
+
+  auto & geometry = meshData.geometry;
+  geometry = { VK_STRUCTURE_TYPE_GEOMETRY_NVX };
+
+  geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NVX;
+  geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NVX;
+  geometry.geometry.triangles.pNext = nullptr;
+  geometry.geometry.triangles.vertexData = meshData.vertices.resource->buffer;
+  geometry.geometry.triangles.vertexOffset = 0;
+  geometry.geometry.triangles.vertexCount = meshData.vertexCount;
+  geometry.geometry.triangles.vertexStride = sizeof(Vec3f);
+  geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+  geometry.geometry.triangles.indexData = meshData.indices.resource->buffer; //idxBuf.resource->buffer;
+  geometry.geometry.triangles.indexOffset = 0;
+  geometry.geometry.triangles.indexCount = 3 * meshData.triangleCount;
+  geometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
+  geometry.geometry.triangles.transformData = VK_NULL_HANDLE;
+  geometry.geometry.triangles.transformOffset = 0;
+  geometry.geometry.aabbs = { };
+  geometry.geometry.aabbs.sType = VK_STRUCTURE_TYPE_GEOMETRY_AABB_NVX;
+  geometry.flags = 0;
+
+  meshData.acc = vCtx->resources->createAccelerationStructure(VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NVX, 1, &geometry, 0);
+  if (scratchSize < meshData.acc.resource->scratchReqs.size) scratchSize = meshData.acc.resource->scratchReqs.size;
+
+  meshData.rebuild = true;
+  return true;
+}
+
 
 void Raycaster::update(Vector<RenderMeshHandle>& meshes)
 {
@@ -209,7 +312,6 @@ void Raycaster::update(Vector<RenderMeshHandle>& meshes)
 
   bool change = false;
 
-  geometries.clear();
   newMeshData.clear();
   newMeshData.reserve(meshes.size());
   for (auto & renderMesh : meshes) {
@@ -227,35 +329,8 @@ void Raycaster::update(Vector<RenderMeshHandle>& meshes)
       newMeshData.pushBack(md);
       logger(0, "Created new MeshData item.");
     }
-    auto &md = newMeshData.back();
-    if (md.meshGen != renderMesh.resource->generation) {
+    if (updateMeshData(scratchSize, newMeshData.back(), renderMesh)) {
       change = true;
-      logger(0, "Updating MeshData item.");
-      auto * rm = renderMesh.resource;
-      md.meshGen = rm->generation;
-
-      geometries.pushBack({ VK_STRUCTURE_TYPE_GEOMETRY_NVX });
-      auto & geometry = geometries.back();
-      geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NVX;
-      geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NVX;
-      geometry.geometry.triangles.pNext = nullptr;
-      geometry.geometry.triangles.vertexData = rm->vertices.resource->buffer;// vtxBuf.resource->buffer;
-      geometry.geometry.triangles.vertexOffset = 0;
-      geometry.geometry.triangles.vertexCount = rm->vertexCount;// ARRAYSIZE(vertices);
-      geometry.geometry.triangles.vertexStride = sizeof(Vec3f);
-      geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-      geometry.geometry.triangles.indexData = rm->indices.resource->buffer; //idxBuf.resource->buffer;
-      geometry.geometry.triangles.indexOffset = 0;
-      geometry.geometry.triangles.indexCount = 3 * rm->tri_n;// ARRAYSIZE(indices);
-      geometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT32;
-      geometry.geometry.triangles.transformData = VK_NULL_HANDLE;
-      geometry.geometry.triangles.transformOffset = 0;
-      geometry.geometry.aabbs = { };
-      geometry.geometry.aabbs.sType = VK_STRUCTURE_TYPE_GEOMETRY_AABB_NVX;
-      geometry.flags = 0;
-      md.acc = vCtx->resources->createAccelerationStructure(VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NVX, 1, &geometry, 0);
-      if (scratchSize < md.acc.resource->scratchReqs.size) scratchSize = md.acc.resource->scratchReqs.size;
-
     }
   }
   meshData.swap(newMeshData);
@@ -264,11 +339,15 @@ void Raycaster::update(Vector<RenderMeshHandle>& meshes)
       topAcc = AccelerationStructureHandle();
       return;
     }
-    auto geometryCount = geometries.size32();
-    assert(geometryCount == meshData.size());
 
+    auto geometryCount = meshData.size32();
+
+    Vector<VkGeometryNVX> geometries(geometryCount);
     Vector<Instance> instances(geometryCount);
+
+    geometries.resize(geometryCount);
     for (uint32_t g = 0; g < geometryCount; g++) {
+      geometries[g] = meshData[g].geometry;
       auto & instance = instances[g];
       for (unsigned j = 0; j < 3; j++) {
         for (unsigned i = 0; i < 4; i++) {
@@ -288,38 +367,31 @@ void Raycaster::update(Vector<RenderMeshHandle>& meshes)
     topAcc = vCtx->resources->createAccelerationStructure(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NVX, 0, nullptr, uint32_t(instances.size()));
     if (scratchSize < topAcc.resource->scratchReqs.size) scratchSize = topAcc.resource->scratchReqs.size;
 
-
-
     auto scratchBuffer = vCtx->resources->createBuffer(scratchSize, VK_BUFFER_USAGE_RAYTRACING_BIT_NVX, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-
-
-
-    auto cmdBuf = vCtx->resources->createPrimaryCommandBuffer(frame.commandPool).resource->cmdBuf;
-
-    VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    vkBeginCommandBuffer(cmdBuf, &beginInfo);
-
 
     VkMemoryBarrier memoryBarrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
     memoryBarrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX;
     memoryBarrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX;
 
+    auto cmdBuf = vCtx->resources->createPrimaryCommandBuffer(frame.commandPool).resource->cmdBuf;
+    VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(cmdBuf, &beginInfo);
     for (unsigned g = 0; g < geometryCount; g++) {
-      vCtx->vkCmdBuildAccelerationStructureNVX(cmdBuf, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NVX,
-                                               0, VK_NULL_HANDLE, 0,
-                                               (uint32_t)geometries.size(), &geometries[0],
-                                               0, VK_FALSE, meshData[g].acc.resource->acc, VK_NULL_HANDLE, scratchBuffer.resource->buffer, 0);
-      vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, 0, 1, &memoryBarrier, 0, 0, 0, 0);
+      if (meshData[g].rebuild) {
+        meshData[g].rebuild = false;
+        vCtx->vkCmdBuildAccelerationStructureNVX(cmdBuf, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NVX,
+                                                 0, VK_NULL_HANDLE, 0,
+                                                 (uint32_t)geometries.size(), &geometries[0],
+                                                 0, VK_FALSE, meshData[g].acc.resource->acc, VK_NULL_HANDLE, scratchBuffer.resource->buffer, 0);
+        vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, 0, 1, &memoryBarrier, 0, 0, 0, 0);
+      }
     }
-
     vCtx->vkCmdBuildAccelerationStructureNVX(cmdBuf, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NVX,
                                              1, instanceBuffer.resource->buffer, 0,
                                              0, nullptr,
                                              0, VK_FALSE, topAcc.resource->acc, VK_NULL_HANDLE, scratchBuffer.resource->buffer, 0);
-
     vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, 0, 1, &memoryBarrier, 0, 0, 0, 0);
-
     vkEndCommandBuffer(cmdBuf);
 
     VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
@@ -334,6 +406,9 @@ void Raycaster::update(Vector<RenderMeshHandle>& meshes)
     vkQueueSubmit(vCtx->queue, 1, &submitInfo, VK_NULL_HANDLE);
     vkQueueWaitIdle(vCtx->queue);
     vkDeviceWaitIdle(vCtx->device);
+
+    buildPipeline();
+    buildDescriptorSets();
 
     for (auto & rename : renames) {
       VkDescriptorAccelerationStructureInfoNVX descriptorAccelerationStructureInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_ACCELERATION_STRUCTURE_INFO_NVX };
@@ -352,6 +427,7 @@ void Raycaster::update(Vector<RenderMeshHandle>& meshes)
       accelerationStructureWrite.pTexelBufferView = nullptr;
       vkUpdateDescriptorSets(vCtx->device, (uint32_t)1, &accelerationStructureWrite, 0, nullptr);
     }
+
   }
 
 }

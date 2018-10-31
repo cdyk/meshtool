@@ -42,16 +42,23 @@ private:
 
 
   struct MeshData {
+    RenderBufferHandle vertices;
+    RenderBufferHandle indices;
+    RenderBufferHandle triangleData;
     RenderMeshHandle src;
     AccelerationStructureHandle acc;
+    VkGeometryNVX geometry;
+
+    uint32_t vertexCount = 0;
+    uint32_t triangleCount = 0;
     uint32_t meshGen = 0u;
+    bool rebuild;
   };
   AccelerationStructureHandle topLevel;
   RenderBufferHandle topLevelInstances;
 
   RenderBufferHandle bindingTable;
 
-  Vector<VkGeometryNVX> geometries;
   Vector<MeshData> meshData;
   Vector<MeshData> newMeshData;
 
@@ -59,6 +66,10 @@ private:
 
   uint32_t w = ~0u;
   uint32_t h = ~0u;
-  void resize(const Vec4f& viewport);
 
+  void resize(const Vec4f& viewport);
+  bool updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, const RenderMeshHandle& renderMesh);
+
+  void buildPipeline();
+  void buildDescriptorSets();
 };
