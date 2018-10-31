@@ -65,17 +65,13 @@ void Raycaster::init()
   logger(0, "rtprops.maxGeometryCount=%d", rtProps.maxGeometryCount);
 
 
-  Vector<ShaderInputSpec> stages(1);
+  Vector<ShaderInputSpec> stages(4);
   stages[0] = { raytrace_rgen, sizeof(raytrace_rgen), VK_SHADER_STAGE_RAYGEN_BIT_NVX };
-  //stages[1] = { raytrace_rmiss, sizeof(raytrace_rmiss), VK_SHADER_STAGE_MISS_BIT_NVX };
-  //stages[2] = { raytrace_rchit, sizeof(raytrace_rchit), VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX };
-  //stages[3] = { raytrace_rahit, sizeof(raytrace_rahit), VK_SHADER_STAGE_ANY_HIT_BIT_NVX };
+  stages[1] = { raytrace_rchit, sizeof(raytrace_rchit), VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX };
+  stages[2] = { raytrace_rahit, sizeof(raytrace_rahit), VK_SHADER_STAGE_ANY_HIT_BIT_NVX };
+  stages[3] = { raytrace_rmiss, sizeof(raytrace_rmiss), VK_SHADER_STAGE_MISS_BIT_NVX };
 
-  Vector<uint32_t> groupNumbers(stages.size());
-  groupNumbers[0] = 0;
-  //groupNumbers[1] = 1;
-  //groupNumbers[2] = 2;
-  //groupNumbers[3] = 2;
+  uint32_t groupNumbers[4] = { 0, 1, 1, 2 };
 
   shader = vCtx->resources->createShader(stages);
   assert(shader.resource->stageCreateInfo.size() == stages.size());
@@ -122,7 +118,7 @@ void Raycaster::init()
     VkRaytracingPipelineCreateInfoNVX info = { VK_STRUCTURE_TYPE_RAYTRACING_PIPELINE_CREATE_INFO_NVX };
     info.pStages = shader.resource->stageCreateInfo.data();
     info.stageCount = shader.resource->stageCreateInfo.size32();
-    info.pGroupNumbers = groupNumbers.data();
+    info.pGroupNumbers = groupNumbers;
     info.maxRecursionDepth = 1;
     info.layout = pipe->pipeLayout;
     CHECK_VULKAN(vCtx->vkCreateRaytracingPipelinesNVX(vCtx->device, nullptr /*vCtx->pipelineCache*/, 1, &info, nullptr, &pipe->pipe));
@@ -131,7 +127,7 @@ void Raycaster::init()
   //CHECK_VULKAN(vCtx->vkCompileDeferredNVX(vCtx->device, pipe->pipe, 0));
   { // shader binding table
 
-    uint32_t groupCount = 1;
+    uint32_t groupCount = 3;
     uint32_t tableSize = groupCount * rtProps.shaderHeaderSize;
     
     bindingTable = vCtx->resources->createBuffer(tableSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
@@ -623,8 +619,8 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat4f&
     vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, pipeline.resource->pipeLayout, 0, 1, &rename.descSet, 0, 0);
     vCtx->vkCmdTraceRaysNVX(cmdBuf,
                             bindingTable.resource->buffer, 0,      // raygen
-                            bindingTable.resource->buffer, 0, rtProps.shaderHeaderSize,   // miss
-                            bindingTable.resource->buffer, 0, rtProps.shaderHeaderSize,   // hit
+                            bindingTable.resource->buffer, 2 * rtProps.shaderHeaderSize, rtProps.shaderHeaderSize,   // miss
+                            bindingTable.resource->buffer, 1 * rtProps.shaderHeaderSize, rtProps.shaderHeaderSize,   // hit
                             w, h);
 
   }

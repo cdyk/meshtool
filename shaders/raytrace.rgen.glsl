@@ -4,7 +4,7 @@
 layout(binding = 0) uniform accelerationStructureNVX topLevel;
 layout(binding = 1, rgba8) uniform image2D image;
 
-#if 1
+#if 0
 
 layout(location = 0) rayPayloadNVX float hitValue;
 
@@ -34,6 +34,9 @@ void main()
   vec4 of = sceneBuf.Pinv * vec4(u, 1, 1);
   vec3 f = (1.f / of.w)*of.xyz;
   vec3 d = normalize(f - o);
+
+  o = vec3(0, 0, -2.0);
+  d = normalize(vec3(u-vec2(0.5), 1));
 
   traceNVX(topLevel,
            gl_RayFlagsOpaqueNVX,   // rayFlags
