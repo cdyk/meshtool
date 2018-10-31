@@ -264,7 +264,7 @@ void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& ren
   vkCmdEndRenderPass(cmdBuf);
 
   if (raycaster) {
-    //raycaster->draw(cmdBuf, viewerViewport, inverse(mul(P, M)));
+    raycaster->draw(cmdBuf, viewerViewport, inverse(mul(P, M)));
   }
 
 

@@ -27,6 +27,18 @@ private:
   ShaderHandle shader;
   PipelineHandle pipeline;
 
+  VkDescriptorPool descPool;
+  struct Rename {
+    ImageHandle offscreenImage;
+    ImageViewHandle offscreenView;
+
+    VkDescriptorSet descSet;
+
+  };
+  Vector<Rename> renames;
+  uint32_t renameIndex = 0;
+
+
   struct MeshData {
     RenderMeshHandle src;
     AccelerationStructureHandle acc;
@@ -44,5 +56,8 @@ private:
   AccelerationStructureHandle acc;
   AccelerationStructureHandle topAcc;
 
+  uint32_t w = ~0u;
+  uint32_t h = ~0u;
+  void resize(const Vec4f& viewport);
 
 };

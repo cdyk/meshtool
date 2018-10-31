@@ -4,6 +4,20 @@
 layout(binding = 0) uniform accelerationStructureNVX topLevel;
 layout(binding = 1, rgba8) uniform image2D image;
 
+#if 1
+
+layout(location = 0) rayPayloadNVX float hitValue;
+
+void main()
+{
+  const vec2 pixelCenter = vec2(gl_LaunchIDNVX.xy) + vec2(0.5);
+  const vec2 inUV = pixelCenter / vec2(gl_LaunchSizeNVX.xy);
+
+  imageStore(image, ivec2(gl_LaunchIDNVX.xy), vec4(inUV.x, inUV.y, 0.0, 0.0));
+}
+
+#else
+
 layout(std140, binding = 2) uniform SceneBuf {
   mat4 Pinv;
 } sceneBuf;
@@ -35,3 +49,4 @@ void main()
 
   imageStore(image, ivec2(gl_LaunchIDNVX.xy), vec4(color, 0.0f));
 }
+#endif

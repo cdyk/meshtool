@@ -51,6 +51,7 @@ public:
   VkFormat depthFormat = VK_FORMAT_D32_SFLOAT;
 
   uint32_t swapChainIndex = ~0u;
+  Vector<VkImage> backBufferImages;
   Vector<ImageViewHandle> backBufferViews;
 
 private:

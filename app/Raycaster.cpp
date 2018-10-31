@@ -60,17 +60,17 @@ void Raycaster::init()
   logger(0, "rtprops.maxGeometryCount=%d", rtProps.maxGeometryCount);
 
 
-  Vector<ShaderInputSpec> stages(4);
+  Vector<ShaderInputSpec> stages(1);
   stages[0] = { raytrace_rgen, sizeof(raytrace_rgen), VK_SHADER_STAGE_RAYGEN_BIT_NVX };
-  stages[1] = { raytrace_rmiss, sizeof(raytrace_rmiss), VK_SHADER_STAGE_MISS_BIT_NVX };
-  stages[2] = { raytrace_rchit, sizeof(raytrace_rchit), VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX };
-  stages[3] = { raytrace_rahit, sizeof(raytrace_rahit), VK_SHADER_STAGE_ANY_HIT_BIT_NVX };
+  //stages[1] = { raytrace_rmiss, sizeof(raytrace_rmiss), VK_SHADER_STAGE_MISS_BIT_NVX };
+  //stages[2] = { raytrace_rchit, sizeof(raytrace_rchit), VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX };
+  //stages[3] = { raytrace_rahit, sizeof(raytrace_rahit), VK_SHADER_STAGE_ANY_HIT_BIT_NVX };
 
   Vector<uint32_t> groupNumbers(stages.size());
   groupNumbers[0] = 0;
-  groupNumbers[1] = 1;
-  groupNumbers[2] = 2;
-  groupNumbers[3] = 2;
+  //groupNumbers[1] = 1;
+  //groupNumbers[2] = 2;
+  //groupNumbers[3] = 2;
 
   shader = vCtx->resources->createShader(stages);
   assert(shader.resource->stageCreateInfo.size() == stages.size());
@@ -80,7 +80,7 @@ void Raycaster::init()
 
 
   {
-    VkDescriptorSetLayoutBinding descSetLayoutBinding[2];
+    VkDescriptorSetLayoutBinding descSetLayoutBinding[3];
     descSetLayoutBinding[0] = {};
     descSetLayoutBinding[0].binding = 0;
     descSetLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
@@ -91,6 +91,11 @@ void Raycaster::init()
     descSetLayoutBinding[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
     descSetLayoutBinding[1].descriptorCount = 1;
     descSetLayoutBinding[1].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+    descSetLayoutBinding[2] = {};
+    descSetLayoutBinding[2].binding = 2;
+    descSetLayoutBinding[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    descSetLayoutBinding[2].descriptorCount = 1;
+    descSetLayoutBinding[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
 
     VkDescriptorSetLayoutCreateInfo layoutCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
     layoutCreateInfo.bindingCount = sizeof(descSetLayoutBinding) / sizeof(descSetLayoutBinding[0]);
@@ -120,8 +125,8 @@ void Raycaster::init()
 
   //CHECK_VULKAN(vCtx->vkCompileDeferredNVX(vCtx->device, pipe->pipe, 0));
 
+  /*
   size_t bindingTableSize = 3 * rtProps.shaderHeaderSize;
-
   auto bindingTableStage = vCtx->resources->createStagingBuffer(bindingTableSize);
   {
     char* ptr = nullptr;
@@ -138,7 +143,34 @@ void Raycaster::init()
 
   bindingTable = vCtx->resources->createBuffer(bindingTableSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_RAYTRACING_BIT_NVX, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
   vCtx->frameManager->copyBuffer(bindingTable, bindingTableStage, bindingTableSize);
+  */
 
+  renames.resize(5);
+  VkDescriptorPoolSize poolSizes[] = {
+      { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, renames.size32()},
+      { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX, renames.size32() },
+      { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,  renames.size32() }
+  };
+
+  VkDescriptorPoolCreateInfo descriptorPoolCreateInfo;
+  descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+  descriptorPoolCreateInfo.pNext = nullptr;
+  descriptorPoolCreateInfo.flags = 0;
+  descriptorPoolCreateInfo.maxSets = renames.size32();
+  descriptorPoolCreateInfo.poolSizeCount = ARRAYSIZE(poolSizes);
+  descriptorPoolCreateInfo.pPoolSizes = poolSizes;
+  CHECK_VULKAN(vkCreateDescriptorPool(vCtx->device, &descriptorPoolCreateInfo, nullptr, &descPool));
+
+  for (auto & rename : renames) {
+
+    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo;
+    descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    descriptorSetAllocateInfo.pNext = nullptr;
+    descriptorSetAllocateInfo.descriptorPool = descPool;
+    descriptorSetAllocateInfo.descriptorSetCount = 1;
+    descriptorSetAllocateInfo.pSetLayouts = &pipe->descLayout;
+    CHECK_VULKAN(vkAllocateDescriptorSets(vCtx->device, &descriptorSetAllocateInfo, &rename.descSet));
+  }
 }
 
 void Raycaster::update(Vector<RenderMeshHandle>& meshes)
@@ -258,6 +290,27 @@ void Raycaster::update(Vector<RenderMeshHandle>& meshes)
   vkQueueSubmit(vCtx->queue, 1, &submitInfo, VK_NULL_HANDLE);
   vkQueueWaitIdle(vCtx->queue);
   vkDeviceWaitIdle(vCtx->device);
+
+  for (auto & rename : renames) {
+    VkDescriptorAccelerationStructureInfoNVX descriptorAccelerationStructureInfo;
+    descriptorAccelerationStructureInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_ACCELERATION_STRUCTURE_INFO_NVX;
+    descriptorAccelerationStructureInfo.pNext = nullptr;
+    descriptorAccelerationStructureInfo.accelerationStructureCount = 1;
+    descriptorAccelerationStructureInfo.pAccelerationStructures = &topAcc.resource->acc;
+
+    VkWriteDescriptorSet accelerationStructureWrite;
+    accelerationStructureWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    accelerationStructureWrite.pNext = &descriptorAccelerationStructureInfo;
+    accelerationStructureWrite.dstSet = rename.descSet;
+    accelerationStructureWrite.dstBinding = 0;
+    accelerationStructureWrite.dstArrayElement = 0;
+    accelerationStructureWrite.descriptorCount = 1;
+    accelerationStructureWrite.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
+    accelerationStructureWrite.pImageInfo = nullptr;
+    accelerationStructureWrite.pBufferInfo = nullptr;
+    accelerationStructureWrite.pTexelBufferView = nullptr;
+    vkUpdateDescriptorSets(vCtx->device, (uint32_t)1, &accelerationStructureWrite, 0, nullptr);
+  }
 
   //vkQueueSubmit(_queuesInfo.Graphics.Queue, 1, &submitInfo, VK_NULL_HANDLE);
   //vkQueueWaitIdle(_queuesInfo.Graphics.Queue);
@@ -475,14 +528,123 @@ void Raycaster::update(Vector<RenderMeshHandle>& meshes)
 }
 
 
+void Raycaster::resize(const Vec4f& viewport)
+{
+  auto newW = uint32_t(viewport.z < 1 ? 1.f : viewport.z);
+  auto newH = uint32_t(viewport.w < 1 ? 1.f : viewport.w);
+  if (newW == w && newH == h) return;
+  w = newW;
+  h = newH;
+  logger(0, "Resized to %dx%d", w, h);
+
+  auto * vCtx = vulkanManager->vCtx;
+  auto * resources = vCtx->resources;
+  for (auto & rename : renames) {
+
+    VkImageCreateInfo imageInfo{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+    imageInfo.extent = { w, h, 1 };
+    imageInfo.mipLevels = 1;
+    imageInfo.arrayLayers = 1;
+    imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+    imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    rename.offscreenImage = resources->createImage(imageInfo);
+
+    VkImageViewCreateInfo viewInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+    rename.offscreenView = resources->createImageView(rename.offscreenImage, viewInfo);
+  }
+
+}
+
+
 void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat4f& Pinv)
 {
+  resize(viewport);
+
+  renameIndex = renameIndex + 1;
+  if (renames.size32() <= renameIndex) renameIndex = 0;
+  auto & rename = renames[renameIndex];
+
   auto * vCtx = vulkanManager->vCtx;
 
-  return;
-  vCtx->vkCmdTraceRaysNVX(cmdBuf,
-                          bindingTable.resource->buffer, 0 * rtProps.shaderHeaderSize,      // raygen
-                          bindingTable.resource->buffer, 1 * rtProps.shaderHeaderSize, 0,   // miss
-                          bindingTable.resource->buffer, 2 * rtProps.shaderHeaderSize, 0,   // hit
-                          uint32_t(viewport.z), uint32_t(viewport.w));
+  auto offscreenImage = rename.offscreenImage.resource->image;
+  auto onscreenImage = vCtx->frameManager->backBufferImages[vCtx->frameManager->swapChainIndex];
+
+  { // Prep for shader storage
+    VkImageMemoryBarrier imageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    imageMemoryBarrier.srcAccessMask = 0;
+    imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarrier.image = offscreenImage;
+    imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+    vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                         0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
+  }
+  if (false) {
+    vCtx->vkCmdTraceRaysNVX(cmdBuf,
+                            bindingTable.resource->buffer, 0 * rtProps.shaderHeaderSize,      // raygen
+                            bindingTable.resource->buffer, 1 * rtProps.shaderHeaderSize, 0,   // miss
+                            bindingTable.resource->buffer, 2 * rtProps.shaderHeaderSize, 0,   // hit
+                            uint32_t(viewport.z), uint32_t(viewport.w));
+
+  }
+  { // Prep for blitting
+    VkImageMemoryBarrier imageMemoryBarriers[2];
+    imageMemoryBarriers[0] = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    imageMemoryBarriers[0].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    imageMemoryBarriers[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    imageMemoryBarriers[0].oldLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imageMemoryBarriers[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    imageMemoryBarriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarriers[0].image = offscreenImage;
+    imageMemoryBarriers[0].subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+
+    imageMemoryBarriers[1] = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    imageMemoryBarriers[1].srcAccessMask = 0;// srcAccessMask;
+    imageMemoryBarriers[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    imageMemoryBarriers[1].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageMemoryBarriers[1].newLayout = VK_IMAGE_LAYOUT_GENERAL;// VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    imageMemoryBarriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarriers[1].image = onscreenImage;
+    imageMemoryBarriers[1].subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+
+    vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                         0, 0, nullptr, 0, nullptr, 2, imageMemoryBarriers);
+  }
+  { // blit
+    VkImageCopy imageCopy{};
+    imageCopy.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+    imageCopy.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+    imageCopy.dstOffset = { 0, 0, 0 };
+    imageCopy.extent = { w, h, 1 };
+    vkCmdCopyImage(cmdBuf,
+                   offscreenImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   onscreenImage, VK_IMAGE_LAYOUT_GENERAL /*VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL*/, 1, &imageCopy);
+  }
+  { // Prop for presentiation
+    VkImageMemoryBarrier imageMemoryBarrier;
+    imageMemoryBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    imageMemoryBarrier.dstAccessMask = 0;
+    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;// VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarrier.image = onscreenImage;
+    imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+
+    vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                         0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
+  }
 }

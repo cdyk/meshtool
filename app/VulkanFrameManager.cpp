@@ -132,7 +132,6 @@ void VulkanFrameManager::resize(uint32_t w, uint32_t h)
   swapChain = vCtx->resources->createSwapChain(swapChain, swapChainInfo);
 
   uint32_t backBufferCount = 0;
-  Vector<VkImage> backBufferImages;
   CHECK_VULKAN(vkGetSwapchainImagesKHR(vCtx->device, swapChain.resource->swapChain, &backBufferCount, NULL));
   backBufferImages.resize(backBufferCount);
   CHECK_VULKAN(vkGetSwapchainImagesKHR(vCtx->device, swapChain.resource->swapChain, &backBufferCount, backBufferImages.data()));
