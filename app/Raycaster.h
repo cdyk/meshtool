@@ -29,6 +29,8 @@ private:
 
   VkDescriptorPool descPool;
   struct Rename {
+    RenderBufferHandle sceneBuffer;
+
     ImageHandle offscreenImage;
     ImageViewHandle offscreenView;
 

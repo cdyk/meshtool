@@ -32,6 +32,11 @@ namespace {
     uint64_t accelerationStructureHandle; // vkGetAccelerationStructureHandleNVX.
   };
 
+  struct SceneBuffer
+  {
+    Mat4f Pinv;
+  };
+
 
 }
 
@@ -124,26 +129,25 @@ void Raycaster::init()
   }
 
   //CHECK_VULKAN(vCtx->vkCompileDeferredNVX(vCtx->device, pipe->pipe, 0));
+  { // shader binding table
 
-  /*
-  size_t bindingTableSize = 3 * rtProps.shaderHeaderSize;
-  auto bindingTableStage = vCtx->resources->createStagingBuffer(bindingTableSize);
-  {
-    char* ptr = nullptr;
-    MappedBufferBase map((void**)&ptr, vCtx, bindingTableStage);
-    // This one grabs handles by the group defined above
-    // First, handle of ray generation shader, followed by contents of shaderRecordNVX.
-    CHECK_VULKAN(vCtx->vkGetRaytracingShaderHandlesNVX(vCtx->device, pipe->pipe, 0, 1, bindingTableSize, ptr + 0 * rtProps.shaderHeaderSize));
-    CHECK_VULKAN(vCtx->vkGetRaytracingShaderHandlesNVX(vCtx->device, pipe->pipe, 1, 1, bindingTableSize, ptr + 1 * rtProps.shaderHeaderSize));
-    CHECK_VULKAN(vCtx->vkGetRaytracingShaderHandlesNVX(vCtx->device, pipe->pipe, 2, 1, bindingTableSize, ptr + 2 * rtProps.shaderHeaderSize));
-    // instanceShaderBindingTableRecordOffset stored in each instance of top-level acc struc
-    // geometry index is the geometry within the instance.
-    // instanceShaderBindingTableRecordOffset + hitProgramShaderBindingTableBaseIndex + geometryIndex × sbtRecordStride + sbtRecordOffset
+    uint32_t groupCount = 1;
+    uint32_t tableSize = groupCount * rtProps.shaderHeaderSize;
+    
+    bindingTable = vCtx->resources->createBuffer(tableSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
+    {
+      char* ptr = nullptr;
+      MappedBufferBase map((void**)&ptr, vCtx, bindingTable);
+
+      CHECK_VULKAN(vCtx->vkGetRaytracingShaderHandlesNVX(vCtx->device, pipe->pipe, 0, groupCount, tableSize, ptr));
+      //CHECK_VULKAN(vCtx->vkGetRaytracingShaderHandlesNVX(vCtx->device, pipe->pipe, 1, 1, bindingTableSize, ptr + 1 * rtProps.shaderHeaderSize));
+      //CHECK_VULKAN(vCtx->vkGetRaytracingShaderHandlesNVX(vCtx->device, pipe->pipe, 2, 1, bindingTableSize, ptr + 2 * rtProps.shaderHeaderSize));
+      // instanceShaderBindingTableRecordOffset stored in each instance of top-level acc struc
+      // geometry index is the geometry within the instance.
+      // instanceShaderBindingTableRecordOffset + hitProgramShaderBindingTableBaseIndex + geometryIndex × sbtRecordStride + sbtRecordOffset
+    }
   }
 
-  bindingTable = vCtx->resources->createBuffer(bindingTableSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_RAYTRACING_BIT_NVX, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-  vCtx->frameManager->copyBuffer(bindingTable, bindingTableStage, bindingTableSize);
-  */
 
   renames.resize(5);
   VkDescriptorPoolSize poolSizes[] = {
@@ -162,6 +166,7 @@ void Raycaster::init()
   CHECK_VULKAN(vkCreateDescriptorPool(vCtx->device, &descriptorPoolCreateInfo, nullptr, &descPool));
 
   for (auto & rename : renames) {
+    rename.sceneBuffer = vCtx->resources->createUniformBuffer(sizeof(SceneBuffer));
 
     VkDescriptorSetAllocateInfo descriptorSetAllocateInfo;
     descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -170,6 +175,18 @@ void Raycaster::init()
     descriptorSetAllocateInfo.descriptorSetCount = 1;
     descriptorSetAllocateInfo.pSetLayouts = &pipe->descLayout;
     CHECK_VULKAN(vkAllocateDescriptorSets(vCtx->device, &descriptorSetAllocateInfo, &rename.descSet));
+
+    VkWriteDescriptorSet writes[1];
+    writes[0] = {};
+    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writes[0].pNext = nullptr;
+    writes[0].dstSet = rename.descSet;
+    writes[0].descriptorCount = 1;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes[0].pBufferInfo = &rename.sceneBuffer.resource->descInfo;
+    writes[0].dstArrayElement = 0;
+    writes[0].dstBinding = 2;
+    vkUpdateDescriptorSets(vCtx->device, 1, writes, 0, nullptr);
   }
 }
 
@@ -311,11 +328,6 @@ void Raycaster::update(Vector<RenderMeshHandle>& meshes)
     accelerationStructureWrite.pTexelBufferView = nullptr;
     vkUpdateDescriptorSets(vCtx->device, (uint32_t)1, &accelerationStructureWrite, 0, nullptr);
   }
-
-  //vkQueueSubmit(_queuesInfo.Graphics.Queue, 1, &submitInfo, VK_NULL_HANDLE);
-  //vkQueueWaitIdle(_queuesInfo.Graphics.Queue);
-  //vkFreeCommandBuffers(_device, _commandPool, 1, &commandBuffer);
-
 
 # if 0
 
@@ -558,8 +570,22 @@ void Raycaster::resize(const Vec4f& viewport)
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
     rename.offscreenView = resources->createImageView(rename.offscreenImage, viewInfo);
-  }
 
+
+    VkDescriptorImageInfo descImageInfo;
+    descImageInfo.sampler = nullptr;
+    descImageInfo.imageView = rename.offscreenView.resource->view;
+    descImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    VkWriteDescriptorSet descImageWrite{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+    descImageWrite.dstSet = rename.descSet;
+    descImageWrite.dstBinding = 1;
+    descImageWrite.dstArrayElement = 0;
+    descImageWrite.descriptorCount = 1;
+    descImageWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    descImageWrite.pImageInfo = &descImageInfo;
+    vkUpdateDescriptorSets(vCtx->device, (uint32_t)1, &descImageWrite, 0, nullptr);
+  }
 }
 
 
@@ -570,8 +596,11 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat4f&
   renameIndex = renameIndex + 1;
   if (renames.size32() <= renameIndex) renameIndex = 0;
   auto & rename = renames[renameIndex];
-
   auto * vCtx = vulkanManager->vCtx;
+  {
+    MappedBuffer<SceneBuffer> map(vCtx, rename.sceneBuffer);
+    map.mem->Pinv = Pinv;
+  }
 
   auto offscreenImage = rename.offscreenImage.resource->image;
   auto onscreenImage = vCtx->frameManager->backBufferImages[vCtx->frameManager->swapChainIndex];
@@ -589,12 +618,14 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat4f&
     vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                          0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
   }
-  if (false) {
+  {
+    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, pipeline.resource->pipe);
+    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, pipeline.resource->pipeLayout, 0, 1, &rename.descSet, 0, 0);
     vCtx->vkCmdTraceRaysNVX(cmdBuf,
-                            bindingTable.resource->buffer, 0 * rtProps.shaderHeaderSize,      // raygen
-                            bindingTable.resource->buffer, 1 * rtProps.shaderHeaderSize, 0,   // miss
-                            bindingTable.resource->buffer, 2 * rtProps.shaderHeaderSize, 0,   // hit
-                            uint32_t(viewport.z), uint32_t(viewport.w));
+                            bindingTable.resource->buffer, 0,      // raygen
+                            bindingTable.resource->buffer, 0, rtProps.shaderHeaderSize,   // miss
+                            bindingTable.resource->buffer, 0, rtProps.shaderHeaderSize,   // hit
+                            w, h);
 
   }
   { // Prep for blitting
@@ -613,7 +644,7 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat4f&
     imageMemoryBarriers[1].srcAccessMask = 0;// srcAccessMask;
     imageMemoryBarriers[1].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     imageMemoryBarriers[1].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageMemoryBarriers[1].newLayout = VK_IMAGE_LAYOUT_GENERAL;// VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    imageMemoryBarriers[1].newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     imageMemoryBarriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     imageMemoryBarriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     imageMemoryBarriers[1].image = onscreenImage;
@@ -626,18 +657,18 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat4f&
     VkImageCopy imageCopy{};
     imageCopy.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
     imageCopy.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-    imageCopy.dstOffset = { 0, 0, 0 };
+    imageCopy.dstOffset = { int32_t(viewport.x), int32_t(viewport.y), 0 };
     imageCopy.extent = { w, h, 1 };
     vkCmdCopyImage(cmdBuf,
                    offscreenImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                   onscreenImage, VK_IMAGE_LAYOUT_GENERAL /*VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL*/, 1, &imageCopy);
+                   onscreenImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopy);
   }
   { // Prop for presentiation
     VkImageMemoryBarrier imageMemoryBarrier;
     imageMemoryBarrier = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
     imageMemoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     imageMemoryBarrier.dstAccessMask = 0;
-    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_GENERAL;// VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
