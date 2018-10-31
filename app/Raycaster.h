@@ -34,7 +34,7 @@ private:
     ImageHandle offscreenImage;
     ImageViewHandle offscreenView;
 
-    VkDescriptorSet descSet;
+    VkDescriptorSet descSet = VK_NULL_HANDLE;
 
   };
   Vector<Rename> renames;
@@ -72,4 +72,7 @@ private:
 
   void buildPipeline();
   void buildDescriptorSets();
+
+  VkDescriptorSetLayout buildDescriptorSetLayout();
+
 };

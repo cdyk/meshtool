@@ -40,10 +40,10 @@ namespace {
 
   struct TriangleData
   {
-    uint8_t n0x, n0y, n0z;
-    uint8_t n1x, n1y, n1z;
-    uint8_t n2x, n2y, n2z;
-    uint8_t r, g, b;
+    float n0x, n0y, n0z;
+    float n1x, n1y, n1z;
+    float n2x, n2y, n2z;
+    float r, g, b;
   };
 
 
@@ -64,10 +64,12 @@ void Raycaster::init()
   renames.resize(5);
 
   auto * vCtx = vulkanManager->vCtx;
-  VkDescriptorPoolSize poolSizes[] = {
-        { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, renames.size32()},
-        { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX, renames.size32() },
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,  10*renames.size32() }
+  VkDescriptorPoolSize poolSizes[] =
+  {
+    { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, renames.size32()},
+    { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX, renames.size32() },
+    { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,  10 * renames.size32() },
+    { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10 * renames.size32()}
   };
 
   VkDescriptorPoolCreateInfo descriptorPoolCreateInfo;
@@ -79,6 +81,50 @@ void Raycaster::init()
   descriptorPoolCreateInfo.pPoolSizes = poolSizes;
   CHECK_VULKAN(vkCreateDescriptorPool(vCtx->device, &descriptorPoolCreateInfo, nullptr, &descPool));
 }
+
+
+VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
+{
+  auto * vCtx = vulkanManager->vCtx;
+  VkDescriptorSetLayoutBinding descSetLayoutBinding[4];
+  descSetLayoutBinding[0] = {};
+  descSetLayoutBinding[0].binding = 0;
+  descSetLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
+  descSetLayoutBinding[0].descriptorCount = 1;
+  descSetLayoutBinding[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+
+  descSetLayoutBinding[1] = {};
+  descSetLayoutBinding[1].binding = 1;
+  descSetLayoutBinding[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+  descSetLayoutBinding[1].descriptorCount = 1;
+  descSetLayoutBinding[1].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+
+  descSetLayoutBinding[2] = {};
+  descSetLayoutBinding[2].binding = 2;
+  descSetLayoutBinding[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  descSetLayoutBinding[2].descriptorCount = 1;
+  descSetLayoutBinding[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+
+  descSetLayoutBinding[3] = {};
+  descSetLayoutBinding[3].binding = 3;
+  descSetLayoutBinding[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  descSetLayoutBinding[3].descriptorCount = meshData.size32();
+  descSetLayoutBinding[3].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+
+  VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+  VkDescriptorSetLayoutCreateInfo layoutCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+  layoutCreateInfo.bindingCount = sizeof(descSetLayoutBinding) / sizeof(descSetLayoutBinding[0]);
+  layoutCreateInfo.pBindings = descSetLayoutBinding;
+  CHECK_VULKAN(vkCreateDescriptorSetLayout(vCtx->device, &layoutCreateInfo, nullptr, &layout));
+  for (auto & rename : renames) {
+    if (rename.descSet) {
+      CHECK_VULKAN(vkFreeDescriptorSets(vCtx->device, descPool, 1, &rename.descSet));
+    }
+    rename.descSet = VK_NULL_HANDLE;
+  }
+  return layout;
+}
+
 
 void Raycaster::buildPipeline()
 {
@@ -109,29 +155,7 @@ void Raycaster::buildPipeline()
   auto * pipe = pipeline.resource;
 
 
-  {
-    VkDescriptorSetLayoutBinding descSetLayoutBinding[3];
-    descSetLayoutBinding[0] = {};
-    descSetLayoutBinding[0].binding = 0;
-    descSetLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
-    descSetLayoutBinding[0].descriptorCount = 1;
-    descSetLayoutBinding[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
-    descSetLayoutBinding[1] = {};
-    descSetLayoutBinding[1].binding = 1;
-    descSetLayoutBinding[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    descSetLayoutBinding[1].descriptorCount = 1;
-    descSetLayoutBinding[1].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
-    descSetLayoutBinding[2] = {};
-    descSetLayoutBinding[2].binding = 2;
-    descSetLayoutBinding[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    descSetLayoutBinding[2].descriptorCount = 1;
-    descSetLayoutBinding[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
-
-    VkDescriptorSetLayoutCreateInfo layoutCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-    layoutCreateInfo.bindingCount = sizeof(descSetLayoutBinding) / sizeof(descSetLayoutBinding[0]);
-    layoutCreateInfo.pBindings = descSetLayoutBinding;
-    CHECK_VULKAN(vkCreateDescriptorSetLayout(vCtx->device, &layoutCreateInfo, nullptr, &pipe->descLayout));
-  }
+  pipe->descLayout = buildDescriptorSetLayout();
 
   {
     VkPipelineLayoutCreateInfo pipeLayoutInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
@@ -187,25 +211,52 @@ void Raycaster::buildDescriptorSets()
   for (auto & rename : renames) {
     rename.sceneBuffer = vCtx->resources->createUniformBuffer(sizeof(SceneBuffer));
 
-    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo;
-    descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    descriptorSetAllocateInfo.pNext = nullptr;
-    descriptorSetAllocateInfo.descriptorPool = descPool;
-    descriptorSetAllocateInfo.descriptorSetCount = 1;
-    descriptorSetAllocateInfo.pSetLayouts = &pipe->descLayout;
-    CHECK_VULKAN(vkAllocateDescriptorSets(vCtx->device, &descriptorSetAllocateInfo, &rename.descSet));
+    if (!rename.descSet) {
+      VkDescriptorSetAllocateInfo descriptorSetAllocateInfo;
+      descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+      descriptorSetAllocateInfo.pNext = nullptr;
+      descriptorSetAllocateInfo.descriptorPool = descPool;
+      descriptorSetAllocateInfo.descriptorSetCount = 1;
+      descriptorSetAllocateInfo.pSetLayouts = &pipe->descLayout;
+      CHECK_VULKAN(vkAllocateDescriptorSets(vCtx->device, &descriptorSetAllocateInfo, &rename.descSet));
+    }
 
-    VkWriteDescriptorSet writes[1];
-    writes[0] = {};
-    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writes[0].pNext = nullptr;
+    VkDescriptorAccelerationStructureInfoNVX descriptorAccelerationStructureInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_ACCELERATION_STRUCTURE_INFO_NVX };
+    descriptorAccelerationStructureInfo.accelerationStructureCount = 1;
+    descriptorAccelerationStructureInfo.pAccelerationStructures = &topAcc.resource->acc;
+
+    Vector<VkWriteDescriptorSet> writes(2 + meshData.size());
+    writes[0] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+    writes[0].pNext = &descriptorAccelerationStructureInfo;
     writes[0].dstSet = rename.descSet;
-    writes[0].descriptorCount = 1;
-    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    writes[0].pBufferInfo = &rename.sceneBuffer.resource->descInfo;
+    writes[0].dstBinding = 0;
     writes[0].dstArrayElement = 0;
-    writes[0].dstBinding = 2;
-    vkUpdateDescriptorSets(vCtx->device, 1, writes, 0, nullptr);
+    writes[0].descriptorCount = 1;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
+    writes[0].pImageInfo = nullptr;
+    writes[0].pBufferInfo = nullptr;
+    writes[0].pTexelBufferView = nullptr;
+
+    writes[1] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+    writes[1].dstSet = rename.descSet;
+    writes[1].descriptorCount = 1;
+    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes[1].pBufferInfo = &rename.sceneBuffer.resource->descInfo;
+    writes[1].dstArrayElement = 0;
+    writes[1].dstBinding = 2;
+
+    for (uint32_t g = 0; g < meshData.size32(); g++) {
+      auto & write = writes[2 + g];
+      write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+      write.dstSet = rename.descSet;
+      write.descriptorCount = 1;
+      write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      write.pBufferInfo = &meshData[g].triangleData.resource->descInfo;
+      write.dstArrayElement = g;
+      write.dstBinding = 3;
+    }
+
+    vkUpdateDescriptorSets(vCtx->device, writes.size32(), writes.data(), 0, nullptr);
   }
 
 }
@@ -234,8 +285,8 @@ bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, co
                                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
   vCtx->resources->copyHostMemToBuffer(meshData.indices, mesh->triVtxIx, sizeof(uint32_t) * 3 * meshData.triangleCount);
 
-  meshData.triangleData = res->createBuffer(sizeof(Vec3f)*meshData.vertexCount,
-                                            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+  meshData.triangleData = res->createBuffer(sizeof(TriangleData)*meshData.vertexCount,
+                                            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
   {
     MappedBuffer<TriangleData> map(vCtx, meshData.triangleData);
@@ -244,19 +295,19 @@ bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, co
       auto n0 = normalize(mesh->nrm[mesh->triNrmIx[3 * t + 0]]);
       auto n1 = normalize(mesh->nrm[mesh->triNrmIx[3 * t + 1]]);
       auto n2 = normalize(mesh->nrm[mesh->triNrmIx[3 * t + 2]]);
-      data.n0x = uint8_t(127.f*n0.x + 127.f);
-      data.n0y = uint8_t(127.f*n0.y + 127.f);
-      data.n0z = uint8_t(127.f*n0.z + 127.f);
-      data.n1x = uint8_t(127.f*n1.x + 127.f);
-      data.n1y = uint8_t(127.f*n1.y + 127.f);
-      data.n1z = uint8_t(127.f*n1.z + 127.f);
-      data.n2x = uint8_t(127.f*n2.x + 127.f);
-      data.n2y = uint8_t(127.f*n2.y + 127.f);
-      data.n2z = uint8_t(127.f*n2.z + 127.f);
+      data.n0x = n0.x;// uint8_t(127.f*n0.x + 127.f);
+      data.n0y = n0.y;// uint8_t(127.f*n0.y + 127.f);
+      data.n0z = n0.z;// uint8_t(127.f*n0.z + 127.f);
+      data.n1x = n1.x;// uint8_t(127.f*n1.x + 127.f);
+      data.n1y = n1.y;// uint8_t(127.f*n1.y + 127.f);
+      data.n1z = n1.z;// uint8_t(127.f*n1.z + 127.f);
+      data.n2x = n2.x;// (127.f*n2.x + 127.f);
+      data.n2y = n2.y;// uint8_t(127.f*n2.y + 127.f);
+      data.n2z = n2.z;// uint8_t(127.f*n2.z + 127.f);
       auto color = mesh->currentColor[t];
-      data.r = (color >> 16) & 0xff;
-      data.g = (color >> 8) & 0xff;
-      data.b = color & 0xff;
+      data.r = (1.f / 255.f)*((color >> 16) & 0xff);
+      data.g = (1.f / 255.f)*((color >> 8) & 0xff);
+      data.b = (1.f / 255.f)*(color & 0xff);
     }
   }
 
@@ -409,25 +460,6 @@ void Raycaster::update(Vector<RenderMeshHandle>& meshes)
 
     buildPipeline();
     buildDescriptorSets();
-
-    for (auto & rename : renames) {
-      VkDescriptorAccelerationStructureInfoNVX descriptorAccelerationStructureInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_ACCELERATION_STRUCTURE_INFO_NVX };
-      descriptorAccelerationStructureInfo.accelerationStructureCount = 1;
-      descriptorAccelerationStructureInfo.pAccelerationStructures = &topAcc.resource->acc;
-
-      VkWriteDescriptorSet accelerationStructureWrite{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-      accelerationStructureWrite.pNext = &descriptorAccelerationStructureInfo;
-      accelerationStructureWrite.dstSet = rename.descSet;
-      accelerationStructureWrite.dstBinding = 0;
-      accelerationStructureWrite.dstArrayElement = 0;
-      accelerationStructureWrite.descriptorCount = 1;
-      accelerationStructureWrite.descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
-      accelerationStructureWrite.pImageInfo = nullptr;
-      accelerationStructureWrite.pBufferInfo = nullptr;
-      accelerationStructureWrite.pTexelBufferView = nullptr;
-      vkUpdateDescriptorSets(vCtx->device, (uint32_t)1, &accelerationStructureWrite, 0, nullptr);
-    }
-
   }
 
 }
