@@ -205,11 +205,16 @@ void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& ren
 {
   auto * frameMgr = vCtx->frameManager;
 
+
+
   frameMgr->startFrame();
   auto & frame = vCtx->frameManager->frame();
   auto & cmdBuf = frame.commandBuffer.resource->cmdBuf;
 
-  
+  if (raycaster) {
+    raycaster->update(renderMeshes);
+  }
+
   VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
   info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   CHECK_VULKAN(vkBeginCommandBuffer(cmdBuf, &info));
@@ -259,8 +264,7 @@ void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& ren
   vkCmdEndRenderPass(cmdBuf);
 
   if (raycaster) {
-    raycaster->update(cmdBuf, renderMeshes);
-    raycaster->draw(cmdBuf, viewerViewport, inverse(mul(P, M)));
+    //raycaster->draw(cmdBuf, viewerViewport, inverse(mul(P, M)));
   }
 
 

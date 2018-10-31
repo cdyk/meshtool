@@ -26,6 +26,16 @@ VulkanResources::~VulkanResources()
   logger(0, "%d unreleased swapChainResources", swapChainResources.getCount());
 }
 
+void VulkanResources::copyHostMemToBuffer(RenderBufferHandle buffer, void* src, size_t size)
+{
+  void * dst = nullptr;
+  CHECK_VULKAN(vkMapMemory(vCtx->device, buffer.resource->mem, 0, buffer.resource->alignedSize, 0, &dst));
+  assert(dst);
+  std::memcpy(dst, src, size);
+  vkUnmapMemory(vCtx->device, buffer.resource->mem);
+}
+
+
 void VulkanResources::houseKeep()
 {
   {
@@ -747,6 +757,61 @@ AccelerationStructureHandle VulkanResources::createAccelerationStructure()
   return accelerationStructures.createResource();
 }
 
+AccelerationStructureHandle VulkanResources::createAccelerationStructure(VkAccelerationStructureTypeNVX type, uint32_t geometryCount, VkGeometryNVX* geometries, uint32_t instanceCount)
+{
+  auto handle = accelerationStructures.createResource();
+  auto * r = handle.resource;
+  //VkAccelerationStructureNVX acc = VK_NULL_HANDLE;
+  //VkDeviceMemory structureMem = VK_NULL_HANDLE;
+  //VkDeviceMemory scratchMem = VK_NULL_HANDLE;
+  //VkBuffer scratchBuffer = VK_NULL_HANDLE;
+
+  VkAccelerationStructureCreateInfoNVX accelerationStructureInfo;
+  accelerationStructureInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NVX;
+  accelerationStructureInfo.pNext = nullptr;
+  accelerationStructureInfo.type = type;
+  accelerationStructureInfo.flags = 0;
+  accelerationStructureInfo.compactedSize = 0;
+  accelerationStructureInfo.instanceCount = instanceCount;
+  accelerationStructureInfo.geometryCount = geometryCount;
+  accelerationStructureInfo.pGeometries = geometries;
+  CHECK_VULKAN(vCtx->vkCreateAccelerationStructureNVX(vCtx->device, &accelerationStructureInfo, nullptr, &r->acc));
+
+  VkMemoryRequirements2 memoryRequirements;
+  VkAccelerationStructureMemoryRequirementsInfoNVX memoryRequirementsInfo;
+  memoryRequirementsInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NVX;
+  memoryRequirementsInfo.pNext = nullptr;
+  memoryRequirementsInfo.accelerationStructure = r->acc;
+  vCtx->vkGetAccelerationStructureMemoryRequirementsNVX(vCtx->device, &memoryRequirementsInfo, &memoryRequirements);
+
+  VkMemoryAllocateInfo memoryAllocateInfo;
+  memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  memoryAllocateInfo.pNext = nullptr;
+  memoryAllocateInfo.allocationSize = memoryRequirements.memoryRequirements.size;
+  memoryAllocateInfo.memoryTypeIndex = getMemoryTypeIndex(memoryRequirements.memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  CHECK_VULKAN(vkAllocateMemory(vCtx->device, &memoryAllocateInfo, nullptr, &r->structureMem));
+
+  VkBindAccelerationStructureMemoryInfoNVX bindInfo;
+  bindInfo.sType = VK_STRUCTURE_TYPE_BIND_ACCELERATION_STRUCTURE_MEMORY_INFO_NVX;
+  bindInfo.pNext = nullptr;
+  bindInfo.accelerationStructure = r->acc;
+  bindInfo.memory = r->structureMem;
+  bindInfo.memoryOffset = 0;
+  bindInfo.deviceIndexCount = 0;
+  bindInfo.pDeviceIndices = nullptr;
+  CHECK_VULKAN(vCtx->vkBindAccelerationStructureMemoryNVX(vCtx->device, 1, &bindInfo));
+
+  VkMemoryRequirements2 scratchMemReq;
+  //VkAccelerationStructureMemoryRequirementsInfoNVX memoryRequirementsInfo;
+  memoryRequirementsInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NVX;
+  memoryRequirementsInfo.pNext = nullptr;
+  memoryRequirementsInfo.accelerationStructure = r->acc;
+  vCtx->vkGetAccelerationStructureScratchMemoryRequirementsNVX(vCtx->device, &memoryRequirementsInfo, &scratchMemReq);
+  r->scratchReqs = scratchMemReq.memoryRequirements;
+
+  return handle;
+}
+
 void VulkanResources::destroyAccelerationStructure(AccelerationStructure* accStr)
 {
   if (accStr->acc) {
@@ -771,8 +836,19 @@ bool VulkanResources::getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uin
   return false;
 }
 
-
-
+uint32_t VulkanResources::getMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags requirements)
+{
+  for (uint32_t i = 0; i < vCtx->memoryProperties.memoryTypeCount; i++) {
+    auto bit = 1 << i;
+    if (typeBits & bit) {
+      if ((vCtx->memoryProperties.memoryTypes[i].propertyFlags & requirements) == requirements) {
+        return i;
+      }
+    }
+  }
+  assert(!"Failed to find suitable memory.");
+  return ~0;
+}
 
 
 MappedBufferBase::MappedBufferBase(void** ptr, VulkanContext* vCtx, RenderBufferHandle h)

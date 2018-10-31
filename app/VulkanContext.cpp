@@ -35,6 +35,7 @@ VulkanContext::VulkanContext(Logger logger,
     Vector<const char*> layers;
     if (debugLayer) {
       layers.pushBack("VK_LAYER_LUNARG_standard_validation");
+      layers.pushBack("VK_LAYER_LUNARG_assistant_layer");
     }
     {
       uint32_t N;

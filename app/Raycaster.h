@@ -14,7 +14,7 @@ public:
   void init();
 
 
-  void update(VkCommandBuffer cmdBuf, Vector<RenderMeshHandle>& meshes);
+  void update(Vector<RenderMeshHandle>& meshes);
 
   void draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat4f& Pinv);
 
@@ -39,4 +39,10 @@ private:
 
   Vector<MeshData> meshData;
   Vector<MeshData> newMeshData;
+
+  bool first = true;
+  AccelerationStructureHandle acc;
+  AccelerationStructureHandle topAcc;
+
+
 };

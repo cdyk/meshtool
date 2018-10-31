@@ -130,8 +130,7 @@ struct AccelerationStructure : public ResourceBase
   AccelerationStructure(ResourceManagerBase& manager) : ResourceBase(manager) {}
   VkAccelerationStructureNVX acc = VK_NULL_HANDLE;
   VkDeviceMemory structureMem = VK_NULL_HANDLE;
-  VkDeviceMemory scratchMem = VK_NULL_HANDLE;
-  VkBuffer scratchBuffer = VK_NULL_HANDLE;
+  VkMemoryRequirements scratchReqs{ 0 };
 };
 typedef ResourceHandle<AccelerationStructure> AccelerationStructureHandle;
 
@@ -191,8 +190,12 @@ public:
   SwapChainHandle createSwapChain(SwapChainHandle oldSwapChain, VkSwapchainCreateInfoKHR& swapChainInfo);
 
   AccelerationStructureHandle createAccelerationStructure();
+  AccelerationStructureHandle createAccelerationStructure(VkAccelerationStructureTypeNVX type, uint32_t geometryCount, VkGeometryNVX* geometries, uint32_t instanceCount);
 
   bool getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements);
+  uint32_t getMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags requirements);
+
+  void copyHostMemToBuffer(RenderBufferHandle buffer, void* src, size_t size);
 
 private:
   VulkanContext* vCtx = nullptr;

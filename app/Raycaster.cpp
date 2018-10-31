@@ -141,9 +141,130 @@ void Raycaster::init()
 
 }
 
-void Raycaster::update(VkCommandBuffer cmdBuf, Vector<RenderMeshHandle>& meshes)
+void Raycaster::update(Vector<RenderMeshHandle>& meshes)
 {
+  if (!first) return;
+  first = false;
+
   auto * vCtx = vulkanManager->vCtx;
+  auto & frame = vCtx->frameManager->frame();
+
+  std::vector<VkGeometryNVX> geometries;
+  VkDeviceSize scratchSize = 0;
+
+  Vec3f vertices[3] = {
+      Vec3f( -0.5f, -0.5f, 0.0f ),
+      Vec3f(+0.0f, +0.5f, 0.0f ),
+      Vec3f(+0.5f, -0.5f, 0.0f )
+  };
+  auto vtxBuf = vCtx->resources->createBuffer(sizeof(vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  vCtx->resources->copyHostMemToBuffer(vtxBuf, vertices, sizeof(vertices));
+
+  uint16_t indices[] = { 0, 1, 2 };
+  auto idxBuf = vCtx->resources->createBuffer(sizeof(indices), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  vCtx->resources->copyHostMemToBuffer(idxBuf, indices, sizeof(indices));
+
+  geometries.push_back({ VK_STRUCTURE_TYPE_GEOMETRY_NVX });
+  auto & geometry = geometries.back();
+  //VkGeometryNVX geometry;
+  geometry.sType = VK_STRUCTURE_TYPE_GEOMETRY_NVX;
+  geometry.pNext = nullptr;
+  geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NVX;
+  geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NVX;
+  geometry.geometry.triangles.pNext = nullptr;
+  geometry.geometry.triangles.vertexData = vtxBuf.resource->buffer;
+  geometry.geometry.triangles.vertexOffset = 0;
+  geometry.geometry.triangles.vertexCount = ARRAYSIZE(vertices);
+  geometry.geometry.triangles.vertexStride = sizeof(Vec3f);
+  geometry.geometry.triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+  geometry.geometry.triangles.indexData = idxBuf.resource->buffer;
+  geometry.geometry.triangles.indexOffset = 0;
+  geometry.geometry.triangles.indexCount = ARRAYSIZE(indices);
+  geometry.geometry.triangles.indexType = VK_INDEX_TYPE_UINT16;
+  geometry.geometry.triangles.transformData = VK_NULL_HANDLE;
+  geometry.geometry.triangles.transformOffset = 0;
+  geometry.geometry.aabbs = { };
+  geometry.geometry.aabbs.sType = VK_STRUCTURE_TYPE_GEOMETRY_AABB_NVX;
+  geometry.flags = 0;
+  acc = vCtx->resources->createAccelerationStructure(VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NVX, 1, &geometry, 0);
+  if (scratchSize < acc.resource->scratchReqs.size) scratchSize = acc.resource->scratchReqs.size;
+
+
+  std::vector<Instance> instances(1);
+  auto & instance = instances[0];
+  for (unsigned j = 0; j < 3; j++) {
+    for (unsigned i = 0; i < 4; i++) {
+      instance.transform[4 * j + i] = i == j ? 1.f : 0.f;
+    }
+  }
+  instance.instanceID = 0;
+  instance.instanceMask = 0xff;
+  instance.instanceContributionToHitGroupIndex = 0;
+  instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NVX;
+  instance.accelerationStructureHandle = 0;
+  CHECK_VULKAN(vCtx->vkGetAccelerationStructureHandleNVX(vCtx->device, acc.resource->acc, sizeof(uint64_t), &instance.accelerationStructureHandle));
+
+  auto instanceBuffer = vCtx->resources->createBuffer(sizeof(Instance), VK_BUFFER_USAGE_RAYTRACING_BIT_NVX, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  vCtx->resources->copyHostMemToBuffer(instanceBuffer, instances.data(), sizeof(Instance)*instances.size());
+
+  topAcc = vCtx->resources->createAccelerationStructure(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NVX, 0, nullptr, uint32_t(instances.size()));
+  if (scratchSize < topAcc.resource->scratchReqs.size) scratchSize = topAcc.resource->scratchReqs.size;
+
+  auto scratchBuffer = vCtx->resources->createBuffer(scratchSize, VK_BUFFER_USAGE_RAYTRACING_BIT_NVX, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+
+
+
+  auto cmdBuf = vCtx->resources->createPrimaryCommandBuffer(frame.commandPool).resource->cmdBuf;
+
+  VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  vkBeginCommandBuffer(cmdBuf, &beginInfo);
+
+
+  VkMemoryBarrier memoryBarrier;
+  memoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+  memoryBarrier.pNext = nullptr;
+  memoryBarrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX;
+  memoryBarrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX;
+
+
+  vCtx->vkCmdBuildAccelerationStructureNVX(cmdBuf, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NVX,
+                                           0, VK_NULL_HANDLE, 0,
+                                           (uint32_t)geometries.size(), &geometries[0],
+                                           0, VK_FALSE, acc.resource->acc, VK_NULL_HANDLE, scratchBuffer.resource->buffer, 0);
+
+  vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, 0, 1, &memoryBarrier, 0, 0, 0, 0);
+
+  vCtx->vkCmdBuildAccelerationStructureNVX(cmdBuf, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NVX,
+                                           1, instanceBuffer.resource->buffer, 0,
+                                           0, nullptr,
+                                           0, VK_FALSE, topAcc.resource->acc, VK_NULL_HANDLE, scratchBuffer.resource->buffer, 0);
+
+  vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, 0, 1, &memoryBarrier, 0, 0, 0, 0);
+
+  vkEndCommandBuffer(cmdBuf);
+
+  VkSubmitInfo submitInfo;
+  submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+  submitInfo.pNext = nullptr;
+  submitInfo.waitSemaphoreCount = 0;
+  submitInfo.pWaitSemaphores = nullptr;
+  submitInfo.pWaitDstStageMask = nullptr;
+  submitInfo.commandBufferCount = 1;
+  submitInfo.pCommandBuffers = &cmdBuf;
+  submitInfo.signalSemaphoreCount = 0;
+  submitInfo.pSignalSemaphores = nullptr;
+
+  vkQueueSubmit(vCtx->queue, 1, &submitInfo, VK_NULL_HANDLE);
+  vkQueueWaitIdle(vCtx->queue);
+  vkDeviceWaitIdle(vCtx->device);
+
+  //vkQueueSubmit(_queuesInfo.Graphics.Queue, 1, &submitInfo, VK_NULL_HANDLE);
+  //vkQueueWaitIdle(_queuesInfo.Graphics.Queue);
+  //vkFreeCommandBuffers(_device, _commandPool, 1, &commandBuffer);
+
+
+# if 0
 
   bool change = false;
 
@@ -234,16 +355,30 @@ void Raycaster::update(VkCommandBuffer cmdBuf, Vector<RenderMeshHandle>& meshes)
 
       CHECK_VULKAN(vkBindBufferMemory(vCtx->device, md.acc.resource->scratchBuffer, md.acc.resource->scratchMem, 0));
 
+      auto cmdBuf = vCtx->resources->createPrimaryCommandBuffer(frame.commandPool).resource->cmdBuf;
+
+      VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+      beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+      vkBeginCommandBuffer(cmdBuf, &beginInfo);
+
       vCtx->vkCmdBuildAccelerationStructureNVX(cmdBuf, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NVX,
                                                0, VK_NULL_HANDLE, 0,
                                                1, &geometry, 0, //VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NVX,
                                                VK_FALSE, md.acc.resource->acc, VK_NULL_HANDLE, md.acc.resource->scratchBuffer, 0);
 
-      VkMemoryBarrier memoryBarrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
-      memoryBarrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX;
-      memoryBarrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX;
+      vkEndCommandBuffer(cmdBuf);
 
-      vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, 0, 1, &memoryBarrier, 0, 0, 0, 0);
+      VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
+      submitInfo.commandBufferCount = 1;
+      submitInfo.pCommandBuffers = &cmdBuf;
+      vkQueueSubmit(vCtx->queue, 1, &submitInfo, VK_NULL_HANDLE);
+      vkQueueWaitIdle(vCtx->queue);
+      vkDeviceWaitIdle(vCtx->device);
+
+      //VkMemoryBarrier memoryBarrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+      //memoryBarrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX;
+      //memoryBarrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX;
+      //vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, 0, 1, &memoryBarrier, 0, 0, 0, 0);
     }
   }
   meshData.swap(newMeshData);
@@ -310,16 +445,33 @@ void Raycaster::update(VkCommandBuffer cmdBuf, Vector<RenderMeshHandle>& meshes)
     //vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, 0, 1, &memoryBarrier, 0, 0, 0, 0);
 
 #if 1
+    auto cmdBuf = vCtx->resources->createPrimaryCommandBuffer(frame.commandPool).resource->cmdBuf;
+
+    VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    vkBeginCommandBuffer(cmdBuf, &beginInfo);
+
     vCtx->vkCmdBuildAccelerationStructureNVX(cmdBuf, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NVX,
                                              instances, topLevelInstances.resource->buffer, 0,
                                              0, nullptr, 0, //VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NVX,
                                              VK_FALSE, topLevel.resource->acc, VK_NULL_HANDLE, topLevel.resource->scratchBuffer, 0);
+
+    vkEndCommandBuffer(cmdBuf);
+
+    VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
+    submitInfo.commandBufferCount = 1;
+    submitInfo.pCommandBuffers = &cmdBuf;
+    vkQueueSubmit(vCtx->queue, 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(vCtx->queue);
+
+    vkDeviceWaitIdle(vCtx->device);
 #endif
     //VkMemoryBarrier memoryBarrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
     //memoryBarrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX;
     //memoryBarrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX;
     //vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, 0, 1, &memoryBarrier, 0, 0, 0, 0);
   }
+#endif
 }
 
 
