@@ -51,11 +51,10 @@ private:
 
   RenderBufferHandle bindingTable;
 
+  Vector<VkGeometryNVX> geometries;
   Vector<MeshData> meshData;
   Vector<MeshData> newMeshData;
 
-  bool first = true;
-  AccelerationStructureHandle acc;
   AccelerationStructureHandle topAcc;
 
   uint32_t w = ~0u;

@@ -26,17 +26,19 @@ layout(location = 0) rayPayloadNVX vec3 color;
 
 void main()
 {
-  vec2 u = (vec2(gl_LaunchIDNVX.xy) + vec2(0.5f)) / vec2(gl_LaunchSizeNVX.xy);
+  vec2 u = vec2(gl_LaunchIDNVX.x, gl_LaunchIDNVX.y) / vec2(gl_LaunchSizeNVX.xy);
 
-  vec4 oh = sceneBuf.Pinv * vec4(u, 0, 1);
+  vec2 c = vec2(2, -2)*u + vec2(-1, 1);
+
+  vec4 oh = (sceneBuf.Pinv) * vec4(c, -1, 1);
   vec3 o = (1.f / oh.w)*oh.xyz;
 
-  vec4 of = sceneBuf.Pinv * vec4(u, 1, 1);
+  vec4 of = (sceneBuf.Pinv) * vec4(c, 1, 1);
   vec3 f = (1.f / of.w)*of.xyz;
   vec3 d = normalize(f - o);
 
-  o = vec3(0, 0, -2.0);
-  d = normalize(vec3(u-vec2(0.5), 1));
+  //o = vec3(0, 0, -2.0);
+  //d = normalize(vec3(u-vec2(0.5), 1));
 
   traceNVX(topLevel,
            gl_RayFlagsOpaqueNVX,   // rayFlags

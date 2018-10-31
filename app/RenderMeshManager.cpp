@@ -42,7 +42,19 @@ RenderMeshHandle RenderMeshManager::createRenderMesh(Mesh* mesh)
   auto * renderMesh = renderMeshHandle.resource;
 
   renderMesh->mesh = mesh;
+  renderMesh->vertexCount = mesh->vtxCount;
   renderMesh->tri_n = mesh->triCount;
+
+  // indexed geometry
+
+  renderMesh->vertices = vCtx->resources->createBuffer(sizeof(Vec3f)*renderMesh->vertexCount, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  vCtx->resources->copyHostMemToBuffer(renderMesh->vertices, mesh->vtx, sizeof(Vec3f)*renderMesh->vertexCount);
+
+  renderMesh->indices = vCtx->resources->createBuffer(sizeof(uint32_t) * 3 * renderMesh->tri_n, VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+  vCtx->resources->copyHostMemToBuffer(renderMesh->indices,  mesh->triVtxIx, sizeof(uint32_t) * 3 * renderMesh->tri_n);
+
+  // unindexed geometry
+
 
   renderMesh->vtx = vCtx->resources->createVertexDeviceBuffer(sizeof(Vec3f) * 3 * renderMesh->tri_n);
   renderMesh->nrm = vCtx->resources->createVertexDeviceBuffer(sizeof(Vec3f) * 3 * renderMesh->tri_n);

@@ -601,7 +601,8 @@ int main(int argc, char** argv)
     }
     app->updateColor = false;
 
-    app->vulkanManager->render(app->width, app->height, app->items.renderMeshes, viewport, app->viewer->getProjectionMatrix(), app->viewer->getViewMatrix());
+    app->vulkanManager->render(app->width, app->height, app->items.renderMeshes, viewport,
+                               app->viewer->getProjectionMatrix(), app->viewer->getViewMatrix(), app->viewer->getProjectionViewInverseMatrix());
     app->vulkanManager->present();
   }
   CHECK_VULKAN(vkDeviceWaitIdle(app->vulkanManager->vCtx->device));

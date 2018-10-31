@@ -201,7 +201,7 @@ void VulkanManager::resize(uint32_t w, uint32_t h)
 }
 
 
-void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes, const Vec4f& viewerViewport, const Mat4f& P, const Mat4f& M)
+void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes, const Vec4f& viewerViewport, const Mat4f& P, const Mat4f& M, const Mat4f& PMinv)
 {
   auto * frameMgr = vCtx->frameManager;
 
@@ -222,6 +222,7 @@ void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& ren
   VkClearValue clearValues[2] = {};
   clearValues[1].depthStencil.depth = 1.f;
 
+  auto PM = mul(P, M);
   {
 
     VkRenderPassBeginInfo beginInfo = {};
@@ -264,7 +265,10 @@ void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& ren
   vkCmdEndRenderPass(cmdBuf);
 
   if (raycaster) {
-    raycaster->draw(cmdBuf, viewerViewport, inverse(mul(P, M)));
+    //auto G = inverse(mul(M, P));
+    //auto H = mul(Minv, Pinv);
+
+    raycaster->draw(cmdBuf, viewerViewport, PMinv);
   }
 
 
