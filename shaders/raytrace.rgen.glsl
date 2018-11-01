@@ -24,7 +24,7 @@ void main()
 
   uint state = gl_LaunchSizeNVX.x * gl_LaunchIDNVX.y + gl_LaunchIDNVX.x + sceneBuf.rndState;
 
-  uint N = 20;
+  uint N = 1;
 
   vec3 color = vec3(0, 0, 0);
   for (uint i = 0; i < N; i++) {

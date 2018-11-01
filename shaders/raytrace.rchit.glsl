@@ -48,7 +48,7 @@ void main() {
            1000.f,                 // tMax
            1);                     // Payload
 
-  payloadIn.color = 0.2f*payload.color;
+  payloadIn.color = 0.7f*payload.color;
 
   //vec3 l = vec3(sceneBuf.lx, sceneBuf.ly, sceneBuf.lz);
   //colorIn =  0.3f*max(0.5f,dot(n,d))*color;// irradiance(n);
