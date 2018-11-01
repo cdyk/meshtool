@@ -96,7 +96,7 @@ void Raycaster::init()
 VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
 {
   auto * vCtx = vulkanManager->vCtx;
-  VkDescriptorSetLayoutBinding descSetLayoutBinding[4];
+  VkDescriptorSetLayoutBinding descSetLayoutBinding[5];
   descSetLayoutBinding[0] = {};
   descSetLayoutBinding[0].binding = BINDING_TOPLEVEL_ACC;
   descSetLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
@@ -121,7 +121,13 @@ VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
   descSetLayoutBinding[3].descriptorCount = meshData.size32();
   descSetLayoutBinding[3].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
 
-  VkDescriptorBindingFlagsEXT flags[4] = { 0, 0, 0, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT };
+  descSetLayoutBinding[4] = {};
+  descSetLayoutBinding[4].binding = BINDING_INPUT_IMAGE;
+  descSetLayoutBinding[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+  descSetLayoutBinding[4].descriptorCount = 1;
+  descSetLayoutBinding[4].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+
+  VkDescriptorBindingFlagsEXT flags[5] = { 0, 0, 0, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT, 0 };
 
   VkDescriptorSetLayoutBindingFlagsCreateInfoEXT bindingFlags{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT };
   bindingFlags.pBindingFlags = flags;
@@ -506,21 +512,36 @@ void Raycaster::resize(const Vec4f& viewport)
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
     rename.offscreenView = resources->createImageView(rename.offscreenImage, viewInfo);
+  }
 
+  for(uint32_t i=0; i<renames.size32(); i++) {
+    auto & rename = renames[i];
+    auto & prevRename = renames[(i + renames.size32() - 1) % renames.size32()];
 
-    VkDescriptorImageInfo descImageInfo;
-    descImageInfo.sampler = nullptr;
-    descImageInfo.imageView = rename.offscreenView.resource->view;
-    descImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+    VkDescriptorImageInfo descImageInfoCurr{};
+    descImageInfoCurr.imageView = rename.offscreenView.resource->view;
+    descImageInfoCurr.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
-    VkWriteDescriptorSet descImageWrite{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    descImageWrite.dstSet = rename.descSet;
-    descImageWrite.dstBinding = BINDING_OUTPUT_IMAGE;
-    descImageWrite.dstArrayElement = 0;
-    descImageWrite.descriptorCount = 1;
-    descImageWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    descImageWrite.pImageInfo = &descImageInfo;
-    vkUpdateDescriptorSets(vCtx->device, (uint32_t)1, &descImageWrite, 0, nullptr);
+    VkDescriptorImageInfo descImageInfoPrev{};
+    descImageInfoPrev.imageView = prevRename.offscreenView.resource->view;
+    descImageInfoPrev.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    VkWriteDescriptorSet descImageWrite[2];
+    descImageWrite[0] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+    descImageWrite[0].dstSet = rename.descSet;
+    descImageWrite[0].dstBinding = BINDING_OUTPUT_IMAGE;
+    descImageWrite[0].dstArrayElement = 0;
+    descImageWrite[0].descriptorCount = 1;
+    descImageWrite[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    descImageWrite[0].pImageInfo = &descImageInfoCurr;
+    descImageWrite[1] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+    descImageWrite[1].dstSet = rename.descSet;
+    descImageWrite[1].dstBinding = BINDING_INPUT_IMAGE;
+    descImageWrite[1].dstArrayElement = 0;
+    descImageWrite[1].descriptorCount = 1;
+    descImageWrite[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    descImageWrite[1].pImageInfo = &descImageInfoPrev;
+    vkUpdateDescriptorSets(vCtx->device, ARRAYSIZE(descImageWrite), descImageWrite, 0, nullptr);
   }
 }
 
@@ -533,12 +554,14 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
 
   rndState = 1664525 * rndState + 1013904223;
 
+  auto & prevRename = renames[renameIndex];
   renameIndex = renameIndex + 1;
   if (renames.size32() <= renameIndex) renameIndex = 0;
   auto & rename = renames[renameIndex];
+
   auto * vCtx = vulkanManager->vCtx;
   {
-    auto l = normalize(mul(Ninv, Vec3f(1, 1, 1)));
+    auto l = normalize(mul(Ninv, Vec3f(1, 1, 0.2f)));
     auto u = normalize(mul(Ninv, Vec3f(0, 1, 0)));
 
     MappedBuffer<SceneBuffer> map(vCtx, rename.sceneBuffer);
@@ -555,6 +578,19 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
   auto offscreenImage = rename.offscreenImage.resource->image;
   auto onscreenImage = vCtx->frameManager->backBufferImages[vCtx->frameManager->swapChainIndex];
 
+  { // Prep prev image for reading
+    VkImageMemoryBarrier imageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+    imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    imageMemoryBarrier.dstAccessMask = 0;
+    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarrier.image = prevRename.offscreenImage.resource->image;
+    imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+    vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                         0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
+  }
   { // Prep for shader storage
     VkImageMemoryBarrier imageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
     imageMemoryBarrier.srcAccessMask = 0;

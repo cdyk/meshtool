@@ -2,3 +2,4 @@
 #define BINDING_OUTPUT_IMAGE    1
 #define BINDING_SCENE_BUF       2
 #define BINDING_TRIANGLE_DATA   3
+#define BINDING_INPUT_IMAGE     4
