@@ -37,6 +37,7 @@ public:
   float menuHeight = 0.f;
 
   TriangleColor triangleColor = TriangleColor::ModelColor;
+  bool raytrace = false;
   bool updateColor = true;
   bool selectAll = false;
   bool selectNone = false;

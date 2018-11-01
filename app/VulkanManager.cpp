@@ -50,10 +50,6 @@ VulkanManager::VulkanManager(Logger l, GLFWwindow* window, uint32_t w, uint32_t 
   const char** extensions = glfwGetRequiredInstanceExtensions(&extensions_count);
   vCtx = new VulkanContext(logger, extensions, extensions_count, 3, new GLFWPresentationSupport(window));
   vCtx->init();
-  if (vCtx->nvxRaytracing) {
-    raycaster = new Raycaster(logger, this);
-    raycaster->init();
-  }
 
   resize(w, h);
 
@@ -201,19 +197,28 @@ void VulkanManager::resize(uint32_t w, uint32_t h)
 }
 
 
-void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes, const Vec4f& viewerViewport, const Mat4f& P, const Mat4f& M, const Mat4f& PMinv, const Mat4f& Minv)
+void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes, const Vec4f& viewerViewport, const Mat4f& P, const Mat4f& M, const Mat4f& PMinv, const Mat4f& Minv, bool raytrace)
 {
   auto * frameMgr = vCtx->frameManager;
-
-
-
   frameMgr->startFrame();
+
+  raytrace = raytrace && vCtx->nvxRaytracing;
+
+  if (raytrace) {
+    if (raycaster == nullptr) {
+      raycaster = new Raycaster(logger, this);
+      raycaster->init();
+    }
+    raycaster->update(renderMeshes);
+  }
+  else if (raycaster) {
+    delete raycaster;
+    raycaster = nullptr;
+  }
+
   auto & frame = vCtx->frameManager->frame();
   auto & cmdBuf = frame.commandBuffer.resource->cmdBuf;
 
-  if (raycaster) {
-    raycaster->update(renderMeshes);
-  }
 
   VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
   info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -223,7 +228,7 @@ void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& ren
   clearValues[1].depthStencil.depth = 1.f;
 
   auto PM = mul(P, M);
-  {
+  if(raytrace == false) {
 
     VkRenderPassBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -264,10 +269,7 @@ void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& ren
 
   vkCmdEndRenderPass(cmdBuf);
 
-  if (raycaster) {
-    //auto G = inverse(mul(M, P));
-    //auto H = mul(Minv, Pinv);
-
+  if (raytrace) {
     raycaster->draw(cmdBuf, viewerViewport, Mat3f(Minv), PMinv);
   }
 

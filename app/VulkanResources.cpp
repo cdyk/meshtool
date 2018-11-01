@@ -817,7 +817,11 @@ void VulkanResources::destroyAccelerationStructure(AccelerationStructure* accStr
   if (accStr->acc) {
     logger(0, "Destroying acceleration structure.");
     vCtx->vkDestroyAccelerationStructureNVX(vCtx->device, accStr->acc, nullptr);
-    accStr = nullptr;
+    accStr->acc = VK_NULL_HANDLE;
+  }
+  if (accStr->structureMem) {
+    vkFreeMemory(vCtx->device, accStr->structureMem, nullptr);
+    accStr->structureMem = VK_NULL_HANDLE;
   }
 }
 

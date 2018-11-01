@@ -59,6 +59,12 @@ Raycaster::Raycaster(Logger logger, VulkanManager* vulkanManager)
 
 Raycaster::~Raycaster()
 {
+  auto * device = vulkanManager->vCtx->device;
+  if (descPool) {
+    vkDestroyDescriptorPool(device, descPool, nullptr);
+    descPool = VK_NULL_HANDLE;
+  }
+
 }
 
 void Raycaster::init()

@@ -127,6 +127,7 @@ namespace {
       if (key == GLFW_KEY_S && action == GLFW_PRESS) app->moveToSelection = true;
     }
     else if (mods == 0) {
+      if (key == GLFW_KEY_R && action == GLFW_PRESS) app->raytrace = !app->raytrace;
       if (key == GLFW_KEY_W && action == GLFW_PRESS)  app->vulkanManager->renderer->outlines = !app->vulkanManager->renderer->outlines;
       if (key == GLFW_KEY_S && action == GLFW_PRESS)  app->vulkanManager->renderer->solid = !app->vulkanManager->renderer->solid;
       if (key == GLFW_KEY_A && action == GLFW_PRESS) app->vulkanManager->renderer->tangentSpaceCoordSys = !app->vulkanManager->renderer->tangentSpaceCoordSys;
@@ -245,6 +246,7 @@ namespace {
         if (ImGui::MenuItem("View all", "CTRL+SHIFT+A", nullptr)) { app->viewAll = true; }
         if (ImGui::MenuItem("View selection", "CTRL+SHIFT+S")) { app->moveToSelection = true; }
         ImGui::Separator();
+        if (ImGui::MenuItem("Raytracing", "R", &app->raytrace, app->vulkanManager->vCtx->nvxRaytracing)) {}
         if (ImGui::MenuItem("Solid", "S", &app->vulkanManager->renderer->solid)) {}
         if (ImGui::MenuItem("Outlines", "W", &app->vulkanManager->renderer->outlines)) {}
         if (ImGui::MenuItem("Tangent coordsys", "C", &app->vulkanManager->renderer->tangentSpaceCoordSys)) {}
@@ -435,7 +437,15 @@ int main(int argc, char** argv)
 
   for (int i = 1; i < argc; i++) {
     auto arg = std::string(argv[i]);
-    if (arg.substr(0, 2) == "--") {
+    if (arg == "--raytace") {
+      app->raytrace = true;
+    }
+    else if (arg == "--no-raytrace") {
+      app->raytrace = false;
+    }
+    else if (arg.substr(0, 2) == "--") {
+     
+
     }
     else {
       auto argLower = arg;
@@ -602,7 +612,7 @@ int main(int argc, char** argv)
     app->updateColor = false;
 
     app->vulkanManager->render(app->width, app->height, app->items.renderMeshes, viewport,
-                               app->viewer->getProjectionMatrix(), app->viewer->getViewMatrix(), app->viewer->getProjectionViewInverseMatrix(), app->viewer->getViewInverseMatrix());
+                               app->viewer->getProjectionMatrix(), app->viewer->getViewMatrix(), app->viewer->getProjectionViewInverseMatrix(), app->viewer->getViewInverseMatrix(), app->raytrace);
     app->vulkanManager->present();
   }
   CHECK_VULKAN(vkDeviceWaitIdle(app->vulkanManager->vCtx->device));

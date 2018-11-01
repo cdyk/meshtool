@@ -27,7 +27,7 @@ private:
   ShaderHandle shader;
   PipelineHandle pipeline;
 
-  VkDescriptorPool descPool;
+  VkDescriptorPool descPool = VK_NULL_HANDLE;
   struct Rename {
     RenderBufferHandle sceneBuffer;
 
