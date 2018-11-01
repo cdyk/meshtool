@@ -93,7 +93,7 @@ VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
   descSetLayoutBinding[0].binding = 0;
   descSetLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
   descSetLayoutBinding[0].descriptorCount = 1;
-  descSetLayoutBinding[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+  descSetLayoutBinding[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX | VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
 
   descSetLayoutBinding[1] = {};
   descSetLayoutBinding[1].binding = 1;
@@ -147,13 +147,12 @@ void Raycaster::buildPipeline()
   logger(0, "rtprops.maxGeometryCount=%d", rtProps.maxGeometryCount);
 
 
-  Vector<ShaderInputSpec> stages(4);
+  Vector<ShaderInputSpec> stages(3);
   stages[0] = { raytrace_rgen, sizeof(raytrace_rgen), VK_SHADER_STAGE_RAYGEN_BIT_NVX };
   stages[1] = { raytrace_rchit, sizeof(raytrace_rchit), VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX };
-  stages[2] = { raytrace_rahit, sizeof(raytrace_rahit), VK_SHADER_STAGE_ANY_HIT_BIT_NVX };
-  stages[3] = { raytrace_rmiss, sizeof(raytrace_rmiss), VK_SHADER_STAGE_MISS_BIT_NVX };
+  stages[2] = { raytrace_rmiss, sizeof(raytrace_rmiss), VK_SHADER_STAGE_MISS_BIT_NVX };
 
-  uint32_t groupNumbers[4] = { 0, 1, 1, 2 };
+  uint32_t groupNumbers[4] = { 0, 1, 2 };
 
   shader = vCtx->resources->createShader(stages);
   assert(shader.resource->stageCreateInfo.size() == stages.size());
@@ -179,7 +178,7 @@ void Raycaster::buildPipeline()
     info.pStages = shader.resource->stageCreateInfo.data();
     info.stageCount = shader.resource->stageCreateInfo.size32();
     info.pGroupNumbers = groupNumbers;
-    info.maxRecursionDepth = 1;
+    info.maxRecursionDepth = 4;
     info.layout = pipe->pipeLayout;
     CHECK_VULKAN(vCtx->vkCreateRaytracingPipelinesNVX(vCtx->device, nullptr /*vCtx->pipelineCache*/, 1, &info, nullptr, &pipe->pipe));
   }
@@ -412,7 +411,7 @@ void Raycaster::update(Vector<RenderMeshHandle>& meshes)
       instance.instanceID = 0;
       instance.instanceMask = 0xff;
       instance.instanceContributionToHitGroupIndex = 0;
-      instance.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NVX;
+      instance.flags = 0;// VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NVX;
       instance.accelerationStructureHandle = 0;
       CHECK_VULKAN(vCtx->vkGetAccelerationStructureHandleNVX(vCtx->device, meshData[g].acc.resource->acc, sizeof(uint64_t), &instance.accelerationStructureHandle));
     }

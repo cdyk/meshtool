@@ -9,7 +9,32 @@ layout(std140, binding = 2) uniform SceneBuf {
   float ux, uy, uz;   // camera up
 } sceneBuf;
 
-layout(location = 0) rayPayloadNVX vec3 color;
+
+struct Payload
+{
+  vec3 color;
+  uint state;
+};
+
+layout(location = 0) rayPayloadNVX Payload payload;
+
+uint xorShift(uint state)
+{
+  state ^= (state << 13);
+  state ^= (state >> 17);
+  state ^= (state << 5);
+  return state;
+}
+
+uint wangHash(uint state)
+{
+  state = (state ^ 61) ^ (state >> 16);
+  state *= 9;
+  state = state ^ (state >> 4);
+  state *= 0x27d4eb2d;
+  state = state ^ (state >> 15);
+  return state;
+}
 
 void main()
 {
@@ -27,18 +52,28 @@ void main()
   //o = vec3(0, 0, -2.0);
   //d = normalize(vec3(u-vec2(0.5), 1));
 
-  traceNVX(topLevel,
-           gl_RayFlagsOpaqueNVX,   // rayFlags
-           ~0u,                    // cullMask
-           0,                      // stbRecordOffset
-           0,                      // stbRecordStride
-           0,                      // missIndex
-           o,                      // origin
-           0.001f,                 // tMin
-           d,                      // dir
-           1000.f,                 // tMax
-           0);                     // Payload
+  uint state = gl_LaunchSizeNVX.x * gl_LaunchIDNVX.y + gl_LaunchIDNVX.x;
 
+  uint N = 50;
+
+  vec3 color = vec3(0, 0, 0);
+  for (uint i = 0; i < N; i++) {
+    state = wangHash(state);
+
+    payload.state = state;
+    traceNVX(topLevel,
+             gl_RayFlagsOpaqueNVX | gl_RayFlagsCullBackFacingTrianglesNVX,   // rayFlags
+             ~0u,                    // cullMask
+             0,                      // stbRecordOffset
+             0,                      // stbRecordStride
+             0,                      // missIndex
+             o,                      // origin
+             0.001f,                 // tMin
+             d,                      // dir
+             1000.f,                 // tMax
+             0);                     // Payload
+    color += (1.f / N)*payload.color;
+  }
 
   imageStore(image, ivec2(gl_LaunchIDNVX.xy), vec4(color, 0.0f));
 }
