@@ -123,10 +123,8 @@ VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
   layoutCreateInfo.bindingCount = sizeof(descSetLayoutBinding) / sizeof(descSetLayoutBinding[0]);
   layoutCreateInfo.pBindings = descSetLayoutBinding;
   CHECK_VULKAN(vkCreateDescriptorSetLayout(vCtx->device, &layoutCreateInfo, nullptr, &layout));
+  CHECK_VULKAN(vkResetDescriptorPool(vCtx->device, descPool, 0));
   for (auto & rename : renames) {
-    if (rename.descSet) {
-      CHECK_VULKAN(vkFreeDescriptorSets(vCtx->device, descPool, 1, &rename.descSet));
-    }
     rename.descSet = VK_NULL_HANDLE;
   }
   return layout;
@@ -322,7 +320,7 @@ bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, co
       data.n2x = n2.x;// (127.f*n2.x + 127.f);
       data.n2y = n2.y;// uint8_t(127.f*n2.y + 127.f);
       data.n2z = n2.z;// uint8_t(127.f*n2.z + 127.f);
-      auto color = mesh->currentColor[t];
+      auto color = t;// mesh->currentColor[t];
       data.r = (1.f / 255.f)*((color >> 16) & 0xff);
       data.g = (1.f / 255.f)*((color >> 8) & 0xff);
       data.b = (1.f / 255.f)*(color & 0xff);
