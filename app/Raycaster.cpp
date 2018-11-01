@@ -86,7 +86,7 @@ void Raycaster::init()
 VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
 {
   auto * vCtx = vulkanManager->vCtx;
-  VkDescriptorSetLayoutBinding descSetLayoutBinding[3];
+  VkDescriptorSetLayoutBinding descSetLayoutBinding[4];
   descSetLayoutBinding[0] = {};
   descSetLayoutBinding[0].binding = 0;
   descSetLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
@@ -105,14 +105,21 @@ VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
   descSetLayoutBinding[2].descriptorCount = 1;
   descSetLayoutBinding[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
 
-  //descSetLayoutBinding[3] = {};
-  //descSetLayoutBinding[3].binding = 3;
-  //descSetLayoutBinding[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-  //descSetLayoutBinding[3].descriptorCount = meshData.size32();
-  //descSetLayoutBinding[3].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+  descSetLayoutBinding[3] = {};
+  descSetLayoutBinding[3].binding = 3;
+  descSetLayoutBinding[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  descSetLayoutBinding[3].descriptorCount = meshData.size32();
+  descSetLayoutBinding[3].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
+
+  VkDescriptorBindingFlagsEXT flags[4] = { 0, 0, 0, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT };
+
+  VkDescriptorSetLayoutBindingFlagsCreateInfoEXT bindingFlags{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT };
+  bindingFlags.pBindingFlags = flags;
+  bindingFlags.bindingCount = ARRAYSIZE(flags);
 
   VkDescriptorSetLayout layout = VK_NULL_HANDLE;
   VkDescriptorSetLayoutCreateInfo layoutCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
+  layoutCreateInfo.pNext = &bindingFlags;
   layoutCreateInfo.bindingCount = sizeof(descSetLayoutBinding) / sizeof(descSetLayoutBinding[0]);
   layoutCreateInfo.pBindings = descSetLayoutBinding;
   CHECK_VULKAN(vkCreateDescriptorSetLayout(vCtx->device, &layoutCreateInfo, nullptr, &layout));
@@ -212,13 +219,21 @@ void Raycaster::buildDescriptorSets()
     rename.sceneBuffer = vCtx->resources->createUniformBuffer(sizeof(SceneBuffer));
 
     if (!rename.descSet) {
-      VkDescriptorSetAllocateInfo descriptorSetAllocateInfo;
-      descriptorSetAllocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-      descriptorSetAllocateInfo.pNext = nullptr;
-      descriptorSetAllocateInfo.descriptorPool = descPool;
-      descriptorSetAllocateInfo.descriptorSetCount = 1;
-      descriptorSetAllocateInfo.pSetLayouts = &pipe->descLayout;
-      CHECK_VULKAN(vkAllocateDescriptorSets(vCtx->device, &descriptorSetAllocateInfo, &rename.descSet));
+
+      // an array of descriptor counts, with each member specifying the number of descriptors in a
+      // variable descriptor count binding in the corresponding descriptor set being allocated.
+      uint32_t varDescCount = meshData.size32();
+
+      VkDescriptorSetVariableDescriptorCountAllocateInfoEXT varDescInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT };
+      varDescInfo.descriptorSetCount = 1;
+      varDescInfo.pDescriptorCounts = &varDescCount;
+
+      VkDescriptorSetAllocateInfo descAllocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+      descAllocInfo.pNext = &varDescInfo;
+      descAllocInfo.descriptorPool = descPool;
+      descAllocInfo.descriptorSetCount = 1;
+      descAllocInfo.pSetLayouts = &pipe->descLayout;
+      CHECK_VULKAN(vkAllocateDescriptorSets(vCtx->device, &descAllocInfo, &rename.descSet));
     }
 
     VkDescriptorAccelerationStructureInfoNVX descriptorAccelerationStructureInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_ACCELERATION_STRUCTURE_INFO_NVX };
