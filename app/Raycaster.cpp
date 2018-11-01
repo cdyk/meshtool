@@ -193,7 +193,7 @@ void Raycaster::buildPipeline()
     info.pStages = shader.resource->stageCreateInfo.data();
     info.stageCount = shader.resource->stageCreateInfo.size32();
     info.pGroupNumbers = groupNumbers;
-    info.maxRecursionDepth = 4;
+    info.maxRecursionDepth = 10;
     info.layout = pipe->pipeLayout;
     CHECK_VULKAN(vCtx->vkCreateRaytracingPipelinesNVX(vCtx->device, nullptr /*vCtx->pipelineCache*/, 1, &info, nullptr, &pipe->pipe));
   }
@@ -322,24 +322,48 @@ bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, co
                                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
   {
     MappedBuffer<TriangleData> map(vCtx, meshData.triangleData);
-    for (uint32_t t = 0; t < meshData.triangleCount; t++) {
-      auto & data = map.mem[t];
-      auto n0 = normalize(mesh->nrm[mesh->triNrmIx[3 * t + 0]]);
-      auto n1 = normalize(mesh->nrm[mesh->triNrmIx[3 * t + 1]]);
-      auto n2 = normalize(mesh->nrm[mesh->triNrmIx[3 * t + 2]]);
-      data.n0x = n0.x;// uint8_t(127.f*n0.x + 127.f);
-      data.n0y = n0.y;// uint8_t(127.f*n0.y + 127.f);
-      data.n0z = n0.z;// uint8_t(127.f*n0.z + 127.f);
-      data.n1x = n1.x;// uint8_t(127.f*n1.x + 127.f);
-      data.n1y = n1.y;// uint8_t(127.f*n1.y + 127.f);
-      data.n1z = n1.z;// uint8_t(127.f*n1.z + 127.f);
-      data.n2x = n2.x;// (127.f*n2.x + 127.f);
-      data.n2y = n2.y;// uint8_t(127.f*n2.y + 127.f);
-      data.n2z = n2.z;// uint8_t(127.f*n2.z + 127.f);
-      auto color = t;// mesh->currentColor[t];
-      data.r = (1.f / 255.f)*((color >> 16) & 0xff);
-      data.g = (1.f / 255.f)*((color >> 8) & 0xff);
-      data.b = (1.f / 255.f)*(color & 0xff);
+    if (mesh->nrmCount) {
+      for (uint32_t t = 0; t < meshData.triangleCount; t++) {
+        auto & data = map.mem[t];
+        auto n0 = normalize(mesh->nrm[mesh->triNrmIx[3 * t + 0]]);
+        auto n1 = normalize(mesh->nrm[mesh->triNrmIx[3 * t + 1]]);
+        auto n2 = normalize(mesh->nrm[mesh->triNrmIx[3 * t + 2]]);
+        data.n0x = n0.x;// uint8_t(127.f*n0.x + 127.f);
+        data.n0y = n0.y;// uint8_t(127.f*n0.y + 127.f);
+        data.n0z = n0.z;// uint8_t(127.f*n0.z + 127.f);
+        data.n1x = n1.x;// uint8_t(127.f*n1.x + 127.f);
+        data.n1y = n1.y;// uint8_t(127.f*n1.y + 127.f);
+        data.n1z = n1.z;// uint8_t(127.f*n1.z + 127.f);
+        data.n2x = n2.x;// (127.f*n2.x + 127.f);
+        data.n2y = n2.y;// uint8_t(127.f*n2.y + 127.f);
+        data.n2z = n2.z;// uint8_t(127.f*n2.z + 127.f);
+        auto color = t;// mesh->currentColor[t];
+        data.r = (1.f / 255.f)*((color >> 16) & 0xff);
+        data.g = (1.f / 255.f)*((color >> 8) & 0xff);
+        data.b = (1.f / 255.f)*(color & 0xff);
+      }
+    }
+    else {
+      for (uint32_t t = 0; t < meshData.triangleCount; t++) {
+        Vec3f p[3];
+        for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * t + k]];
+        auto n = normalize(cross(p[1] - p[0], p[2] - p[0]));
+        auto & data = map.mem[t];
+        data.n0x = n.x;// uint8_t(127.f*n0.x + 127.f);
+        data.n0y = n.y;// uint8_t(127.f*n0.y + 127.f);
+        data.n0z = n.z;// uint8_t(127.f*n0.z + 127.f);
+        data.n1x = n.x;// uint8_t(127.f*n1.x + 127.f);
+        data.n1y = n.y;// uint8_t(127.f*n1.y + 127.f);
+        data.n1z = n.z;// uint8_t(127.f*n1.z + 127.f);
+        data.n2x = n.x;// (127.f*n2.x + 127.f);
+        data.n2y = n.y;// uint8_t(127.f*n2.y + 127.f);
+        data.n2z = n.z;// uint8_t(127.f*n2.z + 127.f);
+        auto color = t;// mesh->currentColor[t];
+        data.r = (1.f / 255.f)*((color >> 16) & 0xff);
+        data.g = (1.f / 255.f)*((color >> 8) & 0xff);
+        data.b = (1.f / 255.f)*(color & 0xff);
+      }
+
     }
   }
 
@@ -452,7 +476,10 @@ void Raycaster::update(Vector<RenderMeshHandle>& meshes)
         vCtx->vkCmdBuildAccelerationStructureNVX(cmdBuf, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NVX,
                                                  0, VK_NULL_HANDLE, 0,
                                                  (uint32_t)geometries.size(), &geometries[0],
-                                                 0, VK_FALSE, meshData[g].acc.resource->acc, VK_NULL_HANDLE, scratchBuffer.resource->buffer, 0);
+                                                 0,
+                                                 //VK_BUILD_ACCELERATION_STRUCTURE_LOW_MEMORY_BIT_NVX,
+                                                 //VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NVX,
+                                                 VK_FALSE, meshData[g].acc.resource->acc, VK_NULL_HANDLE, scratchBuffer.resource->buffer, 0);
         vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, 0, 1, &memoryBarrier, 0, 0, 0, 0);
       }
     }
