@@ -231,18 +231,25 @@ VulkanContext::VulkanContext(Logger logger,
     requestedDeviceExtensions.pushBack(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
     if (nvxRaytracing) {
       requestedDeviceExtensions.pushBack(VK_NVX_RAYTRACING_EXTENSION_NAME);
+      requestedDeviceExtensions.pushBack(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
     }
+
+    VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptorIndexing = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT };
+    VkPhysicalDeviceFeatures2 features2 = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
 
     VkPhysicalDeviceFeatures enabledFeatures{};
     enabledFeatures.fillModeNonSolid = 1;
     enabledFeatures.samplerAnisotropy = 1;
     if (nvxRaytracing) {
       enabledFeatures.vertexPipelineStoresAndAtomics = 1;
+      features2.pNext = &descriptorIndexing;
     }
 
-    VkDeviceCreateInfo deviceInfo = {};
-    deviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    deviceInfo.pNext = nullptr;
+    // I guess this basically enables anything the device has to offer...
+    vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
+
+    VkDeviceCreateInfo deviceInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
+    deviceInfo.pNext = &features2;  // FIXME: Non-null ptr not checked on non-RTX.
     deviceInfo.queueCreateInfoCount = 1;
     deviceInfo.pQueueCreateInfos = &queueInfo;
     deviceInfo.enabledExtensionCount = requestedDeviceExtensions.size32();
@@ -251,8 +258,7 @@ VulkanContext::VulkanContext(Logger logger,
     deviceInfo.ppEnabledLayerNames = nullptr;
     deviceInfo.pEnabledFeatures = &enabledFeatures;
 
-    auto rv = vkCreateDevice(physicalDevice, &deviceInfo, NULL, &device);
-    assert(rv == VK_SUCCESS);
+    CHECK_VULKAN(vkCreateDevice(physicalDevice, &deviceInfo, NULL, &device));
 
     if (nvxRaytracing) {
       vkCreateAccelerationStructureNVX = (PFN_vkCreateAccelerationStructureNVX)vkGetInstanceProcAddr(instance, "vkCreateAccelerationStructureNVX");;
@@ -300,18 +306,16 @@ VulkanContext::VulkanContext(Logger logger,
         { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
         { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
     };
-    VkDescriptorPoolCreateInfo pool_info = {};
-    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    VkDescriptorPoolCreateInfo pool_info{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
     pool_info.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     pool_info.maxSets = 1000 * uint32_t(sizeof(poolSizes) / sizeof(VkDescriptorPoolSize));
     pool_info.poolSizeCount = uint32_t(sizeof(poolSizes) / sizeof(VkDescriptorPoolSize));
     pool_info.pPoolSizes = poolSizes;
-    auto rv = vkCreateDescriptorPool(device, &pool_info, nullptr, &descPool);
-    assert(rv == VK_SUCCESS);
+    CHECK_VULKAN(vkCreateDescriptorPool(device, &pool_info, nullptr, &descPool));
   }
 
   {
-    VkPipelineCacheCreateInfo info = { VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO };
+    VkPipelineCacheCreateInfo info{ VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO };
     CHECK_VULKAN(vkCreatePipelineCache(device, &info, nullptr, &pipelineCache));
   }
 
