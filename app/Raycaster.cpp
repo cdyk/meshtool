@@ -117,18 +117,18 @@ VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
   descSetLayoutBinding[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX | VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX | VK_SHADER_STAGE_MISS_BIT_NVX;
 
   descSetLayoutBinding[3] = {};
-  descSetLayoutBinding[3].binding = BINDING_TRIANGLE_DATA;
-  descSetLayoutBinding[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-  descSetLayoutBinding[3].descriptorCount = meshData.size32();
-  descSetLayoutBinding[3].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
+  descSetLayoutBinding[3].binding = BINDING_INPUT_IMAGE;
+  descSetLayoutBinding[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+  descSetLayoutBinding[3].descriptorCount = 1;
+  descSetLayoutBinding[3].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
 
   descSetLayoutBinding[4] = {};
-  descSetLayoutBinding[4].binding = BINDING_INPUT_IMAGE;
-  descSetLayoutBinding[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-  descSetLayoutBinding[4].descriptorCount = 1;
-  descSetLayoutBinding[4].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+  descSetLayoutBinding[4].binding = BINDING_TRIANGLE_DATA;
+  descSetLayoutBinding[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  descSetLayoutBinding[4].descriptorCount = meshData.size32();
+  descSetLayoutBinding[4].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
 
-  VkDescriptorBindingFlagsEXT flags[5] = { 0, 0, 0, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT, 0 };
+  VkDescriptorBindingFlagsEXT flags[5] = { 0, 0, 0, 0, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT };
 
   VkDescriptorSetLayoutBindingFlagsCreateInfoEXT bindingFlags{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT };
   bindingFlags.pBindingFlags = flags;
