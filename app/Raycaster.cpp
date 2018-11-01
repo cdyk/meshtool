@@ -40,6 +40,7 @@ namespace {
     float lx, ly, lz;   // light at top right behind cam
     float ux, uy, uz;   // camera up
     uint32_t rndState;
+    uint32_t stationaryFrames;
   };
 
   struct TriangleData
@@ -489,6 +490,7 @@ void Raycaster::resize(const Vec4f& viewport)
   if (newW == w && newH == h) return;
   w = newW;
   h = newH;
+  stationaryFrames = 0;
   logger(0, "Resized to %dx%d", w, h);
 
   auto * vCtx = vulkanManager->vCtx;
@@ -552,6 +554,14 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
 
   resize(viewport);
 
+  for (uint32_t i = 0; i < 16; i++) {
+    if (1e-7 < std::abs(Pinv.data[i] - prevPinv.data[i])) {
+      stationaryFrames = 0;
+      break;
+    }
+  }
+  prevPinv = Pinv;
+
   rndState = 1664525 * rndState + 1013904223;
 
   auto & prevRename = renames[renameIndex];
@@ -573,6 +583,7 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
     map.mem->uy = u.y;
     map.mem->uz = u.z;
     map.mem->rndState = rndState;
+    map.mem->stationaryFrames = stationaryFrames;
   }
 
   auto offscreenImage = rename.offscreenImage.resource->image;
@@ -675,4 +686,6 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
     vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                          0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
   }
+
+  stationaryFrames++;
 }

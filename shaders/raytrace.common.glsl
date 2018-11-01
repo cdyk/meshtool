@@ -10,6 +10,7 @@ layout(std140, binding = BINDING_SCENE_BUF) uniform SceneBuf{
   float lx, ly, lz;   // light at top right behind cam
   float ux, uy, uz;   // camera up
   uint rndState;
+  uint stationaryFrames;
 } sceneBuf;
 
 struct TriangleData

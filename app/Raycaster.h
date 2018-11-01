@@ -40,6 +40,8 @@ private:
   Vector<Rename> renames;
   uint32_t renameIndex = 0;
   uint32_t rndState = 42;
+  uint32_t stationaryFrames = 0;
+  Mat4f prevPinv;
 
   struct MeshData {
     RenderBufferHandle vertices;

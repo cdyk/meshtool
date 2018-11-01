@@ -24,7 +24,7 @@ void main()
 
   uint state = gl_LaunchSizeNVX.x * gl_LaunchIDNVX.y + gl_LaunchIDNVX.x + sceneBuf.rndState;
 
-  uint N = 50;
+  uint N = 20;
 
   vec3 color = vec3(0, 0, 0);
   for (uint i = 0; i < N; i++) {
@@ -45,5 +45,10 @@ void main()
     color += (1.f / N)*payload.color;
   }
 
+  if (sceneBuf.stationaryFrames != 0) {
+    vec3 prevCol = imageLoad(imageIn, ivec2(gl_LaunchIDNVX.xy)).rgb;
+    float M = sceneBuf.stationaryFrames;
+    color = ((M - 1)*prevCol + color)/M;
+  }
   imageStore(image, ivec2(gl_LaunchIDNVX.xy), vec4(color, 0.0f));
 }
