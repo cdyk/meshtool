@@ -2,7 +2,7 @@
 
 layout(binding = BINDING_TOPLEVEL_ACC) uniform accelerationStructureNVX topLevel;
 
-layout(binding = BINDING_OUTPUT_IMAGE, rgba8) uniform image2D image;
+layout(binding = BINDING_OUTPUT_IMAGE, rgba32f) uniform writeonly image2D image;
 
 layout(std140, binding = BINDING_SCENE_BUF) uniform SceneBuf{
   mat4 Pinv;

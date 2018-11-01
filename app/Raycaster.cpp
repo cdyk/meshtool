@@ -491,7 +491,7 @@ void Raycaster::resize(const Vec4f& viewport)
 
     VkImageCreateInfo imageInfo{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
-    imageInfo.format = VK_FORMAT_B8G8R8A8_UNORM;
+    imageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
     imageInfo.extent = { w, h, 1 };
     imageInfo.mipLevels = 1;
     imageInfo.arrayLayers = 1;
@@ -604,14 +604,25 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
                          0, 0, nullptr, 0, nullptr, 2, imageMemoryBarriers);
   }
   { // blit
-    VkImageCopy imageCopy{};
-    imageCopy.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-    imageCopy.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-    imageCopy.dstOffset = { int32_t(viewport.x), int32_t(viewport.y), 0 };
-    imageCopy.extent = { w, h, 1 };
-    vkCmdCopyImage(cmdBuf,
+    VkImageBlit blit;
+    blit.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+    blit.srcOffsets[0] = { 0, 0, 0 };
+    blit.srcOffsets[1] = { int32_t(w), int32_t(h), 1 };
+    blit.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+    blit.dstOffsets[0] = { int32_t(viewport.x), int32_t(viewport.y), 0 };
+    blit.dstOffsets[1] = { int32_t(viewport.x) + int32_t(w), int32_t(viewport.y) + int32_t(h), 1 };
+    vkCmdBlitImage(cmdBuf,
                    offscreenImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-                   onscreenImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopy);
+                   onscreenImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                   1, &blit, VK_FILTER_NEAREST);
+    //VkImageCopy imageCopy{};
+    //imageCopy.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+    //imageCopy.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+    //imageCopy.dstOffset = { int32_t(viewport.x), int32_t(viewport.y), 0 };
+    //imageCopy.extent = { w, h, 1 };
+    //vkCmdCopyImage(cmdBuf,
+    //               offscreenImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+    //               onscreenImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopy);
   }
   { // Prop for presentiation
     VkImageMemoryBarrier imageMemoryBarrier;
