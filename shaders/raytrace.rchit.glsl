@@ -28,6 +28,7 @@ layout(std140, binding = 2) uniform SceneBuf{
   mat4 Pinv;
   float lx, ly, lz;   // light at top right behind cam
   float ux, uy, uz;   // camera up
+  uint rndState;
 } sceneBuf;
 
 layout(std140, binding = 3) buffer TriangleDataBuffer {

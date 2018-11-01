@@ -437,7 +437,7 @@ int main(int argc, char** argv)
 
   for (int i = 1; i < argc; i++) {
     auto arg = std::string(argv[i]);
-    if (arg == "--raytace") {
+    if (arg == "--raytrace") {
       app->raytrace = true;
     }
     else if (arg == "--no-raytrace") {

@@ -7,6 +7,7 @@ layout(std140, binding = 2) uniform SceneBuf {
   mat4 Pinv;
   float lx, ly, lz;   // light at top right behind cam
   float ux, uy, uz;   // camera up
+  uint rndState;
 } sceneBuf;
 
 
@@ -52,7 +53,7 @@ void main()
   //o = vec3(0, 0, -2.0);
   //d = normalize(vec3(u-vec2(0.5), 1));
 
-  uint state = gl_LaunchSizeNVX.x * gl_LaunchIDNVX.y + gl_LaunchIDNVX.x;
+  uint state = gl_LaunchSizeNVX.x * gl_LaunchIDNVX.y + gl_LaunchIDNVX.x + sceneBuf.rndState;
 
   uint N = 50;
 

@@ -38,6 +38,7 @@ namespace {
     Mat4f Pinv;
     float lx, ly, lz;   // light at top right behind cam
     float ux, uy, uz;   // camera up
+    uint32_t rndState;
   };
 
   struct TriangleData
@@ -529,6 +530,8 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
 
   resize(viewport);
 
+  rndState = 1664525 * rndState + 1013904223;
+
   renameIndex = renameIndex + 1;
   if (renames.size32() <= renameIndex) renameIndex = 0;
   auto & rename = renames[renameIndex];
@@ -545,6 +548,7 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
     map.mem->ux = u.x;
     map.mem->uy = u.y;
     map.mem->uz = u.z;
+    map.mem->rndState = rndState;
   }
 
   auto offscreenImage = rename.offscreenImage.resource->image;

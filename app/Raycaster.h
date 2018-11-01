@@ -39,7 +39,7 @@ private:
   };
   Vector<Rename> renames;
   uint32_t renameIndex = 0;
-
+  uint32_t rndState = 42;
 
   struct MeshData {
     RenderBufferHandle vertices;
