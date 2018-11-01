@@ -36,6 +36,8 @@ namespace {
   struct SceneBuffer
   {
     Mat4f Pinv;
+    float lx, ly, lz;   // light at top right behind cam
+    float ux, uy, uz;   // camera up
   };
 
   struct TriangleData
@@ -103,7 +105,7 @@ VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
   descSetLayoutBinding[2].binding = 2;
   descSetLayoutBinding[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
   descSetLayoutBinding[2].descriptorCount = 1;
-  descSetLayoutBinding[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+  descSetLayoutBinding[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX | VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX | VK_SHADER_STAGE_MISS_BIT_NVX;
 
   descSetLayoutBinding[3] = {};
   descSetLayoutBinding[3].binding = 3;
@@ -516,7 +518,7 @@ void Raycaster::resize(const Vec4f& viewport)
 }
 
 
-void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat4f& Pinv)
+void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f& Ninv, const Mat4f& Pinv)
 {
   if (!topAcc) return;
 
@@ -527,8 +529,17 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat4f&
   auto & rename = renames[renameIndex];
   auto * vCtx = vulkanManager->vCtx;
   {
+    auto l = normalize(mul(Ninv, Vec3f(1, 1, 1)));
+    auto u = normalize(mul(Ninv, Vec3f(0, 1, 0)));
+
     MappedBuffer<SceneBuffer> map(vCtx, rename.sceneBuffer);
     map.mem->Pinv = Pinv;
+    map.mem->lx = l.x;
+    map.mem->ly = l.y;
+    map.mem->lz = l.z;
+    map.mem->ux = u.x;
+    map.mem->uy = u.y;
+    map.mem->uz = u.z;
   }
 
   auto offscreenImage = rename.offscreenImage.resource->image;

@@ -16,7 +16,7 @@ public:
 
   void update(Vector<RenderMeshHandle>& meshes);
 
-  void draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat4f& Pinv);
+  void draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f& Ninv, const Mat4f& Pinv);
 
 private:
   Logger logger;

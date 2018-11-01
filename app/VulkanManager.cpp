@@ -201,7 +201,7 @@ void VulkanManager::resize(uint32_t w, uint32_t h)
 }
 
 
-void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes, const Vec4f& viewerViewport, const Mat4f& P, const Mat4f& M, const Mat4f& PMinv)
+void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes, const Vec4f& viewerViewport, const Mat4f& P, const Mat4f& M, const Mat4f& PMinv, const Mat4f& Minv)
 {
   auto * frameMgr = vCtx->frameManager;
 
@@ -268,7 +268,7 @@ void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& ren
     //auto G = inverse(mul(M, P));
     //auto H = mul(Minv, Pinv);
 
-    raycaster->draw(cmdBuf, viewerViewport, PMinv);
+    raycaster->draw(cmdBuf, viewerViewport, Mat3f(Minv), PMinv);
   }
 
 

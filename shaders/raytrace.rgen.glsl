@@ -5,6 +5,8 @@ layout(binding = 0) uniform accelerationStructureNVX topLevel;
 layout(binding = 1, rgba8) uniform image2D image;
 layout(std140, binding = 2) uniform SceneBuf {
   mat4 Pinv;
+  float lx, ly, lz;   // light at top right behind cam
+  float ux, uy, uz;   // camera up
 } sceneBuf;
 
 layout(location = 0) rayPayloadNVX vec3 color;

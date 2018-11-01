@@ -16,9 +16,22 @@ struct TriangleData
 layout(location = 0) rayPayloadInNVX vec3 color;
 layout(location = 1) hitAttributeNVX vec3 hitAttribute;
 
+layout(std140, binding = 2) uniform SceneBuf{
+  mat4 Pinv;
+  float lx, ly, lz;   // light at top right behind cam
+  float ux, uy, uz;   // camera up
+} sceneBuf;
+
 layout(std140, binding = 3) buffer TriangleDataBuffer {
     TriangleData data[];
 } triangles[];
+
+vec3 irradiance(vec3 d)
+{
+  vec3 l = vec3(sceneBuf.lx, sceneBuf.ly, sceneBuf.lz);
+  vec3 u = vec3(sceneBuf.ux, sceneBuf.uy, sceneBuf.uz);
+  return clamp(0.5f + dot(u, d), 0, 1) * vec3(0, 0.5, 1) + max(0.f, dot(l, d)) * vec3(7, 6, 5);
+}
 
 void main() {
 
@@ -27,9 +40,12 @@ void main() {
   float w0 = hitAttribute.x;
   float w1 = hitAttribute.y;
   float w2 = 1.f - w0 - w1;
+
   vec3 n = w2 * vec3(data.n0x, data.n0y, data.n0z) +
            w0 * vec3(data.n1x, data.n1y, data.n1z) +
            w1 * vec3(data.n2x, data.n2y, data.n2z);
 
-  color = abs(n);
+  vec3 l = vec3(sceneBuf.lx, sceneBuf.ly, sceneBuf.lz);
+
+  color = 0.3f*irradiance(n);
 }
