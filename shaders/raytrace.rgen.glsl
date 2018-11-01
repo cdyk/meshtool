@@ -1,23 +1,11 @@
 #version 460
 #extension GL_NVX_raytracing : require
 
-struct TriangleData
-{
-  float n0x, n0y, n0z;
-  float n1x, n1y, n1z;
-  float n2x, n2y, n2z;
-  float r, g, b;
-};
-
-
 layout(binding = 0) uniform accelerationStructureNVX topLevel;
 layout(binding = 1, rgba8) uniform image2D image;
 layout(std140, binding = 2) uniform SceneBuf {
   mat4 Pinv;
 } sceneBuf;
-layout(std140, binding = 3) buffer TriangleDataBuffer {
-  TriangleData data[];
-} triangles[];
 
 layout(location = 0) rayPayloadNVX vec3 color;
 
@@ -50,5 +38,5 @@ void main()
            0);                     // Payload
 
 
-  imageStore(image, ivec2(gl_LaunchIDNVX.xy), vec4(color.rg, triangles[0].data[0].r, 0.0f));
+  imageStore(image, ivec2(gl_LaunchIDNVX.xy), vec4(color, 0.0f));
 }

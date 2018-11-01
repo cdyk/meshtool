@@ -5,19 +5,20 @@
 //#extension GL_KHX_shader_explicit_arithmetic_types : require
 //#extension GL_KHX_shader_explicit_arithmetic_types_int8 : require
 
-struct TriangleData
-{
-  float n0x, n0y, n0z;
-  float n1x, n1y, n1z;
-  float n2x, n2y, n2z;
-  float r, g, b;
-};
+//struct TriangleData
+//{
+//  float n0x, n0y, n0z;
+//  float n1x, n1y, n1z;
+//  float n2x, n2y, n2z;
+//  float r, g, b;
+//};
 
 layout(location = 0) rayPayloadInNVX vec3 color;
 layout(location = 1) hitAttributeNVX vec3 hitAttribute;
-layout(std140, binding = 3) buffer TriangleDataBuffer {
-    TriangleData data[];
-} triangles[];
+
+//layout(std140, binding = 3) buffer TriangleDataBuffer {
+//    TriangleData data[];
+//} triangles[];
 
 void main() {
 

@@ -86,7 +86,7 @@ void Raycaster::init()
 VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
 {
   auto * vCtx = vulkanManager->vCtx;
-  VkDescriptorSetLayoutBinding descSetLayoutBinding[4];
+  VkDescriptorSetLayoutBinding descSetLayoutBinding[3];
   descSetLayoutBinding[0] = {};
   descSetLayoutBinding[0].binding = 0;
   descSetLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
@@ -105,11 +105,11 @@ VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
   descSetLayoutBinding[2].descriptorCount = 1;
   descSetLayoutBinding[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
 
-  descSetLayoutBinding[3] = {};
-  descSetLayoutBinding[3].binding = 3;
-  descSetLayoutBinding[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-  descSetLayoutBinding[3].descriptorCount = meshData.size32();
-  descSetLayoutBinding[3].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+  //descSetLayoutBinding[3] = {};
+  //descSetLayoutBinding[3].binding = 3;
+  //descSetLayoutBinding[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  //descSetLayoutBinding[3].descriptorCount = meshData.size32();
+  //descSetLayoutBinding[3].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
 
   VkDescriptorSetLayout layout = VK_NULL_HANDLE;
   VkDescriptorSetLayoutCreateInfo layoutCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
@@ -225,7 +225,7 @@ void Raycaster::buildDescriptorSets()
     descriptorAccelerationStructureInfo.accelerationStructureCount = 1;
     descriptorAccelerationStructureInfo.pAccelerationStructures = &topAcc.resource->acc;
 
-    Vector<VkWriteDescriptorSet> writes(2 + meshData.size());
+    Vector<VkWriteDescriptorSet> writes(2);
     writes[0] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
     writes[0].pNext = &descriptorAccelerationStructureInfo;
     writes[0].dstSet = rename.descSet;
@@ -245,16 +245,16 @@ void Raycaster::buildDescriptorSets()
     writes[1].dstArrayElement = 0;
     writes[1].dstBinding = 2;
 
-    for (uint32_t g = 0; g < meshData.size32(); g++) {
-      auto & write = writes[2 + g];
-      write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-      write.dstSet = rename.descSet;
-      write.descriptorCount = 1;
-      write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-      write.pBufferInfo = &meshData[g].triangleData.resource->descInfo;
-      write.dstArrayElement = g;
-      write.dstBinding = 3;
-    }
+    //for (uint32_t g = 0; g < meshData.size32(); g++) {
+    //  auto & write = writes[2 + g];
+    //  write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+    //  write.dstSet = rename.descSet;
+    //  write.descriptorCount = 1;
+    //  write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    //  write.pBufferInfo = &meshData[g].triangleData.resource->descInfo;
+    //  write.dstArrayElement = g;
+    //  write.dstBinding = 3;
+    //}
 
     vkUpdateDescriptorSets(vCtx->device, writes.size32(), writes.data(), 0, nullptr);
   }
@@ -285,6 +285,7 @@ bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, co
                                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
   vCtx->resources->copyHostMemToBuffer(meshData.indices, mesh->triVtxIx, sizeof(uint32_t) * 3 * meshData.triangleCount);
 
+#if 0
   meshData.triangleData = res->createBuffer(sizeof(TriangleData)*meshData.vertexCount,
                                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
@@ -310,6 +311,7 @@ bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, co
       data.b = (1.f / 255.f)*(color & 0xff);
     }
   }
+#endif
 
   auto & geometry = meshData.geometry;
   geometry = { VK_STRUCTURE_TYPE_GEOMETRY_NVX };
@@ -342,23 +344,10 @@ bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, co
 
 void Raycaster::update(Vector<RenderMeshHandle>& meshes)
 {
-
   auto * vCtx = vulkanManager->vCtx;
   auto & frame = vCtx->frameManager->frame();
 
   VkDeviceSize scratchSize = 0;
-
-  Vec3f vertices[3] = {
-      Vec3f( -0.5f, -0.5f, 0.0f ),
-      Vec3f(+0.0f, +0.5f, 0.0f ),
-      Vec3f(+0.5f, -0.5f, 0.0f )
-  };
-  auto vtxBuf = vCtx->resources->createBuffer(sizeof(vertices), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-  vCtx->resources->copyHostMemToBuffer(vtxBuf, vertices, sizeof(vertices));
-
-  uint32_t indices[] = { 0, 1, 2 };
-  auto idxBuf = vCtx->resources->createBuffer(sizeof(indices), VK_BUFFER_USAGE_INDEX_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-  vCtx->resources->copyHostMemToBuffer(idxBuf, indices, sizeof(indices));
 
 
   bool change = false;
@@ -390,7 +379,6 @@ void Raycaster::update(Vector<RenderMeshHandle>& meshes)
       topAcc = AccelerationStructureHandle();
       return;
     }
-
     auto geometryCount = meshData.size32();
 
     Vector<VkGeometryNVX> geometries(geometryCount);
