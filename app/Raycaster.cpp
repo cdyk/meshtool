@@ -240,7 +240,7 @@ void Raycaster::buildDescriptorSets()
     descriptorAccelerationStructureInfo.accelerationStructureCount = 1;
     descriptorAccelerationStructureInfo.pAccelerationStructures = &topAcc.resource->acc;
 
-    Vector<VkWriteDescriptorSet> writes(2);
+    Vector<VkWriteDescriptorSet> writes(3);
     writes[0] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
     writes[0].pNext = &descriptorAccelerationStructureInfo;
     writes[0].dstSet = rename.descSet;
@@ -260,16 +260,19 @@ void Raycaster::buildDescriptorSets()
     writes[1].dstArrayElement = 0;
     writes[1].dstBinding = 2;
 
-    //for (uint32_t g = 0; g < meshData.size32(); g++) {
-    //  auto & write = writes[2 + g];
-    //  write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    //  write.dstSet = rename.descSet;
-    //  write.descriptorCount = 1;
-    //  write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    //  write.pBufferInfo = &meshData[g].triangleData.resource->descInfo;
-    //  write.dstArrayElement = g;
-    //  write.dstBinding = 3;
-    //}
+    Vector<VkDescriptorBufferInfo> bufInfo(meshData.size32());
+    for (uint32_t g = 0; g < meshData.size32(); g++) {
+      bufInfo[g].buffer = meshData[g].triangleData.resource->buffer;
+      bufInfo[g].offset = 0;
+      bufInfo[g].range = VK_WHOLE_SIZE;
+    }
+    writes[2] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+    writes[2].dstSet = rename.descSet;
+    writes[2].descriptorCount = bufInfo.size32();
+    writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    writes[2].pBufferInfo = bufInfo.data();
+    writes[2].dstArrayElement = 0;
+    writes[2].dstBinding = 3;
 
     vkUpdateDescriptorSets(vCtx->device, writes.size32(), writes.data(), 0, nullptr);
   }
@@ -300,8 +303,7 @@ bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, co
                                                    VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
   vCtx->resources->copyHostMemToBuffer(meshData.indices, mesh->triVtxIx, sizeof(uint32_t) * 3 * meshData.triangleCount);
 
-#if 0
-  meshData.triangleData = res->createBuffer(sizeof(TriangleData)*meshData.vertexCount,
+  meshData.triangleData = res->createBuffer(sizeof(TriangleData)*meshData.triangleCount,
                                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
   {
@@ -326,7 +328,6 @@ bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, co
       data.b = (1.f / 255.f)*(color & 0xff);
     }
   }
-#endif
 
   auto & geometry = meshData.geometry;
   geometry = { VK_STRUCTURE_TYPE_GEOMETRY_NVX };
