@@ -4,71 +4,13 @@
 #extension GL_EXT_nonuniform_qualifier : require
 //#extension GL_KHX_shader_explicit_arithmetic_types : require
 //#extension GL_KHX_shader_explicit_arithmetic_types_int8 : require
+#extension GL_GOOGLE_include_directive : require
 
-struct TriangleData
-{
-  float n0x, n0y, n0z;
-  float n1x, n1y, n1z;
-  float n2x, n2y, n2z;
-  float r, g, b;
-};
-
-struct Payload
-{
-  vec3 color;
-  uint state;
-};
+#include "raytrace.common.glsl"
 
 layout(location = 0) rayPayloadInNVX Payload payloadIn;
 layout(location = 1) rayPayloadNVX Payload payload;
 layout(location = 2) hitAttributeNVX vec3 hitAttribute;
-
-layout(binding = 0) uniform accelerationStructureNVX topLevel;
-layout(std140, binding = 2) uniform SceneBuf{
-  mat4 Pinv;
-  float lx, ly, lz;   // light at top right behind cam
-  float ux, uy, uz;   // camera up
-  uint rndState;
-} sceneBuf;
-
-layout(std140, binding = 3) buffer TriangleDataBuffer {
-    TriangleData data[];
-} triangles[];
-
-float rand(inout uint state)
-{
-  state = 1664525 * state + 1013904223;
-  return (1.0 / 4294967296.0)*state;
-}
-
-const float two_pi = float(2.0 * 3.14159265358979323846264338327950288);
-
-vec3 randomCosineDir(uint state)
-{
-  float r1 = min(1,rand(state));
-  float r2 = min(1,rand(state));
-  float z = sqrt(1.f - r2);
-  float phi = two_pi * r1;
-  float two_sqrt_r2 = sqrt(r2);
-  float x = two_sqrt_r2 * cos(phi);
-  float y = two_sqrt_r2 * sin(phi);
-  return vec3(x, y, z);
-}
-
-void orthonormal(out vec3 u, out vec3 v, out vec3 w, in vec3 d)
-{
-  w = normalize(d);
-  vec3 a = 0.9f < abs(w.x) ? vec3(0, 1, 0) : vec3(1, 0, 0);
-  v = normalize(cross(w, a));
-  u = cross(w, v);
-}
-
-vec3 irradiance(vec3 d)
-{
-  vec3 l = vec3(sceneBuf.lx, sceneBuf.ly, sceneBuf.lz);
-  vec3 u = vec3(sceneBuf.ux, sceneBuf.uy, sceneBuf.uz);
-  return clamp(0.5f + dot(u, d), 0, 1) * vec3(0, 0.5, 1) + max(0.f, dot(l, d)) * vec3(7, 6, 5);
-}
 
 void main() {
 

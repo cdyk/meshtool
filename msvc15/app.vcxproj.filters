@@ -132,6 +132,9 @@
     <ClInclude Include="..\app\Raycaster.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="..\shaders\raytrace.binding.h">
+      <Filter>shaders</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\shaders\vanillaVS.glsl">
@@ -162,5 +165,10 @@
     <CustomBuild Include="..\shaders\raytrace.rahit.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\shaders\raytrace.common.glsl">
+      <Filter>shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

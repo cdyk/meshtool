@@ -3,6 +3,7 @@
 #include "VulkanContext.h"
 #include "LinAlgOps.h"
 #include "Mesh.h"
+#include "../shaders/raytrace.binding.h"
 
 namespace {
 
@@ -97,25 +98,25 @@ VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
   auto * vCtx = vulkanManager->vCtx;
   VkDescriptorSetLayoutBinding descSetLayoutBinding[4];
   descSetLayoutBinding[0] = {};
-  descSetLayoutBinding[0].binding = 0;
+  descSetLayoutBinding[0].binding = BINDING_TOPLEVEL_ACC;
   descSetLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
   descSetLayoutBinding[0].descriptorCount = 1;
   descSetLayoutBinding[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX | VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
 
   descSetLayoutBinding[1] = {};
-  descSetLayoutBinding[1].binding = 1;
+  descSetLayoutBinding[1].binding = BINDING_OUTPUT_IMAGE;
   descSetLayoutBinding[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
   descSetLayoutBinding[1].descriptorCount = 1;
   descSetLayoutBinding[1].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
 
   descSetLayoutBinding[2] = {};
-  descSetLayoutBinding[2].binding = 2;
+  descSetLayoutBinding[2].binding = BINDING_SCENE_BUF;
   descSetLayoutBinding[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
   descSetLayoutBinding[2].descriptorCount = 1;
   descSetLayoutBinding[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX | VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX | VK_SHADER_STAGE_MISS_BIT_NVX;
 
   descSetLayoutBinding[3] = {};
-  descSetLayoutBinding[3].binding = 3;
+  descSetLayoutBinding[3].binding = BINDING_TRIANGLE_DATA;
   descSetLayoutBinding[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
   descSetLayoutBinding[3].descriptorCount = meshData.size32();
   descSetLayoutBinding[3].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
@@ -129,7 +130,7 @@ VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
   VkDescriptorSetLayout layout = VK_NULL_HANDLE;
   VkDescriptorSetLayoutCreateInfo layoutCreateInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
   layoutCreateInfo.pNext = &bindingFlags;
-  layoutCreateInfo.bindingCount = sizeof(descSetLayoutBinding) / sizeof(descSetLayoutBinding[0]);
+  layoutCreateInfo.bindingCount = ARRAYSIZE(descSetLayoutBinding);
   layoutCreateInfo.pBindings = descSetLayoutBinding;
   CHECK_VULKAN(vkCreateDescriptorSetLayout(vCtx->device, &layoutCreateInfo, nullptr, &layout));
   CHECK_VULKAN(vkResetDescriptorPool(vCtx->device, descPool, 0));
@@ -250,7 +251,7 @@ void Raycaster::buildDescriptorSets()
     writes[0] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
     writes[0].pNext = &descriptorAccelerationStructureInfo;
     writes[0].dstSet = rename.descSet;
-    writes[0].dstBinding = 0;
+    writes[0].dstBinding = BINDING_TOPLEVEL_ACC;
     writes[0].dstArrayElement = 0;
     writes[0].descriptorCount = 1;
     writes[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
@@ -264,7 +265,7 @@ void Raycaster::buildDescriptorSets()
     writes[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     writes[1].pBufferInfo = &rename.sceneBuffer.resource->descInfo;
     writes[1].dstArrayElement = 0;
-    writes[1].dstBinding = 2;
+    writes[1].dstBinding = BINDING_SCENE_BUF;
 
     Vector<VkDescriptorBufferInfo> bufInfo(meshData.size32());
     for (uint32_t g = 0; g < meshData.size32(); g++) {
@@ -278,7 +279,7 @@ void Raycaster::buildDescriptorSets()
     writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     writes[2].pBufferInfo = bufInfo.data();
     writes[2].dstArrayElement = 0;
-    writes[2].dstBinding = 3;
+    writes[2].dstBinding = BINDING_TRIANGLE_DATA;
 
     vkUpdateDescriptorSets(vCtx->device, writes.size32(), writes.data(), 0, nullptr);
   }
@@ -514,7 +515,7 @@ void Raycaster::resize(const Vec4f& viewport)
 
     VkWriteDescriptorSet descImageWrite{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
     descImageWrite.dstSet = rename.descSet;
-    descImageWrite.dstBinding = 1;
+    descImageWrite.dstBinding = BINDING_OUTPUT_IMAGE;
     descImageWrite.dstArrayElement = 0;
     descImageWrite.descriptorCount = 1;
     descImageWrite.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;

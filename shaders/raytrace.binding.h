@@ -1,0 +1,4 @@
+#define BINDING_TOPLEVEL_ACC    0
+#define BINDING_OUTPUT_IMAGE    1
+#define BINDING_SCENE_BUF       2
+#define BINDING_TRIANGLE_DATA   3

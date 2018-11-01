@@ -1,41 +1,10 @@
 #version 460
 #extension GL_NVX_raytracing : require
+#extension GL_GOOGLE_include_directive : require
 
-layout(binding = 0) uniform accelerationStructureNVX topLevel;
-layout(binding = 1, rgba8) uniform image2D image;
-layout(std140, binding = 2) uniform SceneBuf {
-  mat4 Pinv;
-  float lx, ly, lz;   // light at top right behind cam
-  float ux, uy, uz;   // camera up
-  uint rndState;
-} sceneBuf;
-
-
-struct Payload
-{
-  vec3 color;
-  uint state;
-};
+#include "raytrace.common.glsl"
 
 layout(location = 0) rayPayloadNVX Payload payload;
-
-uint xorShift(uint state)
-{
-  state ^= (state << 13);
-  state ^= (state >> 17);
-  state ^= (state << 5);
-  return state;
-}
-
-uint wangHash(uint state)
-{
-  state = (state ^ 61) ^ (state >> 16);
-  state *= 9;
-  state = state ^ (state >> 4);
-  state *= 0x27d4eb2d;
-  state = state ^ (state >> 15);
-  return state;
-}
 
 void main()
 {
