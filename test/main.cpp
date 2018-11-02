@@ -154,6 +154,27 @@ int main(int argc, char** argv)
   logger(0, "triCount=%d", mesh->triCount);
 
 
+  {
+    Mat3f testMatrices[] = {  // FIXME: not a particularly extensive test set.
+      Mat3f(0.6f, 0.2f, 0.3f,
+            0.2f, 0.7f, 0.5f,
+            0.3f, 0.5f, 0.7f)
+    };
+
+    for (auto & M : testMatrices) {
+      auto Minv = inverse(M);
+      auto A = mul(Minv, M);
+      auto B = mul(M, Minv);
+
+      for (unsigned j = 0; j < 3; j++) {
+        for (unsigned i = 0; i < 3; i++) {
+          auto t = i == j ? 1.f : 0.f;
+          assert(std::abs(t - A.data[3 * j + i]) < 1e-6f);
+          assert(std::abs(t - B.data[3 * j + i]) < 1e-6f);
+        }
+      }
+    }
+  }
 
   {
     logger(0, "Pool checks...");
