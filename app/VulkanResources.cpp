@@ -26,6 +26,16 @@ VulkanResources::~VulkanResources()
   logger(0, "%d unreleased swapChainResources", swapChainResources.getCount());
 }
 
+void VulkanResources::copyHostMemToBuffer(RenderBufferHandle buffer, void* src, size_t size)
+{
+  void * dst = nullptr;
+  CHECK_VULKAN(vkMapMemory(vCtx->device, buffer.resource->mem, 0, buffer.resource->alignedSize, 0, &dst));
+  assert(dst);
+  std::memcpy(dst, src, size);
+  vkUnmapMemory(vCtx->device, buffer.resource->mem);
+}
+
+
 void VulkanResources::houseKeep()
 {
   {
@@ -144,6 +154,20 @@ void VulkanResources::houseKeep()
       delete r;
     }
   }
+  {
+    Vector<AccelerationStructure*> orphans;
+    accelerationStructures.getOrphans(orphans);
+    for (auto * r : orphans) {
+      if (!r->hasFlag(ResourceBase::Flags::External)) destroyAccelerationStructure(r);
+      delete r;
+    }
+  }
+
+}
+
+PipelineHandle VulkanResources::createPipeline()
+{
+  return pipelineResources.createResource();
 }
 
 
@@ -281,7 +305,7 @@ PipelineHandle VulkanResources::createPipeline(Vector<VkVertexInputBindingDescri
   pipelineCI.renderPass = renderPass.resource->pass;
   pipelineCI.subpass = 0;
 
-  rv = vkCreateGraphicsPipelines(vCtx->device, VK_NULL_HANDLE, 1, &pipelineCI, nullptr, &pipe->pipe);
+  rv = vkCreateGraphicsPipelines(vCtx->device, vCtx->pipelineCache, 1, &pipelineCI, nullptr, &pipe->pipe);
   assert(rv == VK_SUCCESS);
 
   logger(0, "Built pipeline");
@@ -296,7 +320,12 @@ void VulkanResources::destroyPipeline(Pipeline* pipe)
 }
 
 
-RenderBufferHandle VulkanResources::createBuffer(size_t requestedSize, VkImageUsageFlags usageFlags, VkMemoryPropertyFlags properties)
+RenderBufferHandle VulkanResources::createBuffer()
+{
+  return bufferResources.createResource();
+}
+
+RenderBufferHandle VulkanResources::createBuffer(size_t requestedSize, VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags properties)
 {
   auto bufHandle = bufferResources.createResource();
   auto * buf = bufHandle.resource;
@@ -382,12 +411,13 @@ ShaderHandle VulkanResources::createShader(Vector<ShaderInputSpec>& spec, const 
 
   shader->stageCreateInfo.resize(spec.size());
   for (size_t i = 0; i < spec.size(); i++) {
-    shader->stageCreateInfo[i].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    shader->stageCreateInfo[i].pNext = nullptr;
-    shader->stageCreateInfo[i].pSpecializationInfo = nullptr;
-    shader->stageCreateInfo[i].flags = 0;
-    shader->stageCreateInfo[i].pName = "main";
-    shader->stageCreateInfo[i].stage = spec[i].stage;
+    auto& info = shader->stageCreateInfo[i];
+    info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    info.pNext = nullptr;
+    info.pSpecializationInfo = nullptr;
+    info.flags = 0;
+    info.pName = "main";
+    info.stage = spec[i].stage;
 
     VkShaderModuleCreateInfo moduleCreateInfo;
     moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -395,7 +425,7 @@ ShaderHandle VulkanResources::createShader(Vector<ShaderInputSpec>& spec, const 
     moduleCreateInfo.flags = 0;
     moduleCreateInfo.codeSize = spec[i].siz;
     moduleCreateInfo.pCode = spec[i].spv;
-    auto rv = vkCreateShaderModule(vCtx->device, &moduleCreateInfo, nullptr, &shader->stageCreateInfo[i].module);
+    auto rv = vkCreateShaderModule(vCtx->device, &moduleCreateInfo, nullptr, &info.module);
     assert(rv == VK_SUCCESS);
 
     //if (name) {
@@ -722,6 +752,79 @@ void VulkanResources::destroySwapChain(SwapChain* swapChain)
 }
 
 
+AccelerationStructureHandle VulkanResources::createAccelerationStructure()
+{
+  return accelerationStructures.createResource();
+}
+
+AccelerationStructureHandle VulkanResources::createAccelerationStructure(VkAccelerationStructureTypeNVX type, uint32_t geometryCount, VkGeometryNVX* geometries, uint32_t instanceCount)
+{
+  auto handle = accelerationStructures.createResource();
+  auto * r = handle.resource;
+  //VkAccelerationStructureNVX acc = VK_NULL_HANDLE;
+  //VkDeviceMemory structureMem = VK_NULL_HANDLE;
+  //VkDeviceMemory scratchMem = VK_NULL_HANDLE;
+  //VkBuffer scratchBuffer = VK_NULL_HANDLE;
+
+  VkAccelerationStructureCreateInfoNVX accelerationStructureInfo;
+  accelerationStructureInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NVX;
+  accelerationStructureInfo.pNext = nullptr;
+  accelerationStructureInfo.type = type;
+  accelerationStructureInfo.flags = 0;
+  accelerationStructureInfo.compactedSize = 0;
+  accelerationStructureInfo.instanceCount = instanceCount;
+  accelerationStructureInfo.geometryCount = geometryCount;
+  accelerationStructureInfo.pGeometries = geometries;
+  CHECK_VULKAN(vCtx->vkCreateAccelerationStructureNVX(vCtx->device, &accelerationStructureInfo, nullptr, &r->acc));
+
+  VkMemoryRequirements2 memoryRequirements;
+  VkAccelerationStructureMemoryRequirementsInfoNVX memoryRequirementsInfo;
+  memoryRequirementsInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NVX;
+  memoryRequirementsInfo.pNext = nullptr;
+  memoryRequirementsInfo.accelerationStructure = r->acc;
+  vCtx->vkGetAccelerationStructureMemoryRequirementsNVX(vCtx->device, &memoryRequirementsInfo, &memoryRequirements);
+
+  VkMemoryAllocateInfo memoryAllocateInfo;
+  memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+  memoryAllocateInfo.pNext = nullptr;
+  memoryAllocateInfo.allocationSize = memoryRequirements.memoryRequirements.size;
+  memoryAllocateInfo.memoryTypeIndex = getMemoryTypeIndex(memoryRequirements.memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+  CHECK_VULKAN(vkAllocateMemory(vCtx->device, &memoryAllocateInfo, nullptr, &r->structureMem));
+
+  VkBindAccelerationStructureMemoryInfoNVX bindInfo;
+  bindInfo.sType = VK_STRUCTURE_TYPE_BIND_ACCELERATION_STRUCTURE_MEMORY_INFO_NVX;
+  bindInfo.pNext = nullptr;
+  bindInfo.accelerationStructure = r->acc;
+  bindInfo.memory = r->structureMem;
+  bindInfo.memoryOffset = 0;
+  bindInfo.deviceIndexCount = 0;
+  bindInfo.pDeviceIndices = nullptr;
+  CHECK_VULKAN(vCtx->vkBindAccelerationStructureMemoryNVX(vCtx->device, 1, &bindInfo));
+
+  VkMemoryRequirements2 scratchMemReq;
+  //VkAccelerationStructureMemoryRequirementsInfoNVX memoryRequirementsInfo;
+  memoryRequirementsInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NVX;
+  memoryRequirementsInfo.pNext = nullptr;
+  memoryRequirementsInfo.accelerationStructure = r->acc;
+  vCtx->vkGetAccelerationStructureScratchMemoryRequirementsNVX(vCtx->device, &memoryRequirementsInfo, &scratchMemReq);
+  r->scratchReqs = scratchMemReq.memoryRequirements;
+
+  return handle;
+}
+
+void VulkanResources::destroyAccelerationStructure(AccelerationStructure* accStr)
+{
+  if (accStr->acc) {
+    logger(0, "Destroying acceleration structure.");
+    vCtx->vkDestroyAccelerationStructureNVX(vCtx->device, accStr->acc, nullptr);
+    accStr->acc = VK_NULL_HANDLE;
+  }
+  if (accStr->structureMem) {
+    vkFreeMemory(vCtx->device, accStr->structureMem, nullptr);
+    accStr->structureMem = VK_NULL_HANDLE;
+  }
+}
+
 
 bool VulkanResources::getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements)
 {
@@ -737,8 +840,19 @@ bool VulkanResources::getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uin
   return false;
 }
 
-
-
+uint32_t VulkanResources::getMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags requirements)
+{
+  for (uint32_t i = 0; i < vCtx->memoryProperties.memoryTypeCount; i++) {
+    auto bit = 1 << i;
+    if (typeBits & bit) {
+      if ((vCtx->memoryProperties.memoryTypes[i].propertyFlags & requirements) == requirements) {
+        return i;
+      }
+    }
+  }
+  assert(!"Failed to find suitable memory.");
+  return ~0;
+}
 
 
 MappedBufferBase::MappedBufferBase(void** ptr, VulkanContext* vCtx, RenderBufferHandle h)

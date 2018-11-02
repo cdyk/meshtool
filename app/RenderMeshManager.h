@@ -6,6 +6,7 @@ struct RenderMeshResource : RenderResourceBase
 {
   RenderMeshResource(ResourceManagerBase& manager) : RenderResourceBase(manager) {}
   Mesh* mesh = nullptr;
+
   RenderBufferHandle vtx;
   RenderBufferHandle nrm;
   RenderBufferHandle tan;
@@ -16,6 +17,8 @@ struct RenderMeshResource : RenderResourceBase
 
   RenderBufferHandle lines;
   uint32_t lineCount = 0;
+
+  uint32_t generation = 1;
 };
 typedef ResourceHandle<RenderMeshResource> RenderMeshHandle;
 

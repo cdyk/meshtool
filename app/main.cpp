@@ -32,17 +32,38 @@ namespace {
 
   void logger(unsigned level, const char* msg, ...)
   {
+#ifdef _WIN32
+    thread_local static char buf[512];
+    buf[0] = '[';
+    switch (level) {
+    case 0: buf[1] = 'I'; break;
+    case 1: buf[1] = 'W'; break;
+    case 2: buf[1] = 'E'; break;
+    default: buf[1] = '?'; break;
+    }
+    buf[2] = ']';
+    buf[3] = ' ';
+    va_list argptr;
+    va_start(argptr, msg);
+    auto l = vsnprintf(buf + 4, sizeof(buf) - 4 - 2, msg, argptr);
+    va_end(argptr);
+    if (sizeof(buf) - 4 - 2 < l) l = sizeof(buf) - 4 - 2;
+    buf[l + 4] = '\n';
+    buf[l + 4 + 1] = '\0';
+    OutputDebugStringA(buf);
+#else
     switch (level) {
     case 0: fprintf(stderr, "[I] "); break;
     case 1: fprintf(stderr, "[W] "); break;
     case 2: fprintf(stderr, "[E] "); break;
     }
-
     va_list argptr;
     va_start(argptr, msg);
     vfprintf(stderr, msg, argptr);
     va_end(argptr);
     fprintf(stderr, "\n");
+#endif
+
   }
 
   void glfw_error_callback(int error, const char* description)
@@ -106,6 +127,7 @@ namespace {
       if (key == GLFW_KEY_S && action == GLFW_PRESS) app->moveToSelection = true;
     }
     else if (mods == 0) {
+      if (key == GLFW_KEY_R && action == GLFW_PRESS) app->raytrace = !app->raytrace;
       if (key == GLFW_KEY_W && action == GLFW_PRESS)  app->vulkanManager->renderer->outlines = !app->vulkanManager->renderer->outlines;
       if (key == GLFW_KEY_S && action == GLFW_PRESS)  app->vulkanManager->renderer->solid = !app->vulkanManager->renderer->solid;
       if (key == GLFW_KEY_A && action == GLFW_PRESS) app->vulkanManager->renderer->tangentSpaceCoordSys = !app->vulkanManager->renderer->tangentSpaceCoordSys;
@@ -224,6 +246,7 @@ namespace {
         if (ImGui::MenuItem("View all", "CTRL+SHIFT+A", nullptr)) { app->viewAll = true; }
         if (ImGui::MenuItem("View selection", "CTRL+SHIFT+S")) { app->moveToSelection = true; }
         ImGui::Separator();
+        if (ImGui::MenuItem("Raytracing", "R", &app->raytrace, app->vulkanManager->vCtx->nvxRaytracing)) {}
         if (ImGui::MenuItem("Solid", "S", &app->vulkanManager->renderer->solid)) {}
         if (ImGui::MenuItem("Outlines", "W", &app->vulkanManager->renderer->outlines)) {}
         if (ImGui::MenuItem("Tangent coordsys", "C", &app->vulkanManager->renderer->tangentSpaceCoordSys)) {}
@@ -414,7 +437,15 @@ int main(int argc, char** argv)
 
   for (int i = 1; i < argc; i++) {
     auto arg = std::string(argv[i]);
-    if (arg.substr(0, 2) == "--") {
+    if (arg == "--raytrace") {
+      app->raytrace = true;
+    }
+    else if (arg == "--no-raytrace") {
+      app->raytrace = false;
+    }
+    else if (arg.substr(0, 2) == "--") {
+     
+
     }
     else {
       auto argLower = arg;
@@ -580,7 +611,8 @@ int main(int argc, char** argv)
     }
     app->updateColor = false;
 
-    app->vulkanManager->render(app->width, app->height, app->items.renderMeshes, viewport, app->viewer->getProjectionMatrix(), app->viewer->getViewMatrix());
+    app->vulkanManager->render(app->width, app->height, app->items.renderMeshes, viewport,
+                               app->viewer->getProjectionMatrix(), app->viewer->getViewMatrix(), app->viewer->getProjectionViewInverseMatrix(), app->viewer->getViewInverseMatrix(), app->raytrace);
     app->vulkanManager->present();
   }
   CHECK_VULKAN(vkDeviceWaitIdle(app->vulkanManager->vCtx->device));

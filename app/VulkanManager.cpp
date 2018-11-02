@@ -6,6 +6,7 @@
 #include "Common.h"
 #include "VulkanContext.h"
 #include "Renderer.h"
+#include "Raycaster.h"
 #include "ImGuiRenderer.h"
 #include "LinAlgOps.h"
 
@@ -54,6 +55,7 @@ VulkanManager::VulkanManager(Logger l, GLFWwindow* window, uint32_t w, uint32_t 
 
   renderer = new Renderer(logger, this);
   renderer->init();
+
   imGuiRenderer = new ImGuiRenderer(logger, this);
   imGuiRenderer->init();
 }
@@ -195,13 +197,28 @@ void VulkanManager::resize(uint32_t w, uint32_t h)
 }
 
 
-void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes, const Vec4f& viewerViewport, const Mat4f& P, const Mat4f& M)
+void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes, const Vec4f& viewerViewport, const Mat4f& P, const Mat4f& M, const Mat4f& PMinv, const Mat4f& Minv, bool raytrace)
 {
   auto * frameMgr = vCtx->frameManager;
-
   frameMgr->startFrame();
+
+  raytrace = raytrace && vCtx->nvxRaytracing;
+
+  if (raytrace) {
+    if (raycaster == nullptr) {
+      raycaster = new Raycaster(logger, this);
+      raycaster->init();
+    }
+    raycaster->update(renderMeshes);
+  }
+  else if (raycaster) {
+    delete raycaster;
+    raycaster = nullptr;
+  }
+
   auto & frame = vCtx->frameManager->frame();
   auto & cmdBuf = frame.commandBuffer.resource->cmdBuf;
+
 
   VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
   info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -210,7 +227,8 @@ void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& ren
   VkClearValue clearValues[2] = {};
   clearValues[1].depthStencil.depth = 1.f;
 
-  {
+  auto PM = mul(P, M);
+  if(raytrace == false) {
 
     VkRenderPassBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -248,7 +266,13 @@ void VulkanManager::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& ren
   
   vkCmdBeginRenderPass(cmdBuf, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
   imGuiRenderer->recordRendering(frame.commandBuffer);
+
   vkCmdEndRenderPass(cmdBuf);
+
+  if (raytrace) {
+    raycaster->draw(cmdBuf, viewerViewport, Mat3f(Minv), PMinv);
+  }
+
 
   VkPipelineStageFlags wait_stage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
   VkSubmitInfo submitInfo = {};

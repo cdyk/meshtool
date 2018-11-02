@@ -10,6 +10,7 @@ struct Mat4f;
 struct Mat3f;
 
 class Renderer;
+class Raycaster;
 class ImGuiRenderer;
 
 struct GLFWwindow;
@@ -24,13 +25,14 @@ public:
 
   void startFrame();
 
-  void render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes, const Vec4f& viewerViewport, const Mat4f& P, const Mat4f& M);
+  void render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes, const Vec4f& viewerViewport, const Mat4f& P, const Mat4f& M, const Mat4f& PMinv, const Mat4f& Minv, bool raytrace);
 
   void present();
 
   Logger logger;
   GLFWwindow* window = nullptr;
   Renderer* renderer = nullptr;
+  Raycaster* raycaster = nullptr;
   ImGuiRenderer* imGuiRenderer = nullptr;
   VulkanContext* vCtx = nullptr;
 

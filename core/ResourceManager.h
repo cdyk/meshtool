@@ -35,15 +35,18 @@ struct ResourceHandle
   T* resource = nullptr;
 
   ResourceHandle() = default;
-  ResourceHandle(ResourceHandle& rhs) { resource = rhs.resource; if(resource) resource->increment(); }
-  ResourceHandle(ResourceHandle&& rhs) { resource = rhs.resource; rhs.resource = nullptr; }
-  ResourceHandle& operator=(ResourceHandle& rhs) { release(); resource = rhs.resource; if(resource) resource->increment(); return *this; }
-  ResourceHandle& operator=(ResourceHandle&& rhs) { release(); resource = rhs.resource; rhs.resource = nullptr; return *this; }
   ~ResourceHandle() { release(); }
+
+  ResourceHandle(const ResourceHandle& rhs) { resource = rhs.resource; if(resource) resource->increment(); }
+  ResourceHandle& operator=(const ResourceHandle& rhs) { release(); resource = rhs.resource; if(resource) resource->increment(); return *this; }
+
+  ResourceHandle(ResourceHandle&& rhs) { resource = rhs.resource; rhs.resource = nullptr; }
+  ResourceHandle& operator=(ResourceHandle&& rhs) { release(); resource = rhs.resource; rhs.resource = nullptr; return *this; }
 
   explicit operator bool() const { return resource; }
   bool operator!=(const ResourceHandle& rhs) const { return resource != rhs.resource; }
-     
+  bool operator==(const ResourceHandle& rhs) const { return resource == rhs.resource; }
+
   ResourceHandle(T* resource) : resource(resource) { resource->increment(); }
 
   void release()

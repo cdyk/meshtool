@@ -93,6 +93,7 @@
   <ItemGroup>
     <ClCompile Include="..\app\App.cpp" />
     <ClCompile Include="..\app\main.cpp" />
+    <ClCompile Include="..\app\Raycaster.cpp" />
     <ClCompile Include="..\app\Renderer.cpp" />
     <ClCompile Include="..\app\RenderMeshManager.cpp" />
     <ClCompile Include="..\app\RenderTextureManager.cpp" />
@@ -111,6 +112,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\app\App.h" />
+    <ClInclude Include="..\app\Raycaster.h" />
     <ClInclude Include="..\app\Renderer.h" />
     <ClInclude Include="..\app\RenderMeshManager.h" />
     <ClInclude Include="..\app\RenderResource.h" />
@@ -129,6 +131,7 @@
     <ClInclude Include="..\libs\imgui\imstb_rectpack.h" />
     <ClInclude Include="..\libs\imgui\imstb_textedit.h" />
     <ClInclude Include="..\libs\imgui\imstb_truetype.h" />
+    <ClInclude Include="..\shaders\raytrace.binding.h" />
   </ItemGroup>
   <ItemGroup>
     <CustomBuild Include="..\shaders\vanillaPS.glsl">
@@ -188,6 +191,43 @@
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslc.exe -c --target-env=vulkan1.1 -mfmt=c %(FullPath) -o %(FullPath).h</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
     </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\shaders\raytrace.rgen.glsl">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator.exe %(FullPath) -V -x -o %(FullPath).h</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslangValidator.exe %(FullPath) -V -x -o %(FullPath).h</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\shaders\raytrace.rchit.glsl">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator.exe %(FullPath) -V -x -o %(FullPath).h</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslangValidator.exe %(FullPath) -V -x -o %(FullPath).h</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="..\shaders\raytrace.rahit.glsl">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator.exe %(FullPath) -V -x -o %(FullPath).h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslangValidator.exe %(FullPath) -V -x -o %(FullPath).h</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="..\shaders\raytrace.rmiss.glsl">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator.exe %(FullPath) -V -x -o %(FullPath).h</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslangValidator.exe %(FullPath) -V -x -o %(FullPath).h</Command>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\shaders\raytrace.common.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

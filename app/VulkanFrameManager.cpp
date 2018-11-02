@@ -120,7 +120,7 @@ void VulkanFrameManager::resize(uint32_t w, uint32_t h)
   swapChainInfo.imageFormat = surfaceFormat.format;
   swapChainInfo.imageColorSpace = surfaceFormat.colorSpace;
   swapChainInfo.imageArrayLayers = 1;
-  swapChainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+  swapChainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
   swapChainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;           // Assume that graphics family == present family
   swapChainInfo.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR;
   swapChainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
@@ -132,7 +132,6 @@ void VulkanFrameManager::resize(uint32_t w, uint32_t h)
   swapChain = vCtx->resources->createSwapChain(swapChain, swapChainInfo);
 
   uint32_t backBufferCount = 0;
-  Vector<VkImage> backBufferImages;
   CHECK_VULKAN(vkGetSwapchainImagesKHR(vCtx->device, swapChain.resource->swapChain, &backBufferCount, NULL));
   backBufferImages.resize(backBufferCount);
   CHECK_VULKAN(vkGetSwapchainImagesKHR(vCtx->device, swapChain.resource->swapChain, &backBufferCount, backBufferImages.data()));

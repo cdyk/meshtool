@@ -243,9 +243,53 @@ namespace {
     N++;
   }
 
+  const char* parseIndex(Context* context, uint32_t& vi, uint32_t& ti, uint32_t& ni, const char* a, const char* b)
+  {
+    ti = ~0u;
+    ni = ~0u;
+
+    int ix;
+    a = skipSpacing(a, b);
+    a = parseInt(context, ix, a, b);
+    if (ix < 0) ix += context->vertices_n;
+    else --ix;
+    if (ix < 0 || context->vertices_n <= uint32_t(ix)) {
+      context->logger(2, "Illegal vertex index %d at line %d.", ix, context->line);
+      return a;
+    }
+    vi = ix;
+
+    if (a < b && *a == '/') {
+      a++;
+      if (a < b && *a != '/' && *a != ' ') {
+        a = parseInt(context, ix, a, b);
+        if (ix < 0) ix += context->texcoords_n;
+        else --ix;
+        if (ix < 0 || context->texcoords_n <= uint32_t(ix)) {
+          context->logger(2, "Illegal texcoord index %d at line %d.", ix, context->line);
+          return a;
+        }
+        ti = ix;
+        context->useTexcoords = true;
+      }
+      if (a < b && *a == '/' && *a != ' ') {
+        a++;
+        a = parseInt(context, ix, a, b);
+        if (ix < 0) ix += context->normals_n;
+        else --ix;
+        if (ix < 0 || context->normals_n <= uint32_t(ix)) {
+          context->logger(2, "Illegal normal index %d at line %d.", ix, context->line);
+          return a;
+        }
+        ni = ix;
+        context->useNormals = true;
+      }
+    }
+    return a;
+  }
+
   void parseF(Context* context, const char* a, const char* b)
   {
-    int ix;
     Triangle t;
     t.smoothingGroup = context->currentSmoothingGroup;
     t.object = context->currentObject;
@@ -253,45 +297,11 @@ namespace {
 
     unsigned k = 0;
     for (; a < b && k < 3; k++) {
-      t.tex[k] = ~0u;
-      t.nrm[k] = ~0u;
-
-      a = skipSpacing(a, b);
-      a = parseInt(context, ix, a, b);
-      if (ix < 0) ix += context->vertices_n;
-      else --ix;
-      if (ix < 0 || context->vertices_n <= uint32_t(ix)) {
-        context->logger(2, "Illegal vertex index %d at line %d.", ix, context->line);
-        return;
-      }
-      t.vtx[k] = ix;
-
-      if (a < b && *a == '/') {
-        a++;
-        if (a < b && *a != '/' && *a != ' ') {
-          a = parseInt(context, ix, a, b);
-          if (ix < 0) ix += context->texcoords_n;
-          else --ix;
-          if (ix < 0 || context->texcoords_n <= uint32_t(ix)) {
-            context->logger(2, "Illegal texcoord index %d at line %d.", ix, context->line);
-            return;
-          }
-          t.tex[k] = ix;
-          context->useTexcoords = true;
-        }
-        if (a < b && *a == '/' && *a != ' ') {
-          a++;
-          a = parseInt(context, ix, a, b);
-          if (ix < 0) ix += context->normals_n;
-          else --ix;
-          if (ix < 0 || context->normals_n <= uint32_t(ix)) {
-            context->logger(2, "Illegal normal index %d at line %d.", ix, context->line);
-            return;
-          }
-          t.nrm[k] = ix;
-          context->useNormals = true;
-        }
-      }
+      uint32_t vi, ti, ni;
+      a = parseIndex(context, vi, ti, ni, a, b);
+      t.vtx[k] = vi;
+      t.tex[k] = ti;
+      t.nrm[k] = ni;
     }
     if (k == 3) {
       auto & T = context->triangles;
@@ -303,6 +313,39 @@ namespace {
     }
     else {
       context->logger(2, "Skipped malformed triangle at line %d", context->line);
+    }
+
+    while (true) {
+      a = skipSpacing(a, b);
+      if (a < b && (('0' <= *a && *a <= '9') || *a == '-' || *a == '+')) {
+        uint32_t vi, ti, ni;
+        a = parseIndex(context, vi, ti, ni, a, b);
+
+        Triangle r;
+        r.smoothingGroup = context->currentSmoothingGroup;
+        r.object = context->currentObject;
+        r.color = context->currentColor;
+
+        r.vtx[0] = t.vtx[0];
+        r.tex[0] = t.tex[0];
+        r.nrm[0] = t.nrm[0];
+        r.vtx[1] = t.vtx[2];
+        r.tex[1] = t.tex[2];
+        r.nrm[1] = t.nrm[2];
+        r.vtx[2] = vi;
+        r.tex[2] = ti;
+        r.nrm[2] = ni;
+        auto & T = context->triangles;
+        if (T.empty() || T.last->capacity <= T.last->fill + 1) {
+          T.append(context->arena.alloc<Block<Triangle>>());
+        }
+        T.last->data[T.last->fill++] = r;
+        context->triangles_n++;
+        t = r;
+      }
+      else {
+        break;
+      }
     }
   }
 
