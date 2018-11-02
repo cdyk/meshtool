@@ -402,7 +402,7 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
   }
 
-  {
+  if(solid) {
     VkBuffer buffers[4] = {
       rm->vtx.resource->buffer,
       rm->nrm.resource->buffer,
@@ -410,9 +410,6 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
       rm->col.resource->buffer };
     VkDeviceSize offsets[4] = { 0, 0, 0, 0 };
     vkCmdBindVertexBuffers(cmdBuf, 0, 4, buffers, offsets);
-  }
-
-  if(solid) {
     if (texturing != Texturing::None) {
       vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipe);
       vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipeLayout, 0, 1, &rename.objBufSamplerDescSet.resource->descSet, 0, NULL);
@@ -426,6 +423,12 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
   }
 
   if(outlines) {
+    VkBuffer buffers[2] = {
+      rm->vtx.resource->buffer,
+      rm->col.resource->buffer };
+    VkDeviceSize offsets[ARRAYSIZE(buffers)] = { 0, 0 };
+    vkCmdBindVertexBuffers(cmdBuf, 0, ARRAYSIZE(buffers), buffers, offsets);
+
     if (solid) {
       vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, wireFrontFacePipeline.resource->pipe);
       vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
