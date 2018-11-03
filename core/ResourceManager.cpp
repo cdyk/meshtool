@@ -50,18 +50,9 @@ void ResourceManagerBase::houseKeep()
     delete orphan;
   }
   orphanedCopy.clear();
-
-
 }
 
-
-void ResourceManagerBase::getOrphansBase(Vector<ResourceBase*>* o)
+ResourceManagerBase::~ResourceManagerBase()
 {
-  std::lock_guard<std::mutex> guard(lock);
-  auto N = orphaned.size();
-  o->resize(N);
-  for (size_t i = 0; i < N; i++) {
-    (*o)[i] = orphaned[i];
-  }
-  orphaned.resize(0);
+  houseKeep();
 }

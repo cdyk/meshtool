@@ -143,7 +143,6 @@ void Renderer::init()
 
 Renderer::~Renderer()
 {
-  startFrame();
 }
 
 void Renderer::update(Vector<Mesh*>& meshes)
@@ -321,14 +320,10 @@ void Renderer::update(Vector<Mesh*>& meshes)
     // just handles and those will destroy themselves.
     logger(0, "Destroyed Renderer.MeshData item.");
   }
+
+  textureManager->houseKeep();
 }
 
-
-
-void Renderer::startFrame()
-{
-  textureManager->startFrame();
-}
 
 void Renderer::buildPipelines(RenderPassHandle pass)
 {

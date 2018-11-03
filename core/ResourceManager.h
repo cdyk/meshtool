@@ -63,6 +63,7 @@ class ResourceManagerBase
 {
   friend class ResourceBase;
 public:
+  ~ResourceManagerBase();
 
   void houseKeep();
 
@@ -94,15 +95,12 @@ class ResourceManager : public ResourceManagerBase
 public:
   typedef void(*ReleaseFuncPtr)(void* data, T* resource);
 
-  ResourceManager(ReleaseFuncPtr func=nullptr, void* data=nullptr) : ResourceManagerBase((ReleaseFuncBasePtr)func, data) {}
-
+  ResourceManager(ReleaseFuncPtr func, void* data) : ResourceManagerBase((ReleaseFuncBasePtr)func, data) {}
 
   ResourceHandle<T> createResource()
   {
     return ResourceHandle<T>(new T(*this));
   }
-
-  void getOrphans(Vector<T*>& o) { getOrphansBase((Vector<ResourceBase*>*)&o); }
 };
 
 inline ResourceBase::ResourceBase(ResourceManagerBase& manager) : manager(manager) { manager.track(this); }

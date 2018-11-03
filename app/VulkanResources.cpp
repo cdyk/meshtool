@@ -5,12 +5,113 @@
 
 namespace {
 
+  void destroyBuffer(void* data, Buffer* buffer)
+  {
+    auto device = ((VulkanContext*)data)->device;
+    if (buffer->buffer) vkDestroyBuffer(device, buffer->buffer, nullptr);
+    if (buffer->mem) vkFreeMemory(device, buffer->mem, nullptr);
+  }
+
+  void destroyDescriptorSet(void* data, DescriptorSet* descSet)
+  {
+    auto device = ((VulkanContext*)data)->device;
+    auto descPool = ((VulkanContext*)data)->descPool;
+    if (descSet->descSet) vkFreeDescriptorSets(device, descPool, 1, &descSet->descSet);
+  }
+
+  void destroyShader(void* data, Shader* shader)
+  {
+    auto device = ((VulkanContext*)data)->device;
+    for (size_t i = 0; i < shader->stageCreateInfo.size(); i++) {
+      vkDestroyShaderModule(device, shader->stageCreateInfo[i].module, nullptr);
+    }
+    shader->stageCreateInfo.resize(0);
+  }
+
+  void destroyPipeline(void* data, Pipeline* pipe)
+  {
+    auto device = ((VulkanContext*)data)->device;
+    if (pipe->pipe) vkDestroyPipeline(device, pipe->pipe, nullptr);
+    if (pipe->pipeLayout) vkDestroyPipelineLayout(device, pipe->pipeLayout, nullptr);
+    if (pipe->descLayout) vkDestroyDescriptorSetLayout(device, pipe->descLayout, nullptr);
+  }
+
   void destroyImage(void* data, Image* image)
   {
     auto device = ((VulkanContext*)data)->device;
     if (image->image)vkDestroyImage(device, image->image, nullptr);
     if (image->mem) vkFreeMemory(device, image->mem, nullptr);
-    ((VulkanContext*)data)->logger(0, "Destroyed image.");
+  }
+
+  void destroyImageView(void* data, ImageView* view)
+  {
+    auto device = ((VulkanContext*)data)->device;
+    if (view->view) vkDestroyImageView(device, view->view, nullptr);
+  }
+
+  void destroySampler(void* data, Sampler* sampler)
+  {
+    auto device = ((VulkanContext*)data)->device;
+    if (sampler->sampler) vkDestroySampler(device, sampler->sampler, nullptr);
+  }
+
+  void destroyRenderPass(void* data, RenderPass* pass)
+  {
+    auto device = ((VulkanContext*)data)->device;
+    if (pass->pass) vkDestroyRenderPass(device, pass->pass, nullptr);
+    pass->pass = nullptr;
+  }
+
+  void destroyFrameBuffer(void* data, FrameBuffer* fb)
+  {
+    auto device = ((VulkanContext*)data)->device;
+    if (fb->fb) vkDestroyFramebuffer(device, fb->fb, nullptr);
+  }
+
+  void destroyCommandPool(void* data, CommandPool* cmdPool)
+  {
+    auto device = ((VulkanContext*)data)->device;
+    if (cmdPool->cmdPool) vkDestroyCommandPool(device, cmdPool->cmdPool, nullptr);
+    cmdPool->cmdPool = nullptr;
+  }
+
+  void destroyCommandBuffer(void* data, CommandBuffer* cmdBuf)
+  {
+    // FIXME: no point in having these as tracked resources.
+  }
+
+  void destroyFence(void* data, Fence* fence)
+  {
+    auto device = ((VulkanContext*)data)->device;
+    if (fence->fence) vkDestroyFence(device, fence->fence, nullptr);
+    fence->fence = VK_NULL_HANDLE;
+  }
+
+  void destroySemaphore(void* data, Semaphore* semaphore)
+  {
+    auto device = ((VulkanContext*)data)->device;
+    vkDestroySemaphore(device, semaphore->semaphore, nullptr);
+    semaphore->semaphore = nullptr;
+  }
+
+  void destroySwapChain(void* data, SwapChain* swapChain)
+  {
+    auto device = ((VulkanContext*)data)->device;
+    vkDestroySwapchainKHR(device, swapChain->swapChain, nullptr);
+  }
+
+  void destroyAccelerationStructure(void* data, AccelerationStructure* accStr)
+  {
+    auto* vCtx = (VulkanContext*)data;
+    if (accStr->acc) {
+      vCtx->vkDestroyAccelerationStructureNVX(vCtx->device, accStr->acc, nullptr);
+      accStr->acc = VK_NULL_HANDLE;
+    }
+    if (accStr->structureMem) {
+      vkFreeMemory(vCtx->device, accStr->structureMem, nullptr);
+      accStr->structureMem = VK_NULL_HANDLE;
+    }
+    ((VulkanContext*)data)->logger(0, "Destroyed acceleration structure.");
   }
 
 }
@@ -24,7 +125,21 @@ void VulkanResources::init()
 VulkanResources::VulkanResources(VulkanContext* vCtx, Logger logger) :
   vCtx(vCtx),
   logger(logger),
-  renderImageResources(destroyImage, vCtx)
+  bufferResources(destroyBuffer, vCtx),
+  descriptorSetResources(destroyDescriptorSet, vCtx),
+  shaderResources(destroyShader, vCtx),
+  pipelineResources(destroyPipeline, vCtx),
+  renderPassResources(destroyRenderPass, vCtx),
+  frameBufferResources(destroyFrameBuffer, vCtx),
+  renderImageResources(destroyImage, vCtx),
+  imageViewResources(destroyImageView, vCtx),
+  samplerResources(destroySampler, vCtx),
+  commandPoolResources(destroyCommandPool, vCtx),
+  commandBufferResources(destroyCommandBuffer, vCtx),
+  fenceResources(destroyFence, vCtx),
+  semaphoreResources(destroySemaphore, vCtx),
+  swapChainResources(destroySwapChain, vCtx),
+  accelerationStructures(destroyAccelerationStructure, vCtx)
 {}
 
 
@@ -58,132 +173,21 @@ void VulkanResources::copyHostMemToBuffer(RenderBufferHandle buffer, void* src, 
 
 void VulkanResources::houseKeep()
 {
-  {
-    Vector<Buffer*> orphans;
-    bufferResources.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroyBuffer(r);
-      delete r;
-    }
-  }
-
-  {
-    Vector<DescriptorSet*> orphans;
-    descriptorSetResources.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroyDescriptorSet(r);
-      delete r;
-    }
-  }
-
-  {
-    Vector<Shader*> orphans;
-    shaderResources.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroyShader(r);
-      delete r;
-    }
-  }
-
-  {
-    Vector<Pipeline*> orphans;
-    pipelineResources.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroyPipeline(r);
-      delete r;
-    }
-  }
-
-  {
-    Vector<RenderPass*> orphans;
-    renderPassResources.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroyRenderPass(r);
-      delete r;
-    }
-  }
-  {
-    Vector<FrameBuffer*> orphans;
-    frameBufferResources.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroyFrameBuffer(r);
-      delete r;
-    }
-  }
+  bufferResources.houseKeep();
+  descriptorSetResources.houseKeep();
+  shaderResources.houseKeep();
+  pipelineResources.houseKeep();
+  renderPassResources.houseKeep();
+  frameBufferResources.houseKeep();
   renderImageResources.houseKeep();
-  //{
-  //  Vector<Image*> orphans;
-  //  renderImageResources.getOrphans(orphans);
-  //  for (auto * r : orphans) {
-  //    if (!r->hasFlag(ResourceBase::Flags::External)) destroyRenderImage(r);
-  //    delete r;
-  //  }
-  //}
-  {
-    Vector<ImageView*> orphans;
-    imageViewResources.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroyImageView(r);
-      delete r;
-    }
-  }
-  {
-    Vector<Sampler*> orphans;
-    samplerResources.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroySampler(r);
-      delete r;
-    }
-  }
-  {
-    Vector<CommandPool*> orphans;
-    commandPoolResources.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroyCommandPool(r);
-      delete r;
-    }
-  }
-  {
-    Vector<CommandBuffer*> orphans;
-    commandBufferResources.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroyCommandBuffer(r);
-      delete r;
-    }
-  }
-  {
-    Vector<Fence*> orphans;
-    fenceResources.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroyFence(r);
-      delete r;
-    }
-  }
-  {
-    Vector<Semaphore*> orphans;
-    semaphoreResources.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroySemaphore(r);
-      delete r;
-    }
-  }
-  {
-    Vector<SwapChain*> orphans;
-    swapChainResources.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroySwapChain(r);
-      delete r;
-    }
-  }
-  {
-    Vector<AccelerationStructure*> orphans;
-    accelerationStructures.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroyAccelerationStructure(r);
-      delete r;
-    }
-  }
-
+  imageViewResources.houseKeep();
+  samplerResources.houseKeep();
+  commandPoolResources.houseKeep();
+  commandBufferResources.houseKeep();
+  fenceResources.houseKeep();
+  semaphoreResources.houseKeep();
+  swapChainResources.houseKeep();
+  accelerationStructures.houseKeep();
 }
 
 PipelineHandle VulkanResources::createPipeline()
@@ -333,14 +337,6 @@ PipelineHandle VulkanResources::createPipeline(Vector<VkVertexInputBindingDescri
   return pipeHandle;
 }
 
-void VulkanResources::destroyPipeline(Pipeline* pipe)
-{
-  if (pipe->pipe) vkDestroyPipeline(vCtx->device, pipe->pipe, nullptr);
-  if (pipe->pipeLayout) vkDestroyPipelineLayout(vCtx->device, pipe->pipeLayout, nullptr);
-  if (pipe->descLayout) vkDestroyDescriptorSetLayout(vCtx->device, pipe->descLayout, nullptr);
-}
-
-
 RenderBufferHandle VulkanResources::createBuffer()
 {
   return bufferResources.createResource();
@@ -392,13 +388,6 @@ RenderBufferHandle VulkanResources::createBuffer(size_t requestedSize, VkBufferU
   return bufHandle;
 }
 
-void VulkanResources::destroyBuffer(Buffer* buffer)
-{
-  if (buffer->buffer) vkDestroyBuffer(vCtx->device, buffer->buffer, nullptr);
-  if (buffer->mem) vkFreeMemory(vCtx->device, buffer->mem, nullptr);
-}
-
-
 DescriptorSetHandle VulkanResources::createDescriptorSet(VkDescriptorSetLayout descLayout)
 {
   auto descSetHandle = descriptorSetResources.createResource();
@@ -416,12 +405,6 @@ DescriptorSetHandle VulkanResources::createDescriptorSet(VkDescriptorSetLayout d
 
   return descSetHandle;
 }
-
-void VulkanResources::destroyDescriptorSet(DescriptorSet* descSet)
-{
-  if (descSet->descSet) vkFreeDescriptorSets(vCtx->device, vCtx->descPool, 1, &descSet->descSet);
-}
-
 
 ShaderHandle VulkanResources::createShader(Vector<ShaderInputSpec>& spec, const char* name)
 {
@@ -457,24 +440,6 @@ ShaderHandle VulkanResources::createShader(Vector<ShaderInputSpec>& spec, const 
   }
   return shaderHandle;
 }
-
-void VulkanResources::destroyShader(Shader* shader)
-{
-  for (size_t i = 0; i < shader->stageCreateInfo.size(); i++) {
-    vkDestroyShaderModule(vCtx->device, shader->stageCreateInfo[i].module, nullptr);
-  }
-  shader->stageCreateInfo.resize(0);
-}
-
-
-//RenderImageHandle VulkanResources::wrapRenderImageView(VkImageView view)
-//{
-//  auto renderImageHandle = renderImageResources.createResource();
-//  auto * renderImage = renderImageHandle.resource;
-//  renderImage->setFlag(ResourceBase::Flags::External);
-//  renderImage->view = view;
-//  return renderImageHandle;
-//}
 
 ImageHandle VulkanResources::createImage(VkImageCreateInfo& imageCreateInfo)
 {
@@ -547,14 +512,6 @@ ImageHandle VulkanResources::createImage(uint32_t w, uint32_t h, VkImageUsageFla
   return renderImageHandle;
 }
 
-
-void VulkanResources::destroyRenderImage(Image* renderImage)
-{
-  if(renderImage->image)vkDestroyImage(vCtx->device, renderImage->image, nullptr);
-  if(renderImage->mem) vkFreeMemory(vCtx->device, renderImage->mem, nullptr);
-}
-
-
 ImageViewHandle VulkanResources::createImageView(ImageHandle image, VkImageViewCreateInfo& imageViewCreateInfo)
 {
   auto view = imageViewResources.createResource();
@@ -590,12 +547,6 @@ ImageViewHandle VulkanResources::createImageView(VkImage image, VkFormat format,
   return view;
 }
 
-void VulkanResources::destroyImageView(ImageView* view)
-{
-  if (view->view) vkDestroyImageView(vCtx->device, view->view, nullptr);
-}
-
-
 SamplerHandle VulkanResources::createSampler(VkSamplerCreateInfo& samplerCreateInfo)
 {
   auto sampler = samplerResources.createResource();
@@ -603,13 +554,6 @@ SamplerHandle VulkanResources::createSampler(VkSamplerCreateInfo& samplerCreateI
   assert(rv == VK_SUCCESS);
   return sampler;
 }
-
-void VulkanResources::destroySampler(Sampler* sampler)
-{
-  if (sampler->sampler) vkDestroySampler(vCtx->device, sampler->sampler, nullptr);
-}
-
-
 
 RenderPassHandle VulkanResources::createRenderPass(VkAttachmentDescription* attachments, uint32_t attachmentCount,
                                                          VkSubpassDescription* subpasses, uint32_t subpassCount,
@@ -636,13 +580,6 @@ RenderPassHandle VulkanResources::createRenderPass(VkAttachmentDescription* atta
 
   return passHandle;
 }
-
-void VulkanResources::destroyRenderPass(RenderPass* pass)
-{
-  if (pass->pass) vkDestroyRenderPass(vCtx->device, pass->pass, nullptr);
-  pass->pass = nullptr;
-}
-
 
 FrameBufferHandle VulkanResources::createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<ImageViewHandle>& attachments)
 {
@@ -673,12 +610,6 @@ FrameBufferHandle VulkanResources::createFrameBuffer(RenderPassHandle pass, uint
   return fbHandle;
 }
 
-void VulkanResources::destroyFrameBuffer(FrameBuffer* fb)
-{
-  if (fb->fb) vkDestroyFramebuffer(vCtx->device, fb->fb, nullptr);
-}
-
-
 CommandPoolHandle VulkanResources::createCommandPool(uint32_t queueFamilyIx)
 {
   VkCommandPoolCreateInfo info{};
@@ -691,13 +622,6 @@ CommandPoolHandle VulkanResources::createCommandPool(uint32_t queueFamilyIx)
   assert(rv == VK_SUCCESS);
   return poolHandle;
 }
-
-void VulkanResources::destroyCommandPool(CommandPool* cmdPool)
-{
-  if (cmdPool->cmdPool) vkDestroyCommandPool(vCtx->device, cmdPool->cmdPool, nullptr);
-  cmdPool->cmdPool = nullptr;
-}
-
 
 CommandBufferHandle VulkanResources::createPrimaryCommandBuffer(CommandPoolHandle pool)
 {
@@ -713,9 +637,6 @@ CommandBufferHandle VulkanResources::createPrimaryCommandBuffer(CommandPoolHandl
   return handle;
 }
 
-void VulkanResources::destroyCommandBuffer(CommandBuffer* cmdBuf)
-{
-}
 
 
 FenceHandle VulkanResources::createFence(bool signalled)
@@ -730,13 +651,6 @@ FenceHandle VulkanResources::createFence(bool signalled)
   return handle;
 }
 
-void VulkanResources::destroyFence(Fence* fence)
-{
-  if (fence->fence) vkDestroyFence(vCtx->device, fence->fence, nullptr);
-  fence->fence = nullptr;
-}
-
-
 SemaphoreHandle VulkanResources::createSemaphore()
 {
   VkSemaphoreCreateInfo info = {};
@@ -748,14 +662,6 @@ SemaphoreHandle VulkanResources::createSemaphore()
   return handle;
 }
 
-
-void VulkanResources::destroySemaphore(Semaphore* semaphore)
-{
-  vkDestroySemaphore(vCtx->device, semaphore->semaphore, nullptr);
-  semaphore->semaphore = nullptr;
-}
-
-
 SwapChainHandle VulkanResources::createSwapChain(SwapChainHandle oldSwapChain, VkSwapchainCreateInfoKHR& swapChainInfo)
 {
   auto info = swapChainInfo;
@@ -765,11 +671,6 @@ SwapChainHandle VulkanResources::createSwapChain(SwapChainHandle oldSwapChain, V
   CHECK_VULKAN(vkCreateSwapchainKHR(vCtx->device, &info, nullptr, &handle.resource->swapChain));
 
   return handle;
-}
-
-void VulkanResources::destroySwapChain(SwapChain* swapChain)
-{
-  vkDestroySwapchainKHR(vCtx->device, swapChain->swapChain, nullptr);
 }
 
 
@@ -832,20 +733,6 @@ AccelerationStructureHandle VulkanResources::createAccelerationStructure(VkAccel
 
   return handle;
 }
-
-void VulkanResources::destroyAccelerationStructure(AccelerationStructure* accStr)
-{
-  if (accStr->acc) {
-    logger(0, "Destroying acceleration structure.");
-    vCtx->vkDestroyAccelerationStructureNVX(vCtx->device, accStr->acc, nullptr);
-    accStr->acc = VK_NULL_HANDLE;
-  }
-  if (accStr->structureMem) {
-    vkFreeMemory(vCtx->device, accStr->structureMem, nullptr);
-    accStr->structureMem = VK_NULL_HANDLE;
-  }
-}
-
 
 bool VulkanResources::getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements)
 {

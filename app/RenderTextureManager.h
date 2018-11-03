@@ -22,14 +22,12 @@ typedef ResourceHandle<RenderTextureResource> RenderTextureHandle;
 
 class VulkanContext;
 
-class RenderTextureManager : ResourceManager<RenderTextureResource>
+class RenderTextureManager : public ResourceManager<RenderTextureResource>
 {
 public:
   RenderTextureManager(VulkanContext* context);
 
   RenderTextureHandle loadTexture(TextureSource source);
-
-  void startFrame();
 
 private:
   VulkanContext* vCtx = nullptr;

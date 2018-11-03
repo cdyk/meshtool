@@ -201,23 +201,6 @@ private:
   VulkanContext* vCtx = nullptr;
   Logger logger = nullptr;
 
-  void destroyBuffer(Buffer*);
-  void destroyDescriptorSet(DescriptorSet*);
-  void destroyShader(Shader* shader);
-  void destroyPipeline(Pipeline*);
-  void destroyRenderPass(RenderPass*);
-  void destroyFrameBuffer(FrameBuffer*);
-  void destroyRenderImage(Image*);
-  void destroyImageView(ImageView*);
-  void destroySampler(Sampler*);
-  void destroyCommandPool(CommandPool*);
-  void destroyCommandBuffer(CommandBuffer*);
-  void destroyFence(Fence*);
-  void destroySemaphore(Semaphore*);
-  void destroySwapChain(SwapChain*);
-  void destroyAccelerationStructure(AccelerationStructure*);
-
-
   ResourceManager<Buffer> bufferResources;
   ResourceManager<DescriptorSet> descriptorSetResources;
   ResourceManager<Shader> shaderResources;

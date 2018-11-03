@@ -3,6 +3,7 @@
 
 
 RenderTextureManager::RenderTextureManager(VulkanContext* vCtx) :
+  ResourceManager(nullptr, nullptr),
   vCtx(vCtx)
 {
 
@@ -84,14 +85,4 @@ RenderTextureHandle RenderTextureManager::loadTexture(TextureSource source)
   res->state = RenderResourceState::Ready;
 
   return handle;
-}
-
-
-void RenderTextureManager::startFrame()
-{
-  Vector<RenderTextureResource*> orphans;
-  getOrphans(orphans);
-  for (auto * r : orphans) {
-    delete r;
-  }
 }

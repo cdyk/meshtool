@@ -477,7 +477,6 @@ int main(int argc, char** argv)
 
     app->tasks.update();
     checkQueues();
-    app->renderer->startFrame();
 
     app->startFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -615,7 +614,6 @@ int main(int argc, char** argv)
   app->items.meshes.resize(0);
   if(app->renderer) app->renderer->update(app->items.meshes);
   if(app->raycaster) app->raycaster->update(app->items.meshes);
-  app->renderer->startFrame();
 
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();

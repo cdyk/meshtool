@@ -31,8 +31,6 @@ public:
 
   void init();
 
-  void startFrame();
-
   void update(Vector<Mesh*>& meshes);
 
   void draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP);
