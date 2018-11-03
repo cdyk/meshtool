@@ -64,25 +64,39 @@ class ResourceManagerBase
   friend class ResourceBase;
 public:
 
+  void houseKeep();
+
   uint32_t getCount();
   uint32_t getOrphanCount();
 
 protected:
+  typedef void(*ReleaseFuncBasePtr)(void* data, ResourceBase* resource);
+
+  ResourceManagerBase(ReleaseFuncBasePtr func, void* data) : func(func), data(data) {}
+
   void track(ResourceBase* resource);
   void orphan(ResourceBase* resource);
   void getOrphansBase(Vector<ResourceBase*>* o);
 
 private:
+  ReleaseFuncBasePtr func = nullptr;
+  void* data = nullptr;
   std::mutex lock;
   // FIXME: replace with double-linked lists.
   Vector<ResourceBase*> tracked;
   Vector<ResourceBase*> orphaned;
+  Vector<ResourceBase*> orphanedCopy;
 };
 
 template<typename T>
 class ResourceManager : public ResourceManagerBase
 {
 public:
+  typedef void(*ReleaseFuncPtr)(void* data, T* resource);
+
+  ResourceManager(ReleaseFuncPtr func=nullptr, void* data=nullptr) : ResourceManagerBase((ReleaseFuncBasePtr)func, data) {}
+
+
   ResourceHandle<T> createResource()
   {
     return ResourceHandle<T>(new T(*this));

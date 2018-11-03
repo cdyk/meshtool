@@ -3,9 +3,29 @@
 #include "VulkanResources.h"
 
 
+namespace {
+
+  void destroyImage(void* data, Image* image)
+  {
+    auto device = ((VulkanContext*)data)->device;
+    if (image->image)vkDestroyImage(device, image->image, nullptr);
+    if (image->mem) vkFreeMemory(device, image->mem, nullptr);
+    ((VulkanContext*)data)->logger(0, "Destroyed image.");
+  }
+
+}
+
+
+
 void VulkanResources::init()
 {
 }
+
+VulkanResources::VulkanResources(VulkanContext* vCtx, Logger logger) :
+  vCtx(vCtx),
+  logger(logger),
+  renderImageResources(destroyImage, vCtx)
+{}
 
 
 VulkanResources::~VulkanResources()
@@ -90,14 +110,15 @@ void VulkanResources::houseKeep()
       delete r;
     }
   }
-  {
-    Vector<Image*> orphans;
-    renderImageResources.getOrphans(orphans);
-    for (auto * r : orphans) {
-      if (!r->hasFlag(ResourceBase::Flags::External)) destroyRenderImage(r);
-      delete r;
-    }
-  }
+  renderImageResources.houseKeep();
+  //{
+  //  Vector<Image*> orphans;
+  //  renderImageResources.getOrphans(orphans);
+  //  for (auto * r : orphans) {
+  //    if (!r->hasFlag(ResourceBase::Flags::External)) destroyRenderImage(r);
+  //    delete r;
+  //  }
+  //}
   {
     Vector<ImageView*> orphans;
     imageViewResources.getOrphans(orphans);

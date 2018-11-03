@@ -140,7 +140,7 @@ class VulkanContext;
 class VulkanResources
 {
 public:
-  VulkanResources(VulkanContext* vCtx, Logger logger) : vCtx(vCtx), logger(logger) {}
+  VulkanResources(VulkanContext* vCtx, Logger logger);
 
   ~VulkanResources();
 

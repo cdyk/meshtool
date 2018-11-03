@@ -1,5 +1,6 @@
 #include "ResourceManager.h"
 #include "Common.h"
+#include <cassert>
 
 void ResourceManagerBase::track(ResourceBase* resource)
 {
@@ -33,6 +34,24 @@ uint32_t ResourceManagerBase::getOrphanCount()
 {
   std::lock_guard<std::mutex> guard(lock);
   return orphaned.size32();
+}
+
+void ResourceManagerBase::houseKeep()
+{
+  assert(orphanedCopy.size() == 0);
+  {
+    std::lock_guard<std::mutex> guard(lock);
+    orphanedCopy.swap(orphaned);
+  }
+  for (auto orphan : orphanedCopy) {
+    if (!orphan->hasFlag(ResourceBase::Flags::External) && func) {
+      func(data, orphan);
+    }
+    delete orphan;
+  }
+  orphanedCopy.clear();
+
+
 }
 
 
