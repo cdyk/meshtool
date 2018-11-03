@@ -300,10 +300,10 @@ bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData,  c
   auto * res = vCtx->resources;
 
   if (meshData.geometryGeneration == mesh->geometryGeneration && meshData.colorGeneration == mesh->colorGeneration) return false;
-  meshData.geometryGeneration == mesh->geometryGeneration;
-  meshData.colorGeneration == mesh->colorGeneration;
+  meshData.geometryGeneration = mesh->geometryGeneration;
+  meshData.colorGeneration = mesh->colorGeneration;
 
-  logger(0, "Updating MeshData item.");
+  logger(0, "Updating Raytracer.MeshData item.");
 
   meshData.vertexCount = mesh->vtxCount;
   meshData.triangleCount = mesh->triCount;
@@ -407,10 +407,10 @@ void Raycaster::update(Vector<Mesh*>& meshes)
 
   newMeshData.clear();
   newMeshData.reserve(meshes.size());
-  for (auto & renderMesh : meshes) {
+  for (auto & mesh : meshes) {
     bool found = false;
     for (auto & item : meshData) {
-      if (item.src == renderMesh) {
+      if (item.src == mesh) {
         newMeshData.pushBack(item);
         found = true;
         break;
@@ -418,11 +418,11 @@ void Raycaster::update(Vector<Mesh*>& meshes)
     }
     if (!found) {
       MeshData md{};
-      md.src = renderMesh;
+      md.src = mesh;
       newMeshData.pushBack(md);
       logger(0, "Created new MeshData item.");
     }
-    if (updateMeshData(scratchSize, newMeshData.back(), renderMesh)) {
+    if (updateMeshData(scratchSize, newMeshData.back(), mesh)) {
       change = true;
     }
   }

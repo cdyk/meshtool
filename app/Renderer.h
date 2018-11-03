@@ -34,6 +34,8 @@ public:
 
   void startFrame();
 
+  void update(Vector<Mesh*>& meshes);
+
   void drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMeshHandle renderMesh, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP);
   
   RenderTextureManager* textureManager = nullptr;
@@ -42,6 +44,28 @@ public:
 private:
   Logger logger;
   App* app = nullptr;
+
+  struct MeshData
+  {
+    Mesh* src = nullptr;
+    uint32_t geometryGeneration = 0;
+    uint32_t colorGeneration = 0;
+
+    RenderBufferHandle vtx;
+    RenderBufferHandle nrm;
+    RenderBufferHandle tan;
+    RenderBufferHandle bnm;
+    RenderBufferHandle tex;
+    RenderBufferHandle col;
+    uint32_t triangleCount = 0;
+
+    RenderBufferHandle lines;
+    uint32_t lineCount = 0;
+
+
+  };
+  Vector<MeshData> meshData;
+  Vector<MeshData> newMeshData;
 
   struct {
     RenderBufferHandle vtxCol;

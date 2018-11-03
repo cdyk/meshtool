@@ -231,6 +231,10 @@ void App::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes,
     raycaster = nullptr;
   }
 
+  if (raytrace == false) {
+    renderer->update(items.meshes);
+  }
+
   auto & frame = vCtx->frameManager->frame();
   auto & cmdBuf = frame.commandBuffer.resource->cmdBuf;
 

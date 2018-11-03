@@ -5,6 +5,7 @@
 #include "Mesh.h"
 #include "VulkanContext.h"
 #include "RenderTextureManager.h"
+#include "LinAlgOps.h"
 
 struct ObjectBuffer
 {
@@ -39,6 +40,25 @@ namespace {
   uint32_t texturedPS[]
 #include "texturedPS.glsl.h"
     ;
+
+  struct RGBA8
+  {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+    uint8_t a;
+  };
+  static_assert(sizeof(RGBA8) == sizeof(uint32_t));
+
+  struct Vec3fRGBA8
+  {
+    Vec3f p;
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+    uint8_t a;
+  };
+  static_assert(sizeof(Vec3fRGBA8) == 4 * sizeof(uint32_t));
 
 }
 
@@ -126,6 +146,184 @@ Renderer::~Renderer()
 {
   startFrame();
 }
+
+void Renderer::update(Vector<Mesh*>& meshes)
+{
+  auto * vCtx = app->vCtx;
+  auto * resources = vCtx->resources;
+
+  for (auto & mesh : meshes) {
+    bool found = false;
+    for (auto & item : meshData) {
+      if (item.src == mesh) {
+        newMeshData.pushBack(std::move(item));
+        item.src = nullptr;
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      newMeshData.pushBack(MeshData{ mesh });
+      logger(0, "Created new Renderer.MeshData item.");
+    }
+    auto & meshData = newMeshData.back();
+    if (meshData.geometryGeneration != mesh->geometryGeneration) {
+      meshData.geometryGeneration = mesh->geometryGeneration;
+      meshData.colorGeneration = 0; // trigger update
+
+      meshData.triangleCount = mesh->triCount;
+      meshData.vtx = resources->createVertexDeviceBuffer(sizeof(Vec3f) * 3 * meshData.triangleCount);
+      meshData.nrm = resources->createVertexDeviceBuffer(sizeof(Vec3f) * 3 * meshData.triangleCount);
+      meshData.tan = resources->createVertexDeviceBuffer(sizeof(Vec3f) * 3 * meshData.triangleCount);
+      meshData.bnm = resources->createVertexDeviceBuffer(sizeof(Vec3f) * 3 * meshData.triangleCount);
+      meshData.tex = resources->createVertexDeviceBuffer(sizeof(Vec2f) * 3 * meshData.triangleCount);
+      meshData.col = resources->createVertexDeviceBuffer(sizeof(uint32_t) * 3 * meshData.triangleCount);
+
+      {
+        auto vtxStaging = resources->createStagingBuffer(meshData.vtx.resource->requestedSize);
+        auto nrmStaging = resources->createStagingBuffer(meshData.nrm.resource->requestedSize);
+        auto tanStaging = resources->createStagingBuffer(meshData.tan.resource->requestedSize);
+        auto bnmStaging = resources->createStagingBuffer(meshData.bnm.resource->requestedSize);
+        auto texStaging = resources->createStagingBuffer(meshData.tex.resource->requestedSize);
+        {
+          MappedBuffer<Vec3f> vtxMap(vCtx, vtxStaging);
+          MappedBuffer<Vec3f> nrmMap(vCtx, nrmStaging);
+          MappedBuffer<Vec3f> tanMap(vCtx, tanStaging);
+          MappedBuffer<Vec3f> bnmMap(vCtx, bnmStaging);
+          MappedBuffer<Vec2f> texMap(vCtx, texStaging);
+
+          if (mesh->nrmCount) {
+            if (mesh->texCount) {
+
+              for (unsigned i = 0; i < mesh->triCount; i++) {
+                Vec3f u, v;
+                tangentSpaceBasis(u, v,
+                                  mesh->vtx[mesh->triVtxIx[3 * i + 0]], mesh->vtx[mesh->triVtxIx[3 * i + 1]], mesh->vtx[mesh->triVtxIx[3 * i + 2]],
+                                  mesh->tex[mesh->triTexIx[3 * i + 0]], mesh->tex[mesh->triTexIx[3 * i + 1]], mesh->tex[mesh->triTexIx[3 * i + 2]]);
+
+                for (unsigned k = 0; k < 3; k++) {
+                  auto n = normalize(mesh->nrm[mesh->triNrmIx[i]]);
+
+                  auto uu = normalize(u - dot(u, n)*n);
+                  auto vv = normalize(v - dot(v, n)*n);
+
+                  tanMap.mem[3 * i + k] = uu;
+                  bnmMap.mem[3 * i + k] = vv;
+                }
+              }
+
+              for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
+                vtxMap.mem[i] = mesh->vtx[mesh->triVtxIx[i]];
+                nrmMap.mem[i] = mesh->nrm[mesh->triNrmIx[i]];
+                texMap.mem[i] = 10.f*mesh->tex[mesh->triTexIx[i]];
+                //tanMap.mem[i] = Vec3f(0.f);
+                //bnmMap.mem[i] = Vec3f(0.f);
+              }
+            }
+            else {
+              for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
+                vtxMap.mem[i] = mesh->vtx[mesh->triVtxIx[i]];
+                nrmMap.mem[i] = mesh->nrm[mesh->triNrmIx[i]];
+                tanMap.mem[i] = Vec3f(0.f);
+                bnmMap.mem[i] = Vec3f(0.f);
+                texMap.mem[i] = Vec2f(0.5f);
+              }
+            }
+          }
+          else {
+            if (mesh->texCount) {
+              for (unsigned i = 0; i < mesh->triCount; i++) {
+                Vec3f p[3];
+                for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
+                auto n = cross(p[1] - p[0], p[2] - p[0]);
+                for (unsigned k = 0; k < 3; k++) {
+                  vtxMap.mem[3 * i + k] = p[k];
+                  nrmMap.mem[3 * i + k] = n;
+                  texMap.mem[3 * i + k] = 10.f*mesh->tex[mesh->triTexIx[3 * i + k]];
+                  tanMap.mem[3 * i + k] = Vec3f(0.f);
+                  bnmMap.mem[3 * i + k] = Vec3f(0.f);
+                }
+              }
+            }
+            else {
+              for (unsigned i = 0; i < mesh->triCount; i++) {
+                Vec3f p[3];
+                for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
+                auto n = cross(p[1] - p[0], p[2] - p[0]);
+                for (unsigned k = 0; k < 3; k++) {
+                  vtxMap.mem[3 * i + k] = p[k];
+                  nrmMap.mem[3 * i + k] = n;
+                  texMap.mem[3 * i + k] = Vec2f(0.5f);
+                  tanMap.mem[3 * i + k] = Vec3f(0.f);
+                  bnmMap.mem[3 * i + k] = Vec3f(0.f);
+                }
+              }
+            }
+          }
+          vCtx->frameManager->copyBuffer(meshData.vtx, vtxStaging, meshData.vtx.resource->requestedSize);
+          vCtx->frameManager->copyBuffer(meshData.nrm, nrmStaging, meshData.nrm.resource->requestedSize);
+          vCtx->frameManager->copyBuffer(meshData.tan, tanStaging, meshData.tan.resource->requestedSize);
+          vCtx->frameManager->copyBuffer(meshData.bnm, bnmStaging, meshData.bnm.resource->requestedSize);
+          vCtx->frameManager->copyBuffer(meshData.tex, texStaging, meshData.tex.resource->requestedSize);
+        }
+      }
+
+      meshData.lineCount = mesh->lineCount;
+      if (meshData.lineCount) {
+        meshData.lines = vCtx->resources->createVertexDeviceBuffer(sizeof(Vec3fRGBA8) * 2 * meshData.lineCount);
+        auto lineVtxStaging = vCtx->resources->createStagingBuffer(meshData.lines.resource->requestedSize);
+        {
+          MappedBuffer<Vec3fRGBA8> map(vCtx, lineVtxStaging);
+          for (unsigned i = 0; i < 2 * meshData.lineCount; i++) {
+            auto c = mesh->lineColor[i / 2];
+            map.mem[i].p = mesh->vtx[mesh->lineVtxIx[i]];
+            map.mem[i].r = (c >> 16) & 0xffu;
+            map.mem[i].g = (c >> 8) & 0xffu;
+            map.mem[i].b = (c >> 0) & 0xffu;
+            map.mem[i].a = 255u;
+          }
+        }
+        vCtx->frameManager->copyBuffer(meshData.lines, lineVtxStaging, meshData.lines.resource->requestedSize);
+      }
+      else {
+        meshData.lines = RenderBufferHandle();
+      }
+      logger(0, "Updated geometry of MeshData item");
+    }
+
+    if (meshData.colorGeneration != mesh->colorGeneration) {
+      meshData.colorGeneration = mesh->colorGeneration;
+
+      auto stagingBuf = vCtx->resources->createStagingBuffer(meshData.col.resource->requestedSize);
+      {
+        MappedBuffer<RGBA8> map(vCtx, stagingBuf);
+        for (unsigned i = 0; i < meshData.triangleCount; i++) {
+          auto color = meshData.src->currentColor[i];
+
+          RGBA8 col;
+          col.r = (color >> 16) & 0xff;
+          col.g = (color >> 8) & 0xff;
+          col.b = (color) & 0xff;
+          col.a = 255;
+
+          map.mem[3 * i + 0] = col;
+          map.mem[3 * i + 1] = col;
+          map.mem[3 * i + 2] = col;
+        }
+      }
+      vCtx->frameManager->copyBuffer(meshData.col, stagingBuf, meshData.col.resource->requestedSize);
+      logger(0, "Updated color of MeshData item");
+    }
+  }
+  meshData.swap(newMeshData);
+  for (auto & item : newMeshData) {
+    if (item.src == nullptr) continue;
+    // just handles and those will destroy themselves.
+    logger(0, "Destroyed Renderer.MeshData item.");
+  }
+}
+
+
 
 void Renderer::startFrame()
 {
