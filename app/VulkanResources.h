@@ -155,6 +155,7 @@ public:
   RenderBufferHandle createBuffer(size_t initialSize, VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags properties);
   RenderBufferHandle createStagingBuffer(size_t initialSize) { return createBuffer(initialSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT); }
   RenderBufferHandle createVertexDeviceBuffer(size_t initialSize) { return createBuffer(initialSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT); }
+  RenderBufferHandle createIndexDeviceBuffer(size_t initialSize) { return createBuffer(initialSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT); }
   RenderBufferHandle createUniformBuffer(size_t initialSize) { return createBuffer(initialSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT); }
 
   DescriptorSetHandle createDescriptorSet(VkDescriptorSetLayout descLayout);

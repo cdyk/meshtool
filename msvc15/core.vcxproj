@@ -130,6 +130,7 @@
     <ClCompile Include="..\core\mem\Arena.cpp" />
     <ClCompile Include="..\core\mem\Pool.cpp" />
     <ClCompile Include="..\core\Mesh.cpp" />
+    <ClCompile Include="..\core\MeshIndexing.cpp" />
     <ClCompile Include="..\core\ObjReader.cpp" />
     <ClCompile Include="..\core\ResourceManager.cpp" />
     <ClCompile Include="..\core\spatial\R3PointKdTree.cpp" />
@@ -145,6 +146,7 @@
     <ClInclude Include="..\core\LinAlgOps.h" />
     <ClInclude Include="..\core\mem\Allocators.h" />
     <ClInclude Include="..\core\Mesh.h" />
+    <ClInclude Include="..\core\MeshIndexing.h" />
     <ClInclude Include="..\core\ResourceManager.h" />
     <ClInclude Include="..\core\spatial\R3PointKdTree.h" />
     <ClInclude Include="..\core\topo\HalfEdgeMesh.h" />

@@ -3,6 +3,7 @@
 #include "App.h"
 #include "Renderer.h"
 #include "Mesh.h"
+#include "MeshIndexing.h"
 #include "VulkanContext.h"
 #include "RenderTextureManager.h"
 #include "LinAlgOps.h"
@@ -178,6 +179,8 @@ void Renderer::update(Vector<Mesh*>& meshes)
       meshData.tex = resources->createVertexDeviceBuffer(sizeof(Vec2f) * 3 * meshData.triangleCount);
       meshData.col = resources->createVertexDeviceBuffer(sizeof(uint32_t) * 3 * meshData.triangleCount);
 
+
+      Vector<uint32_t> indices;
       {
         auto vtxStaging = resources->createStagingBuffer(meshData.vtx.resource->requestedSize);
         auto nrmStaging = resources->createStagingBuffer(meshData.nrm.resource->requestedSize);
@@ -220,9 +223,15 @@ void Renderer::update(Vector<Mesh*>& meshes)
               }
             }
             else {
-              for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
-                vtxMap.mem[i] = mesh->vtx[mesh->triVtxIx[i]];
-                nrmMap.mem[i] = mesh->nrm[mesh->triNrmIx[i]];
+
+              Vector<uint32_t> newVertices;
+
+              uniqueIndices(logger, indices, newVertices, mesh->triVtxIx, mesh->triNrmIx, 3*mesh->triCount);
+
+              for (uint32_t i = 0; i < newVertices.size32(); i++) {
+                auto ix = newVertices[i];
+                vtxMap.mem[i] = mesh->vtx[mesh->triVtxIx[ix]];
+                nrmMap.mem[i] = mesh->nrm[mesh->triNrmIx[ix]];
                 tanMap.mem[i] = Vec3f(0.f);
                 bnmMap.mem[i] = Vec3f(0.f);
                 texMap.mem[i] = Vec2f(0.5f);
@@ -265,6 +274,19 @@ void Renderer::update(Vector<Mesh*>& meshes)
           vCtx->frameManager->copyBuffer(meshData.bnm, bnmStaging, meshData.bnm.resource->requestedSize);
           vCtx->frameManager->copyBuffer(meshData.tex, texStaging, meshData.tex.resource->requestedSize);
         }
+      }
+
+      if (indices.any()) {
+        meshData.indices = resources->createIndexDeviceBuffer(sizeof(uint32_t)*indices.size());
+        auto stage = resources->createStagingBuffer(sizeof(uint32_t)*indices.size());
+        {
+          MappedBuffer<uint32_t> map(vCtx, stage);
+          std::memcpy(map.mem, indices.data(), sizeof(uint32_t)*indices.size());
+        }
+        vCtx->frameManager->copyBuffer(meshData.indices, stage, sizeof(uint32_t)*indices.size());
+      }
+      else {
+        meshData.indices = RenderBufferHandle();
       }
 
       meshData.lineCount = mesh->lineCount;
@@ -671,7 +693,13 @@ void Renderer::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4f& 
         vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipe);
         vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
       }
-      vkCmdDraw(cmdBuf, 3 * item.triangleCount, 1, 0, 0);
+      if (item.indices) {
+        vkCmdBindIndexBuffer(cmdBuf, item.indices.resource->buffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdDrawIndexed(cmdBuf, 3 * item.triangleCount, 1, 0, 0, 0);
+      }
+      else {
+        vkCmdDraw(cmdBuf, 3 * item.triangleCount, 1, 0, 0);
+      }
     }
 
     if (outlines) {

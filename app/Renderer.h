@@ -54,6 +54,8 @@ private:
     RenderBufferHandle bnm;
     RenderBufferHandle tex;
     RenderBufferHandle col;
+
+    RenderBufferHandle indices;
     uint32_t triangleCount = 0;
 
     RenderBufferHandle lines;
