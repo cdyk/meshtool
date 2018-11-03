@@ -361,6 +361,7 @@ namespace {
       if (isEmpty(bbox)) {
         bbox = BBox3f(Vec3f(-1.f), Vec3f(1.f));
       }
+
       app->viewer->setViewVolume(bbox);
       app->viewer->viewAll();
     }
@@ -546,6 +547,8 @@ int main(int argc, char** argv)
 
     if (app->updateColor) {
       for (auto * m : app->items.meshes) {
+        m->touchColor();
+
         auto color = app->triangleColor;
         switch (color) {
         case TriangleColor::ObjectId:

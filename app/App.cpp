@@ -224,7 +224,7 @@ void App::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes,
       raycaster = new Raycaster(logger, this);
       raycaster->init();
     }
-    raycaster->update(renderMeshes);
+    raycaster->update(items.meshes);
   }
   else if (raycaster) {
     delete raycaster;

@@ -8,6 +8,9 @@ struct Mesh
   Arena arena;
   StringInterning strings;
 
+  uint32_t geometryGeneration = 1;  // is never zero
+  uint32_t colorGeneration = 1;     // is never zero
+
   BBox3f bbox;
   Vec3f* vtx = nullptr;
   uint32_t vtxCount = 0;
@@ -33,10 +36,12 @@ struct Mesh
   const char** obj = nullptr;
   uint32_t obj_n = 0;
 
-
   // move to mesh app state or something.
   uint32_t* currentColor = nullptr;  // Current triangle color, one uint32_t per triangle;
   bool * selected = nullptr;
 
   const char* name = nullptr;
+
+  void touchColor() { geometryGeneration++; if (!geometryGeneration) geometryGeneration++; }
+  void touchGeometry() { geometryGeneration++; if (!geometryGeneration) geometryGeneration++; touchColor(); }
 };

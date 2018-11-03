@@ -1,7 +1,7 @@
 #pragma once
 #include "Common.h"
 #include "VulkanResources.h"
-#include "RenderMeshManager.h"
+#include "Mesh.h"
 #include "LinAlg.h"
 
 class App;
@@ -14,7 +14,7 @@ public:
   void init();
 
 
-  void update(Vector<RenderMeshHandle>& meshes);
+  void update(Vector<Mesh*>& meshes);
 
   void draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f& Ninv, const Mat4f& Pinv);
 
@@ -44,16 +44,18 @@ private:
   Mat4f prevPinv;
 
   struct MeshData {
+    Mesh* src = nullptr;
+    uint32_t geometryGeneration = 0;
+    uint32_t colorGeneration = 0;
+
     RenderBufferHandle vertices;
     RenderBufferHandle indices;
     RenderBufferHandle triangleData;
-    RenderMeshHandle src;
     AccelerationStructureHandle acc;
     VkGeometryNVX geometry;
 
     uint32_t vertexCount = 0;
     uint32_t triangleCount = 0;
-    uint32_t meshGen = 0u;
     bool rebuild;
   };
   AccelerationStructureHandle topLevel;
@@ -70,7 +72,7 @@ private:
   uint32_t h = ~0u;
 
   void resize(const Vec4f& viewport);
-  bool updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, const RenderMeshHandle& renderMesh);
+  bool updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, const Mesh* mesh);
 
   void buildPipeline();
   void buildDescriptorSets();

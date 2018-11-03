@@ -294,17 +294,16 @@ void Raycaster::buildDescriptorSets()
 }
 
 
-bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, const RenderMeshHandle& renderMesh)
+bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData,  const Mesh* mesh)
 {
   auto * vCtx = app->vCtx;
   auto * res = vCtx->resources;
 
-  auto * rm = renderMesh.resource;
-  if (meshData.meshGen == rm->generation) return false;
-  meshData.meshGen = rm->generation;
+  if (meshData.geometryGeneration == mesh->geometryGeneration && meshData.colorGeneration == mesh->colorGeneration) return false;
+  meshData.geometryGeneration == mesh->geometryGeneration;
+  meshData.colorGeneration == mesh->colorGeneration;
 
   logger(0, "Updating MeshData item.");
-  auto * mesh = rm->mesh;
 
   meshData.vertexCount = mesh->vtxCount;
   meshData.triangleCount = mesh->triCount;
@@ -396,7 +395,7 @@ bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, co
 }
 
 
-void Raycaster::update(Vector<RenderMeshHandle>& meshes)
+void Raycaster::update(Vector<Mesh*>& meshes)
 {
   auto * vCtx = app->vCtx;
   auto & frame = vCtx->frameManager->frame();
