@@ -500,7 +500,7 @@ void Raycaster::update(Vector<Mesh*>& meshes)
 
     vkQueueSubmit(vCtx->queue, 1, &submitInfo, VK_NULL_HANDLE);
     vkQueueWaitIdle(vCtx->queue);
-    vkDeviceWaitIdle(vCtx->device);
+    //vkDeviceWaitIdle(vCtx->device);
 
     buildPipeline();
     buildDescriptorSets();
@@ -615,31 +615,28 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
   auto offscreenImage = rename.offscreenImage.resource->image;
   auto onscreenImage = vCtx->frameManager->backBufferImages[vCtx->frameManager->swapChainIndex];
 
-  { // Prep prev image for reading
-    VkImageMemoryBarrier imageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-    imageMemoryBarrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    imageMemoryBarrier.dstAccessMask = 0;
-    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    imageMemoryBarrier.image = prevRename.offscreenImage.resource->image;
-    imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+  {
+    VkImageMemoryBarrier imageMemoryBarriers[2];
+    imageMemoryBarriers[0] = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER }; // Prep prev image for reading
+    imageMemoryBarriers[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    imageMemoryBarriers[0].dstAccessMask = 0;
+    imageMemoryBarriers[0].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageMemoryBarriers[0].newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imageMemoryBarriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarriers[0].image = prevRename.offscreenImage.resource->image;
+    imageMemoryBarriers[0].subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
+    imageMemoryBarriers[1] = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER }; // Prep for shader storage
+    imageMemoryBarriers[1].srcAccessMask = 0;
+    imageMemoryBarriers[1].dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    imageMemoryBarriers[1].oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageMemoryBarriers[1].newLayout = VK_IMAGE_LAYOUT_GENERAL;
+    imageMemoryBarriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageMemoryBarriers[1].image = offscreenImage;
+    imageMemoryBarriers[1].subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
     vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                         0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
-  }
-  { // Prep for shader storage
-    VkImageMemoryBarrier imageMemoryBarrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-    imageMemoryBarrier.srcAccessMask = 0;
-    imageMemoryBarrier.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_GENERAL;
-    imageMemoryBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    imageMemoryBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    imageMemoryBarrier.image = offscreenImage;
-    imageMemoryBarrier.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-    vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
-                         0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
+                         0, 0, nullptr, 0, nullptr, 2, imageMemoryBarriers);
   }
   {
     vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, pipeline.resource->pipe);

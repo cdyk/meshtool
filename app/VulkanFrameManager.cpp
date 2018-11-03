@@ -97,9 +97,6 @@ VkPresentModeKHR VulkanFrameManager::choosePresentMode(Vector<VkPresentModeKHR>&
 
 void VulkanFrameManager::resize(uint32_t w, uint32_t h)
 {
-  auto rv = vkDeviceWaitIdle(vCtx->device);
-  assert(rv == VK_SUCCESS);
-
   SwapChainHandle oldSwapChain = swapChain;
   CHECK_VULKAN(vkDeviceWaitIdle(vCtx->device));
 
