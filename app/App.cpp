@@ -212,8 +212,14 @@ void App::resize(uint32_t w, uint32_t h)
 }
 
 
-void App::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes, const Vec4f& viewerViewport, const Mat4f& P, const Mat4f& M, const Mat4f& PMinv, const Mat4f& Minv, bool raytrace)
+void App::render(const Vec4f& viewport)
 {
+  const Mat4f& P = viewer->getProjectionMatrix();
+  const Mat4f& M = viewer->getViewMatrix();
+  const Mat4f& PMinv = viewer->getProjectionViewInverseMatrix();
+  const Mat4f& Minv = viewer->getViewInverseMatrix();
+
+
   auto * frameMgr = vCtx->frameManager;
   frameMgr->startFrame();
 
@@ -253,8 +259,8 @@ void App::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes,
     beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     beginInfo.renderPass = rendererPass.resource->pass;
     beginInfo.framebuffer = rendererFrameBuffers[frameMgr->swapChainIndex].resource->fb;
-    beginInfo.renderArea.extent.width = w;
-    beginInfo.renderArea.extent.height = h;
+    beginInfo.renderArea.extent.width = width;
+    beginInfo.renderArea.extent.height = height;
     beginInfo.clearValueCount = 2;
     beginInfo.pClearValues = clearValues;
 
@@ -268,9 +274,7 @@ void App::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes,
 
 
     vkCmdBeginRenderPass(cmdBuf, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    for (size_t i = 0; i < renderMeshes.size(); i++) {
-      renderer->drawRenderMesh(cmdBuf, rendererPass, renderMeshes[i], viewerViewport, Mat3f(M), MVP);
-    }
+    renderer->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP);
     vkCmdEndRenderPass(cmdBuf);
   }
 
@@ -289,7 +293,7 @@ void App::render(uint32_t w, uint32_t h, Vector<RenderMeshHandle>& renderMeshes,
   vkCmdEndRenderPass(cmdBuf);
 
   if (raytrace) {
-    raycaster->draw(cmdBuf, viewerViewport, Mat3f(Minv), PMinv);
+    raycaster->draw(cmdBuf, viewport, Mat3f(Minv), PMinv);
   }
 
 

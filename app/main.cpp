@@ -17,6 +17,7 @@
 #include "Mesh.h"
 #include "LinAlgOps.h"
 #include "Renderer.h"
+#include "Raycaster.h"
 #include "HandlePicking.h"
 #include "App.h"
 
@@ -351,7 +352,6 @@ namespace {
         app->updateColor = true;
 
         app->items.meshes.pushBack(m);
-        app->items.renderMeshes.pushBack(app->renderer->meshManager->createRenderMesh(m));
       }
       auto bbox = createEmptyBBox3f();
       for (auto * m : app->items.meshes) {
@@ -604,22 +604,15 @@ int main(int argc, char** argv)
         }
       }
     }
-
-    size_t i = 0; 
-    for (auto & renderMesh : app->items.renderMeshes) {
-      if (app->updateColor) {
-        app->renderer->meshManager->updateRenderMeshColor(renderMesh);
-      }
-    }
     app->updateColor = false;
 
-    app->render(app->width, app->height, app->items.renderMeshes, viewport,
-                               app->viewer->getProjectionMatrix(), app->viewer->getViewMatrix(), app->viewer->getProjectionViewInverseMatrix(), app->viewer->getViewInverseMatrix(), app->raytrace);
+    app->render(viewport);
     app->present();
   }
   CHECK_VULKAN(vkDeviceWaitIdle(app->vCtx->device));
   app->items.meshes.resize(0);
-  app->items.renderMeshes.resize(0);
+  if(app->renderer) app->renderer->update(app->items.meshes);
+  if(app->raycaster) app->raycaster->update(app->items.meshes);
   app->renderer->startFrame();
 
   ImGui_ImplGlfw_Shutdown();

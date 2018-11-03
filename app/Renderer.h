@@ -4,7 +4,6 @@
 #include "VulkanContext.h"
 #include "ResourceManager.h"
 #include "RenderTextureManager.h"
-#include "RenderMeshManager.h"
 
 struct Vec4f;
 struct Mat4f;
@@ -36,10 +35,10 @@ public:
 
   void update(Vector<Mesh*>& meshes);
 
-  void drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMeshHandle renderMesh, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP);
+  void draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP);
   
   RenderTextureManager* textureManager = nullptr;
-  RenderMeshManager* meshManager = nullptr;
+
 
 private:
   Logger logger;
@@ -101,7 +100,7 @@ private:
     RenderBufferHandle objectBuffer;
   };
   Vector<Rename> renaming;
-  unsigned renamingCurr = 0;
+  unsigned renameNext = 0;
 
   void buildPipelines(RenderPassHandle pass);
 

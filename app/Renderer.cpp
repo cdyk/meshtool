@@ -65,8 +65,7 @@ namespace {
 Renderer::Renderer(Logger logger, App* app) :
   logger(logger),
   app(app),
-  textureManager(new RenderTextureManager(app->vCtx)),
-  meshManager(new RenderMeshManager(app->vCtx, logger))
+  textureManager(new RenderTextureManager(app->vCtx))
 {
 
 }
@@ -152,6 +151,7 @@ void Renderer::update(Vector<Mesh*>& meshes)
   auto * vCtx = app->vCtx;
   auto * resources = vCtx->resources;
 
+  newMeshData.clear();
   for (auto & mesh : meshes) {
     bool found = false;
     for (auto & item : meshData) {
@@ -328,7 +328,6 @@ void Renderer::update(Vector<Mesh*>& meshes)
 void Renderer::startFrame()
 {
   textureManager->startFrame();
-  meshManager->startFrame();
 }
 
 void Renderer::buildPipelines(RenderPassHandle pass)
@@ -575,62 +574,13 @@ void Renderer::buildPipelines(RenderPassHandle pass)
 
 }
 
-void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, RenderMeshHandle renderMesh, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP)
+void Renderer::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP)
 {
   auto * vCtx = app->vCtx;
 
-  auto * rm = renderMesh.resource;
   if (!vanillaPipeline || vanillaPipeline.resource->pass != pass) buildPipelines(pass);
 
-  auto & rename = renaming[renamingCurr];
-  {
-    MappedBuffer<ObjectBuffer> map(vCtx, rename.objectBuffer);
-    map.mem->MVP = MVP;
-    map.mem->Ncol0 = Vec4f(N.cols[0], 0.f);
-    map.mem->Ncol1 = Vec4f(N.cols[1], 0.f);
-    map.mem->Ncol2 = Vec4f(N.cols[2], 0.f);
-  }
-  {
-    VkWriteDescriptorSet writes[1];
-    writes[0] = {};
-    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writes[0].pNext = nullptr;
-    writes[0].dstSet = rename.objBufDescSet.resource->descSet;
-    writes[0].descriptorCount = 1;
-    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    writes[0].pBufferInfo = &rename.objectBuffer.resource->descInfo;
-    writes[0].dstArrayElement = 0;
-    writes[0].dstBinding = 0;
-    vkUpdateDescriptorSets(vCtx->device, 1, writes, 0, nullptr);
-  }
-  {
-    VkWriteDescriptorSet writes[2];
-    writes[0] = {};
-    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writes[0].dstSet = rename.objBufSamplerDescSet.resource->descSet;
-    writes[0].descriptorCount = 1;
-    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    writes[0].dstArrayElement = 0;
-    writes[0].dstBinding = 0;
-    writes[0].pBufferInfo = &rename.objectBuffer.resource->descInfo;
-
-    // Fixme: this is only needed once    
-    VkDescriptorImageInfo imageInfo{};
-    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo.imageView = texturing == Texturing::Checker ? checkerTex.resource->view.resource->view : colorGradientTex.resource->view.resource->view;
-    imageInfo.sampler = texSampler.resource->sampler;
-
-    writes[1] = {};
-    writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writes[1].dstSet = rename.objBufSamplerDescSet.resource->descSet;
-    writes[1].descriptorCount = 1;
-    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    writes[1].dstArrayElement = 0;
-    writes[1].dstBinding = 1;
-    writes[1].pImageInfo = &imageInfo;
-
-    vkUpdateDescriptorSets(vCtx->device, 2, writes, 0, nullptr);
-  }
+  
 
 
   {
@@ -652,70 +602,125 @@ void Renderer::drawRenderMesh(VkCommandBuffer cmdBuf, RenderPassHandle pass, Ren
     vkCmdSetScissor(cmdBuf, 0, 1, &scissor);
   }
 
-  if(solid) {
-    VkBuffer buffers[4] = {
-      rm->vtx.resource->buffer,
-      rm->nrm.resource->buffer,
-      rm->tex.resource->buffer,
-      rm->col.resource->buffer };
-    VkDeviceSize offsets[4] = { 0, 0, 0, 0 };
-    vkCmdBindVertexBuffers(cmdBuf, 0, 4, buffers, offsets);
-    if (texturing != Texturing::None) {
-      vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipe);
-      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipeLayout, 0, 1, &rename.objBufSamplerDescSet.resource->descSet, 0, NULL);
+  for (auto & item : meshData) {
 
+    auto & rename = renaming[renameNext];
+    renameNext = (renameNext + 1);
+    if (renaming.size() <= renameNext) {
+      renameNext = 0;
     }
-    else {
-      vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipe);
-      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
-    }
-    vkCmdDraw(cmdBuf, 3 * rm->tri_n, 1, 0, 0);
-  }
 
-  if(outlines) {
-    VkBuffer buffers[2] = {
-      rm->vtx.resource->buffer,
-      rm->col.resource->buffer };
-    VkDeviceSize offsets[ARRAYSIZE(buffers)] = { 0, 0 };
-    vkCmdBindVertexBuffers(cmdBuf, 0, ARRAYSIZE(buffers), buffers, offsets);
+    {
+      MappedBuffer<ObjectBuffer> map(vCtx, rename.objectBuffer);
+      map.mem->MVP = MVP;
+      map.mem->Ncol0 = Vec4f(N.cols[0], 0.f);
+      map.mem->Ncol1 = Vec4f(N.cols[1], 0.f);
+      map.mem->Ncol2 = Vec4f(N.cols[2], 0.f);
+    }
+    {
+      VkWriteDescriptorSet writes[1];
+      writes[0] = {};
+      writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      writes[0].pNext = nullptr;
+      writes[0].dstSet = rename.objBufDescSet.resource->descSet;
+      writes[0].descriptorCount = 1;
+      writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      writes[0].pBufferInfo = &rename.objectBuffer.resource->descInfo;
+      writes[0].dstArrayElement = 0;
+      writes[0].dstBinding = 0;
+      vkUpdateDescriptorSets(vCtx->device, 1, writes, 0, nullptr);
+    }
+    {
+      VkWriteDescriptorSet writes[2];
+      writes[0] = {};
+      writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      writes[0].dstSet = rename.objBufSamplerDescSet.resource->descSet;
+      writes[0].descriptorCount = 1;
+      writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      writes[0].dstArrayElement = 0;
+      writes[0].dstBinding = 0;
+      writes[0].pBufferInfo = &rename.objectBuffer.resource->descInfo;
+
+      // Fixme: this is only needed once    
+      VkDescriptorImageInfo imageInfo{};
+      imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      imageInfo.imageView = texturing == Texturing::Checker ? checkerTex.resource->view.resource->view : colorGradientTex.resource->view.resource->view;
+      imageInfo.sampler = texSampler.resource->sampler;
+
+      writes[1] = {};
+      writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+      writes[1].dstSet = rename.objBufSamplerDescSet.resource->descSet;
+      writes[1].descriptorCount = 1;
+      writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+      writes[1].dstArrayElement = 0;
+      writes[1].dstBinding = 1;
+      writes[1].pImageInfo = &imageInfo;
+
+      vkUpdateDescriptorSets(vCtx->device, 2, writes, 0, nullptr);
+    }
 
     if (solid) {
-      vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, wireFrontFacePipeline.resource->pipe);
-      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
+      VkBuffer buffers[4] = {
+        item.vtx.resource->buffer,
+        item.nrm.resource->buffer,
+        item.tex.resource->buffer,
+        item.col.resource->buffer };
+      VkDeviceSize offsets[4] = { 0, 0, 0, 0 };
+      vkCmdBindVertexBuffers(cmdBuf, 0, 4, buffers, offsets);
+      if (texturing != Texturing::None) {
+        vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipe);
+        vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipeLayout, 0, 1, &rename.objBufSamplerDescSet.resource->descSet, 0, NULL);
+
+      }
+      else {
+        vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipe);
+        vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
+      }
+      vkCmdDraw(cmdBuf, 3 * item.triangleCount, 1, 0, 0);
     }
-    else {
-      vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, wireBothFacesPipeline.resource->pipe);
-      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
+
+    if (outlines) {
+      VkBuffer buffers[2] = {
+        item.vtx.resource->buffer,
+        item.col.resource->buffer };
+      VkDeviceSize offsets[ARRAYSIZE(buffers)] = { 0, 0 };
+      vkCmdBindVertexBuffers(cmdBuf, 0, ARRAYSIZE(buffers), buffers, offsets);
+
+      if (solid) {
+        vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, wireFrontFacePipeline.resource->pipe);
+        vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
+      }
+      else {
+        vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, wireBothFacesPipeline.resource->pipe);
+        vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
+      }
+      vkCmdDraw(cmdBuf, 3 * item.triangleCount, 1, 0, 0);
     }
-    vkCmdDraw(cmdBuf, 3 * rm->tri_n, 1, 0, 0);
+
+    if (tangentSpaceCoordSys) {
+      VkBuffer buffers[5] = {
+        coordSys.vtxCol.resource->buffer,
+        item.vtx.resource->buffer,
+        item.tan.resource->buffer,
+        item.bnm.resource->buffer,
+        item.nrm.resource->buffer,
+      };
+      VkDeviceSize offsets[5] = { 0, 0, 0, 0, 0 };
+      vkCmdBindVertexBuffers(cmdBuf, 0, 5, buffers, offsets);
+      vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, coordSys.pipeline.resource->pipe);
+      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, coordSys.pipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
+      vkCmdDraw(cmdBuf, 6, 3 * item.triangleCount, 0, 0);
+    }
+
+    if (item.lineCount) {
+      VkBuffer buffers[1] = { item.lines.resource->buffer };
+      VkDeviceSize offsets[1] = { 0 };
+      vkCmdBindVertexBuffers(cmdBuf, 0, 1, buffers, offsets);
+      vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.resource->pipe);
+      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
+      vkCmdDraw(cmdBuf, 2 * item.lineCount, 1, 0, 0);
+    }
+   
   }
-
-  if(tangentSpaceCoordSys) {
-    VkBuffer buffers[5] = {
-      coordSys.vtxCol.resource->buffer,
-      rm->vtx.resource->buffer,
-      rm->tan.resource->buffer,
-      rm->bnm.resource->buffer,
-      rm->nrm.resource->buffer,
-    };
-    VkDeviceSize offsets[5] = { 0, 0, 0, 0, 0 };
-    vkCmdBindVertexBuffers(cmdBuf, 0, 5, buffers, offsets);
-    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, coordSys.pipeline.resource->pipe);
-    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, coordSys.pipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
-    vkCmdDraw(cmdBuf, 6, 3 * rm->tri_n, 0, 0);
-  }
-
-  if (rm->lineCount) {
-    VkBuffer buffers[1] = { rm->lines.resource->buffer };
-    VkDeviceSize offsets[1] = { 0 };
-    vkCmdBindVertexBuffers(cmdBuf, 0, 1, buffers, offsets);
-    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.resource->pipe);
-    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
-    vkCmdDraw(cmdBuf, 2 * rm->lineCount, 1, 0, 0);
-  }
-
-
-  renamingCurr = (renamingCurr + 1);
-  if (renaming.size() <= renamingCurr) renamingCurr = 0;
 }
 
