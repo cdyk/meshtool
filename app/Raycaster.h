@@ -4,12 +4,12 @@
 #include "RenderMeshManager.h"
 #include "LinAlg.h"
 
-class VulkanManager;
+class App;
 
 class Raycaster
 {
 public:
-  Raycaster(Logger logger, VulkanManager* vulkanManager);
+  Raycaster(Logger logger, App* app);
   ~Raycaster();
   void init();
 
@@ -20,7 +20,7 @@ public:
 
 private:
   Logger logger;
-  VulkanManager* vulkanManager = nullptr;
+  App* app = nullptr;
 
   VkPhysicalDeviceRaytracingPropertiesNVX rtProps;
 

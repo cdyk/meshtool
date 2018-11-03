@@ -1,5 +1,5 @@
 #include "Raycaster.h"
-#include "VulkanManager.h"
+#include "App.h"
 #include "VulkanContext.h"
 #include "LinAlgOps.h"
 #include "Mesh.h"
@@ -54,15 +54,15 @@ namespace {
 
 }
 
-Raycaster::Raycaster(Logger logger, VulkanManager* vulkanManager)
-  : logger(logger),
-  vulkanManager(vulkanManager)
+Raycaster::Raycaster(Logger logger, App* app) :
+  logger(logger),
+  app(app)
 {
 }
 
 Raycaster::~Raycaster()
 {
-  auto * device = vulkanManager->vCtx->device;
+  auto * device = app->vCtx->device;
   if (descPool) {
     vkDestroyDescriptorPool(device, descPool, nullptr);
     descPool = VK_NULL_HANDLE;
@@ -74,7 +74,7 @@ void Raycaster::init()
 {
   renames.resize(5);
 
-  auto * vCtx = vulkanManager->vCtx;
+  auto * vCtx = app->vCtx;
   VkDescriptorPoolSize poolSizes[] =
   {
     { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, renames.size32()},
@@ -96,7 +96,7 @@ void Raycaster::init()
 
 VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
 {
-  auto * vCtx = vulkanManager->vCtx;
+  auto * vCtx = app->vCtx;
   VkDescriptorSetLayoutBinding descSetLayoutBinding[5];
   descSetLayoutBinding[0] = {};
   descSetLayoutBinding[0].binding = BINDING_TOPLEVEL_ACC;
@@ -150,7 +150,7 @@ VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
 
 void Raycaster::buildPipeline()
 {
-  auto * vCtx = vulkanManager->vCtx;
+  auto * vCtx = app->vCtx;
 
   rtProps = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAYTRACING_PROPERTIES_NVX };
   VkPhysicalDeviceProperties2 props2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
@@ -224,7 +224,7 @@ void Raycaster::buildPipeline()
 
 void Raycaster::buildDescriptorSets()
 {
-  auto * vCtx = vulkanManager->vCtx;
+  auto * vCtx = app->vCtx;
   auto * pipe = pipeline.resource;
 
   
@@ -296,7 +296,7 @@ void Raycaster::buildDescriptorSets()
 
 bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, const RenderMeshHandle& renderMesh)
 {
-  auto * vCtx = vulkanManager->vCtx;
+  auto * vCtx = app->vCtx;
   auto * res = vCtx->resources;
 
   auto * rm = renderMesh.resource;
@@ -398,7 +398,7 @@ bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, co
 
 void Raycaster::update(Vector<RenderMeshHandle>& meshes)
 {
-  auto * vCtx = vulkanManager->vCtx;
+  auto * vCtx = app->vCtx;
   auto & frame = vCtx->frameManager->frame();
 
   VkDeviceSize scratchSize = 0;
@@ -520,7 +520,7 @@ void Raycaster::resize(const Vec4f& viewport)
   stationaryFrames = 0;
   logger(0, "Resized to %dx%d", w, h);
 
-  auto * vCtx = vulkanManager->vCtx;
+  auto * vCtx = app->vCtx;
   auto * resources = vCtx->resources;
   for (auto & rename : renames) {
 
@@ -596,7 +596,7 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
   if (renames.size32() <= renameIndex) renameIndex = 0;
   auto & rename = renames[renameIndex];
 
-  auto * vCtx = vulkanManager->vCtx;
+  auto * vCtx = app->vCtx;
   {
     auto l = normalize(mul(Ninv, Vec3f(1, 1, 0.2f)));
     auto u = normalize(mul(Ninv, Vec3f(0, 1, 0)));

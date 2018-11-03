@@ -17,7 +17,6 @@
 #include "Mesh.h"
 #include "LinAlgOps.h"
 #include "Renderer.h"
-#include "VulkanManager.h"
 #include "HandlePicking.h"
 #include "App.h"
 
@@ -25,7 +24,7 @@
 namespace {
 
   
-  App* app = new App();
+  App* app = nullptr;
   
 
   
@@ -128,9 +127,9 @@ namespace {
     }
     else if (mods == 0) {
       if (key == GLFW_KEY_R && action == GLFW_PRESS) app->raytrace = !app->raytrace;
-      if (key == GLFW_KEY_W && action == GLFW_PRESS)  app->vulkanManager->renderer->outlines = !app->vulkanManager->renderer->outlines;
-      if (key == GLFW_KEY_S && action == GLFW_PRESS)  app->vulkanManager->renderer->solid = !app->vulkanManager->renderer->solid;
-      if (key == GLFW_KEY_A && action == GLFW_PRESS) app->vulkanManager->renderer->tangentSpaceCoordSys = !app->vulkanManager->renderer->tangentSpaceCoordSys;
+      if (key == GLFW_KEY_W && action == GLFW_PRESS)  app->renderer->outlines = !app->renderer->outlines;
+      if (key == GLFW_KEY_S && action == GLFW_PRESS)  app->renderer->solid = !app->renderer->solid;
+      if (key == GLFW_KEY_A && action == GLFW_PRESS) app->renderer->tangentSpaceCoordSys = !app->renderer->tangentSpaceCoordSys;
       if (key == GLFW_KEY_C && action == GLFW_PRESS) {
         switch (app->triangleColor)
         {
@@ -142,10 +141,10 @@ namespace {
         app->updateColor = true;
       }
       if (key == GLFW_KEY_T && action == GLFW_PRESS) {
-        switch (app->vulkanManager->renderer->texturing) {
-        case Renderer::Texturing::None: app->vulkanManager->renderer->texturing = Renderer::Texturing::Checker; break;
-        case Renderer::Texturing::Checker: app->vulkanManager->renderer->texturing = Renderer::Texturing::ColorGradient; break;
-        case Renderer::Texturing::ColorGradient: app->vulkanManager->renderer->texturing = Renderer::Texturing::None; break;
+        switch (app->renderer->texturing) {
+        case Renderer::Texturing::None: app->renderer->texturing = Renderer::Texturing::Checker; break;
+        case Renderer::Texturing::Checker: app->renderer->texturing = Renderer::Texturing::ColorGradient; break;
+        case Renderer::Texturing::ColorGradient: app->renderer->texturing = Renderer::Texturing::None; break;
         }
       }
       if (key == GLFW_KEY_F && action == GLFW_PRESS) {
@@ -246,10 +245,10 @@ namespace {
         if (ImGui::MenuItem("View all", "CTRL+SHIFT+A", nullptr)) { app->viewAll = true; }
         if (ImGui::MenuItem("View selection", "CTRL+SHIFT+S")) { app->moveToSelection = true; }
         ImGui::Separator();
-        if (ImGui::MenuItem("Raytracing", "R", &app->raytrace, app->vulkanManager->vCtx->nvxRaytracing)) {}
-        if (ImGui::MenuItem("Solid", "S", &app->vulkanManager->renderer->solid)) {}
-        if (ImGui::MenuItem("Outlines", "W", &app->vulkanManager->renderer->outlines)) {}
-        if (ImGui::MenuItem("Tangent coordsys", "C", &app->vulkanManager->renderer->tangentSpaceCoordSys)) {}
+        if (ImGui::MenuItem("Raytracing", "R", &app->raytrace, app->vCtx->nvxRaytracing)) {}
+        if (ImGui::MenuItem("Solid", "S", &app->renderer->solid)) {}
+        if (ImGui::MenuItem("Outlines", "W", &app->renderer->outlines)) {}
+        if (ImGui::MenuItem("Tangent coordsys", "C", &app->renderer->tangentSpaceCoordSys)) {}
         if (ImGui::BeginMenu("Color")) {
           bool sel[4] = {
             app->triangleColor == TriangleColor::Single,
@@ -265,13 +264,13 @@ namespace {
         }
         if (ImGui::BeginMenu("Texturing")) {
           bool sel[3] = {
-            app->vulkanManager->renderer->texturing == Renderer::Texturing::None,
-            app->vulkanManager->renderer->texturing == Renderer::Texturing::Checker,
-            app->vulkanManager->renderer->texturing == Renderer::Texturing::ColorGradient,
+            app->renderer->texturing == Renderer::Texturing::None,
+            app->renderer->texturing == Renderer::Texturing::Checker,
+            app->renderer->texturing == Renderer::Texturing::ColorGradient,
           };
-          if (ImGui::MenuItem("None", "T", &sel[0])) app->vulkanManager->renderer->texturing = Renderer::Texturing::None;
-          if (ImGui::MenuItem("Checker", "T", &sel[1])) app->vulkanManager->renderer->texturing = Renderer::Texturing::Checker;
-          if (ImGui::MenuItem("Color gradient", "T", &sel[2])) app->vulkanManager->renderer->texturing = Renderer::Texturing::ColorGradient;
+          if (ImGui::MenuItem("None", "T", &sel[0])) app->renderer->texturing = Renderer::Texturing::None;
+          if (ImGui::MenuItem("Checker", "T", &sel[1])) app->renderer->texturing = Renderer::Texturing::Checker;
+          if (ImGui::MenuItem("Color gradient", "T", &sel[2])) app->renderer->texturing = Renderer::Texturing::ColorGradient;
           ImGui::EndMenu();
         }
         ImGui::EndMenu();
@@ -352,7 +351,7 @@ namespace {
         app->updateColor = true;
 
         app->items.meshes.pushBack(m);
-        app->items.renderMeshes.pushBack(app->vulkanManager->renderer->meshManager->createRenderMesh(m));
+        app->items.renderMeshes.pushBack(app->renderer->meshManager->createRenderMesh(m));
       }
       auto bbox = createEmptyBBox3f();
       for (auto * m : app->items.meshes) {
@@ -390,7 +389,6 @@ namespace {
 int main(int argc, char** argv)
 {
   GLFWwindow* window;
-  app->tasks.init(logger);
 
   glfwSetErrorCallback(glfw_error_callback);
   if (!glfwInit()) return -1;
@@ -405,13 +403,14 @@ int main(int argc, char** argv)
     logger(2, "GLFW: Vulkan not supported");
     return -1;
   }
-  glfwGetFramebufferSize(window, &app->width, &app->height);
-
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
 
+  int w, h;
 
-  app->vulkanManager = new VulkanManager(logger, window, app->width, app->height);
+  glfwGetFramebufferSize(window, &w, &h);
+  app = new App(logger, window, w, h);
+  app->tasks.init(logger);
 
   glfwSetWindowSizeCallback(window, resizeFunc);
   glfwSetCursorPosCallback(window, moveFunc);
@@ -464,7 +463,7 @@ int main(int argc, char** argv)
     glfwPollEvents();
     if (app->wasResized) {
       app->wasResized = false;
-      app->vulkanManager->resize(app->width, app->height);
+      app->resize(app->width, app->height);
     }
     {
       Vec2f viewerPos(app->leftSplit, app->menuHeight);
@@ -475,9 +474,9 @@ int main(int argc, char** argv)
 
     app->tasks.update();
     checkQueues();
-    app->vulkanManager->renderer->startFrame();
+    app->renderer->startFrame();
 
-    app->vulkanManager->startFrame();
+    app->startFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     guiTraversal(window);
@@ -606,21 +605,20 @@ int main(int argc, char** argv)
     size_t i = 0; 
     for (auto & renderMesh : app->items.renderMeshes) {
       if (app->updateColor) {
-        app->vulkanManager->renderer->meshManager->updateRenderMeshColor(renderMesh);
+        app->renderer->meshManager->updateRenderMeshColor(renderMesh);
       }
     }
     app->updateColor = false;
 
-    app->vulkanManager->render(app->width, app->height, app->items.renderMeshes, viewport,
+    app->render(app->width, app->height, app->items.renderMeshes, viewport,
                                app->viewer->getProjectionMatrix(), app->viewer->getViewMatrix(), app->viewer->getProjectionViewInverseMatrix(), app->viewer->getViewInverseMatrix(), app->raytrace);
-    app->vulkanManager->present();
+    app->present();
   }
-  CHECK_VULKAN(vkDeviceWaitIdle(app->vulkanManager->vCtx->device));
+  CHECK_VULKAN(vkDeviceWaitIdle(app->vCtx->device));
   app->items.meshes.resize(0);
   app->items.renderMeshes.resize(0);
-  app->vulkanManager->renderer->startFrame();
+  app->renderer->startFrame();
 
-  delete app->vulkanManager;
   ImGui_ImplGlfw_Shutdown();
   ImGui::DestroyContext();
 

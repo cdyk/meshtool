@@ -101,7 +101,6 @@
     <ClCompile Include="..\app\VulkanFrameManager.cpp" />
     <ClCompile Include="..\app\ImGuiRenderer.cpp" />
     <ClCompile Include="..\app\VulkanInfos.cpp" />
-    <ClCompile Include="..\app\VulkanManager.cpp" />
     <ClCompile Include="..\app\VulkanResources.cpp" />
     <ClCompile Include="..\libs\imgui\examples\imgui_impl_glfw.cpp" />
     <ClCompile Include="..\libs\imgui\examples\imgui_impl_vulkan.cpp" />
@@ -121,7 +120,6 @@
     <ClInclude Include="..\app\VulkanFrameManager.h" />
     <ClInclude Include="..\app\ImGuiRenderer.h" />
     <ClInclude Include="..\app\VulkanInfos.h" />
-    <ClInclude Include="..\app\VulkanManager.h" />
     <ClInclude Include="..\app\VulkanResources.h" />
     <ClInclude Include="..\libs\imgui\examples\imgui_impl_glfw.h" />
     <ClInclude Include="..\libs\imgui\examples\imgui_impl_vulkan.h" />

@@ -52,9 +52,6 @@
     <ClCompile Include="..\app\VulkanInfos.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="..\app\VulkanManager.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="..\app\VulkanResources.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -109,9 +106,6 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\app\VulkanInfos.h">
-      <Filter>src</Filter>
-    </ClInclude>
-    <ClInclude Include="..\app\VulkanManager.h">
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\app\VulkanResources.h">

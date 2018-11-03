@@ -1,5 +1,5 @@
 #include "ImGuiRenderer.h"
-#include "VulkanManager.h"
+#include "App.h"
 #include "VulkanContext.h"
 
 #include <imgui.h>
@@ -22,12 +22,12 @@ namespace
 
 void ImGuiRenderer::init()
 {
-  auto * vCtx = vulkanManager->vCtx;
+  auto * vCtx = app->vCtx;
   auto & frame = vCtx->frameManager->frame();
   auto cmdPool = frame.commandPool.resource->cmdPool;
   auto cmdBuf = frame.commandBuffer.resource->cmdBuf;
 
-  ImGui_ImplGlfw_InitForVulkan(vulkanManager->window, true);
+  ImGui_ImplGlfw_InitForVulkan(app->window, true);
 
   ImGui_ImplVulkan_InitInfo init_info = {};
   init_info.Instance = vCtx->instance;
@@ -39,7 +39,7 @@ void ImGuiRenderer::init()
   init_info.DescriptorPool = vCtx->descPool;
   init_info.Allocator = nullptr;
   init_info.CheckVkResultFn = check_vk_result;
-  ImGui_ImplVulkan_Init(&init_info, vulkanManager->imguiRenderPass.resource->pass);
+  ImGui_ImplVulkan_Init(&init_info, app->imguiRenderPass.resource->pass);
 
   CHECK_VULKAN(vkResetCommandPool(vCtx->device, cmdPool, 0));
 

@@ -2,12 +2,12 @@
 #include "Common.h"
 #include "VulkanResources.h"
 
-class VulkanManager;
+class App;
 
 class ImGuiRenderer
 {
 public:
-  ImGuiRenderer(Logger logger, VulkanManager* vulkanManager) : logger(logger), vulkanManager(vulkanManager) {}
+  ImGuiRenderer(Logger logger, App* app) : logger(logger), app(app) {}
 
   void init();
   void startFrame();
@@ -17,5 +17,5 @@ public:
 
 private:
   Logger logger = nullptr;
-  VulkanManager* vulkanManager = nullptr;
+  App* app = nullptr;
 };
