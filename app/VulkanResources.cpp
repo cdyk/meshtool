@@ -630,7 +630,7 @@ FrameBufferHandle VulkanResources::createFrameBuffer(RenderPassHandle pass, uint
 
   fb->pass = pass;
 
-  Buffer<VkImageView> att(attachments.size());
+  MemBuffer<VkImageView> att(attachments.size());
   fb->attachments.resize(attachments.size());
   for (size_t i = 0; i < attachments.size(); i++) {
     fb->attachments[i] = attachments[i];

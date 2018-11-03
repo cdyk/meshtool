@@ -35,7 +35,7 @@ uint64_t fnv_1a(const char* bytes, size_t l)
 
 
 
-void BufferBase::free()
+void MemBufferBase::free()
 {
   if (ptr) ::free(ptr - sizeof(size_t));
   ptr = nullptr;

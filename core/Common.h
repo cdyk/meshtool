@@ -61,7 +61,7 @@ struct ListHeader
 };
 
 
-struct BufferBase
+struct MemBufferBase
 {
 public:
   size_t allocated()
@@ -73,10 +73,10 @@ public:
 protected:
   char* ptr = nullptr;
 
-  BufferBase() {}
-  ~BufferBase() { free(); }
+  MemBufferBase() {}
+  ~MemBufferBase() { free(); }
 
-  void _swap(BufferBase& other) { auto t = ptr; ptr = other.ptr; other.ptr = t; }
+  void _swap(MemBufferBase& other) { auto t = ptr; ptr = other.ptr; other.ptr = t; }
   void free();
 
   void _accommodate(size_t typeSize, size_t count, bool keep)
@@ -97,10 +97,10 @@ protected:
 };
 
 template<typename T>
-struct Buffer : public BufferBase
+struct MemBuffer : public MemBufferBase
 {
-  Buffer() = default;
-  Buffer(size_t size) { accommodate(size); }
+  MemBuffer() = default;
+  MemBuffer(size_t size) { accommodate(size); }
 
   T* data() { return (T*)ptr; }
   T& operator[](size_t ix) { return data()[ix]; }
@@ -111,7 +111,7 @@ struct Buffer : public BufferBase
 
 // calls constructors/destructors
 template<typename T>
-class Vector : BufferBase
+class Vector : MemBufferBase
 {
 public:
   Vector() = default;

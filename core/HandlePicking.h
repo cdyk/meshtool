@@ -12,7 +12,7 @@ struct Hit
 
 struct HitTmp
 {
-  Buffer<uint8_t> vertexMasks;
+  MemBuffer<uint8_t> vertexMasks;
 };
 
 

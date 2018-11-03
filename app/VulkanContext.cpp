@@ -103,7 +103,7 @@ VulkanContext::VulkanContext(Logger logger,
   }
   // choose physical device
   {
-    Buffer<VkPhysicalDevice> devices;
+    MemBuffer<VkPhysicalDevice> devices;
 
     uint32_t gpuCount = 0;
     auto rv = vkEnumeratePhysicalDevices(instance, &gpuCount, nullptr);
@@ -114,8 +114,8 @@ VulkanContext::VulkanContext(Logger logger,
 
     size_t chosenDevice = 0;
     VkPhysicalDeviceProperties chosenProps = { 0 };
-    Buffer<VkExtensionProperties> extensionProps;
-    Buffer<VkQueueFamilyProperties> queueProps;
+    MemBuffer<VkExtensionProperties> extensionProps;
+    MemBuffer<VkQueueFamilyProperties> queueProps;
     for (size_t i = 0; i < gpuCount; i++) {
       physicalDevice = devices[i];
 
@@ -197,7 +197,7 @@ VulkanContext::VulkanContext(Logger logger,
   { 
 
     uint32_t queueFamilyCount = 0;
-    Buffer<VkQueueFamilyProperties> queueProps;
+    MemBuffer<VkQueueFamilyProperties> queueProps;
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, nullptr);
     queueProps.accommodate(queueFamilyCount);
     vkGetPhysicalDeviceQueueFamilyProperties(physicalDevice, &queueFamilyCount, queueProps.data());

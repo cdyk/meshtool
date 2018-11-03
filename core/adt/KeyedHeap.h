@@ -50,8 +50,8 @@ protected:
  
   Key keyRange = 0;
   HeapPos fill = 0;
-  Buffer<LutEntry> lut;
-  Buffer<Key> heap;
+  MemBuffer<LutEntry> lut;
+  MemBuffer<Key> heap;
 
   void percolateUp(HeapPos heapPos);
 
