@@ -39,7 +39,7 @@ void VulkanResources::copyHostMemToBuffer(RenderBufferHandle buffer, void* src, 
 void VulkanResources::houseKeep()
 {
   {
-    Vector<RenderBuffer*> orphans;
+    Vector<Buffer*> orphans;
     bufferResources.getOrphans(orphans);
     for (auto * r : orphans) {
       if (!r->hasFlag(ResourceBase::Flags::External)) destroyBuffer(r);
@@ -371,7 +371,7 @@ RenderBufferHandle VulkanResources::createBuffer(size_t requestedSize, VkBufferU
   return bufHandle;
 }
 
-void VulkanResources::destroyBuffer(RenderBuffer* buffer)
+void VulkanResources::destroyBuffer(Buffer* buffer)
 {
   if (buffer->buffer) vkDestroyBuffer(vCtx->device, buffer->buffer, nullptr);
   if (buffer->mem) vkFreeMemory(vCtx->device, buffer->mem, nullptr);

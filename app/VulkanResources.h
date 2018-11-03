@@ -26,16 +26,16 @@ struct Shader : ResourceBase
 typedef ResourceHandle<Shader> ShaderHandle;
 
 
-struct RenderBuffer : ResourceBase
+struct Buffer : ResourceBase
 {
-  RenderBuffer(ResourceManagerBase& manager) : ResourceBase(manager) {}
+  Buffer(ResourceManagerBase& manager) : ResourceBase(manager) {}
   VkBuffer buffer = VK_NULL_HANDLE;
   VkDeviceMemory mem = VK_NULL_HANDLE;
   size_t requestedSize = 0;
   size_t alignedSize = 0;
   VkDescriptorBufferInfo descInfo;
 };
-typedef ResourceHandle<RenderBuffer> RenderBufferHandle;
+typedef ResourceHandle<Buffer> RenderBufferHandle;
 
 struct RenderPass : ResourceBase
 {
@@ -201,7 +201,7 @@ private:
   VulkanContext* vCtx = nullptr;
   Logger logger = nullptr;
 
-  void destroyBuffer(RenderBuffer*);
+  void destroyBuffer(Buffer*);
   void destroyDescriptorSet(DescriptorSet*);
   void destroyShader(Shader* shader);
   void destroyPipeline(Pipeline*);
@@ -218,7 +218,7 @@ private:
   void destroyAccelerationStructure(AccelerationStructure*);
 
 
-  ResourceManager<RenderBuffer> bufferResources;
+  ResourceManager<Buffer> bufferResources;
   ResourceManager<DescriptorSet> descriptorSetResources;
   ResourceManager<Shader> shaderResources;
   ResourceManager<Pipeline> pipelineResources;
