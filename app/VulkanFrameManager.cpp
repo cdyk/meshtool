@@ -26,7 +26,13 @@ void VulkanFrameManager::init()
   frameData.resize(framesInFlight);
   for (auto & frame : frameData) {
     frame.commandPool = res->createCommandPool(vCtx->queueFamilyIndex);
-    frame.commandBuffer = res->createPrimaryCommandBuffer(frame.commandPool);
+
+    VkCommandBufferAllocateInfo cmdAllocInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+    cmdAllocInfo.commandPool = frame.commandPool.resource->cmdPool;
+    cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    cmdAllocInfo.commandBufferCount = 1;
+    CHECK_VULKAN(vkAllocateCommandBuffers(vCtx->device, &cmdAllocInfo, &frame.commandBuffer));
+
     frame.imageAcquiredSemaphore = res->createSemaphore();
     frame.renderCompleteSemaphore = res->createSemaphore();
     frame.fence = res->createFence(true);
@@ -180,28 +186,39 @@ void VulkanFrameManager::houseKeep()
  
 }
 
+VkCommandBuffer VulkanFrameManager::createPrimaryCommandBuffer()
+{
+  VkCommandBuffer cmdBuf = VK_NULL_HANDLE;
+  VkCommandBufferAllocateInfo cmdAllocInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
+  cmdAllocInfo.commandPool = currentFrameData().commandPool.resource->cmdPool;
+  cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  cmdAllocInfo.commandBufferCount = 1;
+  CHECK_VULKAN(vkAllocateCommandBuffers(vCtx->device, &cmdAllocInfo, &cmdBuf));
+  return cmdBuf;
+}
+
 void VulkanFrameManager::copyBuffer(RenderBufferHandle dst, RenderBufferHandle src, VkDeviceSize size)
 {
-  auto cmdBuf = vCtx->resources->createPrimaryCommandBuffer(currentFrameData().commandPool);
+  auto cmdBuf = createPrimaryCommandBuffer();
 
   VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
   beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &beginInfo);
+  vkBeginCommandBuffer(cmdBuf, &beginInfo);
 
   VkBufferCopy copyRegion{};
   copyRegion.size = size;
-  vkCmdCopyBuffer(cmdBuf.resource->cmdBuf, src.resource->buffer, dst.resource->buffer, 1, &copyRegion);
-  vkEndCommandBuffer(cmdBuf.resource->cmdBuf);
+  vkCmdCopyBuffer(cmdBuf, src.resource->buffer, dst.resource->buffer, 1, &copyRegion);
+  vkEndCommandBuffer(cmdBuf);
   submitGraphics(cmdBuf, true);
 }
 
 void VulkanFrameManager::transitionImageLayout(ImageHandle image, VkImageLayout layout)
 {
-  auto cmdBuf = vCtx->resources->createPrimaryCommandBuffer(currentFrameData().commandPool);
+  auto cmdBuf = createPrimaryCommandBuffer();
 
   VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
   beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &beginInfo);
+  vkBeginCommandBuffer(cmdBuf, &beginInfo);
 
   VkImageMemoryBarrier barrier = {};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -247,26 +264,20 @@ void VulkanFrameManager::transitionImageLayout(ImageHandle image, VkImageLayout 
   else {
     assert(false && "unhandled transition");
   }
-  vkCmdPipelineBarrier(cmdBuf.resource->cmdBuf,
-                       srcStage, dstStage,
-                       0,
-                       0, nullptr,
-                       0, nullptr,
-                       1, &barrier
-  );
+  vkCmdPipelineBarrier(cmdBuf, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 
-  vkEndCommandBuffer(cmdBuf.resource->cmdBuf);
+  vkEndCommandBuffer(cmdBuf);
   submitGraphics(cmdBuf, true);
   image.resource->layout = layout;
 }
 
 void VulkanFrameManager::copyBufferToImage(ImageHandle dst, RenderBufferHandle src, uint32_t w, uint32_t h)
 {
-  auto cmdBuf = vCtx->resources->createPrimaryCommandBuffer(currentFrameData().commandPool);
+  auto cmdBuf = createPrimaryCommandBuffer();
 
   VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
   beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &beginInfo);
+  vkBeginCommandBuffer(cmdBuf, &beginInfo);
 
   VkBufferImageCopy region{};
   region.bufferOffset = 0;
@@ -278,19 +289,19 @@ void VulkanFrameManager::copyBufferToImage(ImageHandle dst, RenderBufferHandle s
   region.imageSubresource.layerCount = 1;
   region.imageOffset = { 0, 0, 0 };
   region.imageExtent = { w, h, 1 };
-  vkCmdCopyBufferToImage(cmdBuf.resource->cmdBuf, src.resource->buffer, dst.resource->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-  vkEndCommandBuffer(cmdBuf.resource->cmdBuf);
+  vkCmdCopyBufferToImage(cmdBuf, src.resource->buffer, dst.resource->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+  vkEndCommandBuffer(cmdBuf);
   submitGraphics(cmdBuf, true);
 }
 
 
 
-void VulkanFrameManager::submitGraphics(CommandBufferHandle cmdBuf, bool wait)
+void VulkanFrameManager::submitGraphics(VkCommandBuffer cmdBuf, bool wait)
 {
   VkSubmitInfo submitInfo{};
   submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
   submitInfo.commandBufferCount = 1;
-  submitInfo.pCommandBuffers = &cmdBuf.resource->cmdBuf;
+  submitInfo.pCommandBuffers = &cmdBuf;
   vkQueueSubmit(vCtx->queue, 1, &submitInfo, VK_NULL_HANDLE);
   if (wait) vkQueueWaitIdle(vCtx->queue);
 }

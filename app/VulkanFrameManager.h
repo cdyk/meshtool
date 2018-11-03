@@ -19,10 +19,11 @@ public:
 
   void resize(uint32_t w, uint32_t h);
 
+  VkCommandBuffer createPrimaryCommandBuffer();
   void copyBuffer(RenderBufferHandle dst, RenderBufferHandle src, VkDeviceSize size);
   void transitionImageLayout(ImageHandle image, VkImageLayout layout);
   void copyBufferToImage(ImageHandle dst, RenderBufferHandle src, uint32_t w, uint32_t h);
-  void submitGraphics(CommandBufferHandle cmdBuf, bool wait = false);
+  void submitGraphics(VkCommandBuffer cmdBuf, bool wait = false);
 
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   VkSurfaceFormatKHR surfaceFormat;
@@ -32,7 +33,7 @@ public:
   struct FrameData
   {
     CommandPoolHandle commandPool;
-    CommandBufferHandle commandBuffer;
+    VkCommandBuffer commandBuffer;
     FenceHandle fence;
     SemaphoreHandle imageAcquiredSemaphore;
     SemaphoreHandle renderCompleteSemaphore;

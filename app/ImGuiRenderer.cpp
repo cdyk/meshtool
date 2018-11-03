@@ -25,7 +25,7 @@ void ImGuiRenderer::init()
   auto * vCtx = app->vCtx;
   auto & frame = vCtx->frameManager->frame();
   auto cmdPool = frame.commandPool.resource->cmdPool;
-  auto cmdBuf = frame.commandBuffer.resource->cmdBuf;
+  auto cmdBuf = frame.commandBuffer;
 
   ImGui_ImplGlfw_InitForVulkan(app->window, true);
 
@@ -66,9 +66,9 @@ void ImGuiRenderer::startFrame()
   ImGui_ImplVulkan_NewFrame();
 }
 
-void ImGuiRenderer::recordRendering(CommandBufferHandle commandBuffer)
+void ImGuiRenderer::recordRendering(VkCommandBuffer commandBuffer)
 {
-  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer.resource->cmdBuf);
+  ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
 }
 
 void ImGuiRenderer::shutdown()

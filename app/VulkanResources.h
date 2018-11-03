@@ -96,14 +96,6 @@ struct CommandPool : ResourceBase
 };
 typedef ResourceHandle<CommandPool> CommandPoolHandle;
 
-struct CommandBuffer : ResourceBase
-{
-  CommandBuffer(ResourceManagerBase& manager) : ResourceBase(manager) {}
-  VkCommandBuffer cmdBuf = VK_NULL_HANDLE;
-  CommandPoolHandle pool;
-};
-typedef ResourceHandle<CommandBuffer> CommandBufferHandle;
-
 struct Fence : ResourceBase
 {
   Fence(ResourceManagerBase& manager) : ResourceBase(manager) {}
@@ -184,7 +176,6 @@ public:
 
   FrameBufferHandle createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<ImageViewHandle>& attachments);
   CommandPoolHandle createCommandPool(uint32_t queueFamilyIx);
-  CommandBufferHandle createPrimaryCommandBuffer(CommandPoolHandle pool);
   FenceHandle createFence(bool signalled);
   SemaphoreHandle createSemaphore();
   SwapChainHandle createSwapChain(SwapChainHandle oldSwapChain, VkSwapchainCreateInfoKHR& swapChainInfo);
@@ -211,7 +202,6 @@ private:
   ResourceManager<ImageView> imageViewResources;
   ResourceManager<Sampler> samplerResources;
   ResourceManager<CommandPool> commandPoolResources;
-  ResourceManager<CommandBuffer> commandBufferResources;
   ResourceManager<Fence> fenceResources;
   ResourceManager<Semaphore> semaphoreResources;
   ResourceManager<SwapChain> swapChainResources;

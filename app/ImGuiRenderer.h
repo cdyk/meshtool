@@ -11,7 +11,7 @@ public:
 
   void init();
   void startFrame();
-  void recordRendering(CommandBufferHandle commandBuffer);
+  void recordRendering(VkCommandBuffer commandBuffer);
   void shutdown();
 
 

@@ -75,11 +75,6 @@ namespace {
     cmdPool->cmdPool = nullptr;
   }
 
-  void destroyCommandBuffer(void* data, CommandBuffer* cmdBuf)
-  {
-    // FIXME: no point in having these as tracked resources.
-  }
-
   void destroyFence(void* data, Fence* fence)
   {
     auto device = ((VulkanContext*)data)->device;
@@ -135,7 +130,6 @@ VulkanResources::VulkanResources(VulkanContext* vCtx, Logger logger) :
   imageViewResources(destroyImageView, vCtx),
   samplerResources(destroySampler, vCtx),
   commandPoolResources(destroyCommandPool, vCtx),
-  commandBufferResources(destroyCommandBuffer, vCtx),
   fenceResources(destroyFence, vCtx),
   semaphoreResources(destroySemaphore, vCtx),
   swapChainResources(destroySwapChain, vCtx),
@@ -153,9 +147,7 @@ VulkanResources::~VulkanResources()
   logger(0, "%d unreleased renderPasses", renderPassResources.getCount());
   logger(0, "%d unreleased frameBuffers", frameBufferResources.getCount());
   logger(0, "%d unreleased renderImages", renderImageResources.getCount());
-  logger(0, "%d unreleased command buffers", commandBufferResources.getCount());
   logger(0, "%d unreleased commandPoolResources", commandPoolResources.getCount());
-  logger(0, "%d unreleased commandBufferResources", commandBufferResources.getCount());
   logger(0, "%d unreleased fenceResources", fenceResources.getCount());
   logger(0, "%d unreleased semaphoreResources", semaphoreResources.getCount());
   logger(0, "%d unreleased swapChainResources", swapChainResources.getCount());
@@ -183,7 +175,6 @@ void VulkanResources::houseKeep()
   imageViewResources.houseKeep();
   samplerResources.houseKeep();
   commandPoolResources.houseKeep();
-  commandBufferResources.houseKeep();
   fenceResources.houseKeep();
   semaphoreResources.houseKeep();
   swapChainResources.houseKeep();
@@ -622,21 +613,6 @@ CommandPoolHandle VulkanResources::createCommandPool(uint32_t queueFamilyIx)
   assert(rv == VK_SUCCESS);
   return poolHandle;
 }
-
-CommandBufferHandle VulkanResources::createPrimaryCommandBuffer(CommandPoolHandle pool)
-{
-  VkCommandBufferAllocateInfo info{};
-  info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-  info.commandPool = pool.resource->cmdPool;
-  info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-  info.commandBufferCount = 1;
-  auto handle = commandBufferResources.createResource();
-  handle.resource->pool = pool;
-  auto rv = vkAllocateCommandBuffers(vCtx->device, &info, &handle.resource->cmdBuf);
-  assert(rv == VK_SUCCESS);
-  return handle;
-}
-
 
 
 FenceHandle VulkanResources::createFence(bool signalled)

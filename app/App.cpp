@@ -254,7 +254,7 @@ void App::render(const Vec4f& viewport)
     gpuTimeAccN++;
   }
 
-  auto & cmdBuf = frame.commandBuffer.resource->cmdBuf;
+  auto & cmdBuf = frame.commandBuffer;
 
 
   VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
