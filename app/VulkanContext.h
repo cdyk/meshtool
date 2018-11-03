@@ -2,7 +2,6 @@
 #include <vulkan/vulkan.h>
 #include "Common.h"
 #include "ResourceManager.h"
-#include "VulkanInfos.h"
 #include "VulkanResources.h"
 #include "VulkanFrameManager.h"
 
@@ -69,7 +68,6 @@ public:
 
   Logger logger = nullptr;
   ISurfaceManager* surfaceManager = nullptr;
-  VulkanInfos* infos = nullptr;
   VulkanResources* resources = nullptr;
   VulkanFrameManager* frameManager = nullptr;
   VulkanTextureManager* textureManager = nullptr;

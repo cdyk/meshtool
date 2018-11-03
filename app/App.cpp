@@ -191,10 +191,18 @@ void App::resize(uint32_t w, uint32_t h)
   vCtx->frameManager->transitionImageLayout(depthImage, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL);
 
   Vector<ImageViewHandle> attachments(2);
-  auto viewInfo = vCtx->infos->imageView.baseLevel2D;
-  viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-  attachments[1] = vCtx->resources->createImageView(depthImage, viewInfo);
-
+  {
+    VkImageViewCreateInfo viewInfo = { VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
+    viewInfo.format = VK_FORMAT_UNDEFINED;
+    viewInfo.components.r = VK_COMPONENT_SWIZZLE_R;
+    viewInfo.components.g = VK_COMPONENT_SWIZZLE_G;
+    viewInfo.components.b = VK_COMPONENT_SWIZZLE_B;
+    viewInfo.components.a = VK_COMPONENT_SWIZZLE_A;
+    viewInfo.subresourceRange = { VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 };
+    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.flags = 0;
+    attachments[1] = vCtx->resources->createImageView(depthImage, viewInfo);
+  }
   rendererFrameBuffers.resize(vCtx->frameManager->backBufferViews.size());
   for (uint32_t i = 0; i < vCtx->frameManager->backBufferViews.size(); i++) {
     attachments[0] = vCtx->frameManager->backBufferViews[i];

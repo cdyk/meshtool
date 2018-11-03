@@ -105,7 +105,21 @@ void Renderer::init()
 
   checkerTex = textureManager->loadTexture(TextureSource::Checker);
   colorGradientTex = textureManager->loadTexture(TextureSource::ColorGradient);
-  texSampler = vCtx->resources->createSampler(vCtx->infos->samplers.triLlinearRepeat);
+
+  VkSamplerCreateInfo samplerInfo{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+  samplerInfo.magFilter = VK_FILTER_LINEAR;
+  samplerInfo.minFilter = VK_FILTER_LINEAR;
+  samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+  samplerInfo.anisotropyEnable = VK_TRUE;
+  samplerInfo.maxAnisotropy = 16;
+  samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+  samplerInfo.unnormalizedCoordinates = VK_FALSE;
+  samplerInfo.compareEnable = VK_FALSE;
+  samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+  samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+  texSampler = vCtx->resources->createSampler(samplerInfo);
 }
 
 Renderer::~Renderer()
@@ -152,15 +166,23 @@ void Renderer::buildPipelines(RenderPassHandle pass)
   objBufSamplerLayoutInfo.bindingCount = 2;
   objBufSamplerLayoutInfo.pBindings = objBufSamplerLayoutBinding;
 
-
-
-  
   VkPipelineLayoutCreateInfo pipeLayoutInfo{};
   pipeLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
   pipeLayoutInfo.pNext = NULL;
   pipeLayoutInfo.pushConstantRangeCount = 0;
   pipeLayoutInfo.pPushConstantRanges = NULL;
 
+  VkPipelineRasterizationStateCreateInfo cullBackDepthBiasRasInfo{ VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
+  cullBackDepthBiasRasInfo.polygonMode = VK_POLYGON_MODE_FILL;
+  cullBackDepthBiasRasInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+  cullBackDepthBiasRasInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  cullBackDepthBiasRasInfo.depthClampEnable = VK_FALSE;
+  cullBackDepthBiasRasInfo.rasterizerDiscardEnable = VK_FALSE;
+  cullBackDepthBiasRasInfo.depthBiasEnable = VK_TRUE;
+  cullBackDepthBiasRasInfo.depthBiasConstantFactor = 1;
+  cullBackDepthBiasRasInfo.depthBiasClamp = 0;
+  cullBackDepthBiasRasInfo.depthBiasSlopeFactor = 1;
+  cullBackDepthBiasRasInfo.lineWidth = 1.0f;
   {
     Vector<VkVertexInputAttributeDescription> inputAttrib(4);
     for (unsigned i = 0; i < inputAttrib.size(); i++) {
@@ -189,7 +211,7 @@ void Renderer::buildPipelines(RenderPassHandle pass)
                                                       objBufLayoutInfo,
                                                       pass,
                                                       vanillaShader,
-                                                      vCtx->infos->pipelineRasterization.cullBackDepthBias);
+                                                      cullBackDepthBiasRasInfo);
   }
 
   {
@@ -214,13 +236,14 @@ void Renderer::buildPipelines(RenderPassHandle pass)
     inputBind[1].stride = sizeof(Vec3f);
     inputBind[2].stride = sizeof(Vec2f);
     inputBind[3].stride = sizeof(uint32_t);
+
     texturedPipeline = vCtx->resources->createPipeline(inputBind,
                                                        inputAttrib,
                                                        pipeLayoutInfo,
                                                        objBufSamplerLayoutInfo,
                                                        pass,
                                                        texturedShader,
-                                                       vCtx->infos->pipelineRasterization.cullBackDepthBias);
+                                                       cullBackDepthBiasRasInfo);
   }
 
   {
@@ -242,23 +265,54 @@ void Renderer::buildPipelines(RenderPassHandle pass)
     inputBind[0].stride = sizeof(Vec3f);
     inputBind[1].stride = sizeof(uint32_t);
 
+    VkPipelineRasterizationStateCreateInfo wireFrontRasInfo{ VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
+    wireFrontRasInfo.polygonMode = VK_POLYGON_MODE_LINE;
+    wireFrontRasInfo.cullMode = VK_CULL_MODE_BACK_BIT;
+    wireFrontRasInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    wireFrontRasInfo.depthClampEnable = VK_FALSE;
+    wireFrontRasInfo.rasterizerDiscardEnable = VK_FALSE;
+    wireFrontRasInfo.depthBiasEnable = VK_FALSE;
+    wireFrontRasInfo.depthBiasConstantFactor = 0;
+    wireFrontRasInfo.depthBiasClamp = 0;
+    wireFrontRasInfo.depthBiasSlopeFactor = 0;
+    wireFrontRasInfo.lineWidth = 1.0f;
     wireFrontFacePipeline = vCtx->resources->createPipeline(inputBind,
                                                             inputAttrib,
                                                             pipeLayoutInfo,
                                                             objBufLayoutInfo,
                                                             pass,
                                                             flatShader,
-                                                            vCtx->infos->pipelineRasterization.cullBackLine);
+                                                            wireFrontRasInfo);
 
+    VkPipelineRasterizationStateCreateInfo wireBothRasInfo{ VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
+    wireBothRasInfo.polygonMode = VK_POLYGON_MODE_LINE;
+    wireBothRasInfo.cullMode = VK_CULL_MODE_NONE;
+    wireBothRasInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    wireBothRasInfo.depthClampEnable = VK_FALSE;
+    wireBothRasInfo.rasterizerDiscardEnable = VK_FALSE;
+    wireBothRasInfo.depthBiasEnable = VK_FALSE;
+    wireBothRasInfo.depthBiasConstantFactor = 0;
+    wireBothRasInfo.depthBiasClamp = 0;
+    wireBothRasInfo.depthBiasSlopeFactor = 0;
+    wireBothRasInfo.lineWidth = 1.0f;
     wireBothFacesPipeline = vCtx->resources->createPipeline(inputBind,
                                                             inputAttrib,
                                                             pipeLayoutInfo,
                                                             objBufLayoutInfo,
                                                             pass,
                                                             flatShader,
-                                                            vCtx->infos->pipelineRasterization.cullNoneLine);
+                                                            wireBothRasInfo);
   }
 
+
+  VkPipelineRasterizationStateCreateInfo cullNothingRasInfo{ VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
+  cullNothingRasInfo.polygonMode = VK_POLYGON_MODE_FILL;
+  cullNothingRasInfo.cullMode = VK_CULL_MODE_NONE;
+  cullNothingRasInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  cullNothingRasInfo.depthClampEnable = VK_FALSE;
+  cullNothingRasInfo.rasterizerDiscardEnable = VK_FALSE;
+  cullNothingRasInfo.depthBiasEnable = VK_FALSE;
+  cullNothingRasInfo.lineWidth = 1.0f;
   {
     Vector<VkVertexInputAttributeDescription> inputAttrib(6);
     inputAttrib[0] = { 0 };
@@ -273,7 +327,6 @@ void Renderer::buildPipelines(RenderPassHandle pass)
       inputAttrib[i].binding = i - 1;
       inputAttrib[i].format = VK_FORMAT_R32G32B32_SFLOAT;
     }
-
     Vector<VkVertexInputBindingDescription> inputBind(5);
     inputBind[0] = { 0 };
     inputBind[0].stride = sizeof(Vec3f) + sizeof(Vec3f);
@@ -290,7 +343,7 @@ void Renderer::buildPipelines(RenderPassHandle pass)
                                                         objBufLayoutInfo,
                                                         pass,
                                                         coordSys.shader,
-                                                        vCtx->infos->pipelineRasterization.cullNoneSolid,
+                                                        cullNothingRasInfo,
                                                         VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
   }
 
@@ -303,7 +356,6 @@ void Renderer::buildPipelines(RenderPassHandle pass)
     inputAttrib[1].location = 1;
     inputAttrib[1].format = VK_FORMAT_R8G8B8A8_UNORM;
     inputAttrib[1].offset = 12;
-
     Vector<VkVertexInputBindingDescription> inputBind(1);
     inputBind[0] = { 0 };
     inputBind[0].stride = 16;
@@ -314,7 +366,7 @@ void Renderer::buildPipelines(RenderPassHandle pass)
                                                    objBufLayoutInfo,
                                                    pass,
                                                    flatShader,
-                                                   vCtx->infos->pipelineRasterization.cullNoneSolid,
+                                                   cullNothingRasInfo,
                                                    VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
   }
 

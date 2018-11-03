@@ -1,4 +1,3 @@
-#include "VulkanInfos.h"
 #include "VulkanContext.h"
 #include "VulkanFrameManager.h"
 
@@ -176,7 +175,11 @@ void VulkanFrameManager::houseKeep()
 void VulkanFrameManager::copyBuffer(RenderBufferHandle dst, RenderBufferHandle src, VkDeviceSize size)
 {
   auto cmdBuf = vCtx->resources->createPrimaryCommandBuffer(currentFrameData().commandPool);
-  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &vCtx->infos->commandBuffer.singleShot);
+
+  VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &beginInfo);
+
   VkBufferCopy copyRegion{};
   copyRegion.size = size;
   vkCmdCopyBuffer(cmdBuf.resource->cmdBuf, src.resource->buffer, dst.resource->buffer, 1, &copyRegion);
@@ -187,7 +190,10 @@ void VulkanFrameManager::copyBuffer(RenderBufferHandle dst, RenderBufferHandle s
 void VulkanFrameManager::transitionImageLayout(ImageHandle image, VkImageLayout layout)
 {
   auto cmdBuf = vCtx->resources->createPrimaryCommandBuffer(currentFrameData().commandPool);
-  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &vCtx->infos->commandBuffer.singleShot);
+
+  VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &beginInfo);
 
   VkImageMemoryBarrier barrier = {};
   barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -249,7 +255,10 @@ void VulkanFrameManager::transitionImageLayout(ImageHandle image, VkImageLayout 
 void VulkanFrameManager::copyBufferToImage(ImageHandle dst, RenderBufferHandle src, uint32_t w, uint32_t h)
 {
   auto cmdBuf = vCtx->resources->createPrimaryCommandBuffer(currentFrameData().commandPool);
-  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &vCtx->infos->commandBuffer.singleShot);
+
+  VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+  beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+  vkBeginCommandBuffer(cmdBuf.resource->cmdBuf, &beginInfo);
 
   VkBufferImageCopy region{};
   region.bufferOffset = 0;

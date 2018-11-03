@@ -2,7 +2,6 @@
 #include <GLFW/glfw3.h>
 #include <cassert>
 #include "VulkanContext.h"
-#include "VulkanInfos.h"
 #include "VulkanResources.h"
 #include "VulkanFrameManager.h"
 
@@ -319,7 +318,6 @@ VulkanContext::VulkanContext(Logger logger,
     CHECK_VULKAN(vkCreatePipelineCache(device, &info, nullptr, &pipelineCache));
   }
 
-  infos = new VulkanInfos();
   resources = new VulkanResources(this, logger);
   frameManager = new VulkanFrameManager(this, logger, framesInFlight);
 }
@@ -348,7 +346,6 @@ void VulkanContext::shutdown()
   delete resources;
   resources = nullptr;
 
-  delete infos; infos = nullptr;
   vkDestroyDevice(device, nullptr);
 
   if (debugLayer) {
