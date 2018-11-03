@@ -36,6 +36,8 @@ public:
     FenceHandle fence;
     SemaphoreHandle imageAcquiredSemaphore;
     SemaphoreHandle renderCompleteSemaphore;
+    VkQueryPool timerPool;
+    bool hasTimings = false;
   };
   Vector<FrameData> frameData;
 

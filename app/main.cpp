@@ -276,6 +276,8 @@ namespace {
         }
         ImGui::EndMenu();
       }
+      ImGui::SetCursorPosX(ImGui::GetWindowContentRegionMax().x - ImGui::CalcTextSize(app->fpsString).x);
+      ImGui::Text(app->fpsString);
       app->menuHeight = ImGui::GetWindowSize().y;
       ImGui::EndMainMenuBar();
     }

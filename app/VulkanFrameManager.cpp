@@ -21,6 +21,7 @@ void VulkanFrameManager::init()
   presentMode = choosePresentMode(requestedPresentModes);
 
   auto * res = vCtx->resources;
+  auto device = vCtx->device;
 
   frameData.resize(framesInFlight);
   for (auto & frame : frameData) {
@@ -29,6 +30,13 @@ void VulkanFrameManager::init()
     frame.imageAcquiredSemaphore = res->createSemaphore();
     frame.renderCompleteSemaphore = res->createSemaphore();
     frame.fence = res->createFence(true);
+
+    VkQueryPoolCreateInfo poolInfo{ VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO };
+    poolInfo.queryType = VK_QUERY_TYPE_TIMESTAMP;
+    poolInfo.queryCount = 32;
+    poolInfo.pipelineStatistics = 0;
+    CHECK_VULKAN(vkCreateQueryPool(device, &poolInfo, nullptr, &frame.timerPool));
+    frame.hasTimings = false;
   }
 }
 

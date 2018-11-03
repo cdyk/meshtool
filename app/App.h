@@ -70,6 +70,7 @@ public:
   bool picking = false;
   unsigned scrollToItem = ~0u;
 
+  char fpsString[64] = { '\0' };
 
   std::mutex incomingMeshLock;
   Vector<Mesh*> incomingMeshes;
@@ -92,6 +93,13 @@ public:
 
   Vector<FrameBufferHandle> rendererFrameBuffers;
   Vector<FrameBufferHandle> imguiFrameBuffers;
+
+
+  double fpsStart = 0.0;
+  double cpuTimeAcc = 0.0;
+  double gpuTimeAcc = 0.0;
+  unsigned cpuTimeAccN = 0;
+  unsigned gpuTimeAccN = 0;
 
 
 };

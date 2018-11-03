@@ -47,7 +47,8 @@ namespace
 App::App(Logger l, GLFWwindow* window, uint32_t w, uint32_t h) :
   window(window),
   width(w),
-  height(h)
+  height(h),
+  fpsStart(glfwGetTime())
 {
   viewer = new Viewer();
   logger = l;
@@ -214,6 +215,10 @@ void App::resize(uint32_t w, uint32_t h)
 
 void App::render(const Vec4f& viewport)
 {
+  auto device = vCtx->device;
+
+  auto cpuStart = glfwGetTime();
+
   const Mat4f& P = viewer->getProjectionMatrix();
   const Mat4f& M = viewer->getViewMatrix();
   const Mat4f& PMinv = viewer->getProjectionViewInverseMatrix();
@@ -242,12 +247,22 @@ void App::render(const Vec4f& viewport)
   }
 
   auto & frame = vCtx->frameManager->frame();
+  if (frame.hasTimings) {
+    uint64_t results[2];
+    vkGetQueryPoolResults(device, frame.timerPool, 0, 2, sizeof(results), results, sizeof(results[0]), VK_QUERY_RESULT_64_BIT | VK_QUERY_RESULT_WAIT_BIT);
+    gpuTimeAcc += vCtx->physicalDeviceProperties.limits.timestampPeriod*(results[1] - results[0]);
+    gpuTimeAccN++;
+  }
+
   auto & cmdBuf = frame.commandBuffer.resource->cmdBuf;
 
 
   VkCommandBufferBeginInfo info = { VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
   info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
   CHECK_VULKAN(vkBeginCommandBuffer(cmdBuf, &info));
+  vkCmdResetQueryPool(cmdBuf, frame.timerPool, 0, 2);
+  vkCmdWriteTimestamp(cmdBuf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, frame.timerPool, 0);
+
 
   VkClearValue clearValues[2] = {};
   clearValues[1].depthStencil.depth = 1.f;
@@ -308,8 +323,30 @@ void App::render(const Vec4f& viewport)
   submitInfo.signalSemaphoreCount = 1;
   submitInfo.pSignalSemaphores = &frame.renderCompleteSemaphore.resource->semaphore;
 
+
+  vkCmdWriteTimestamp(cmdBuf, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, frame.timerPool, 1);
+  frame.hasTimings = true;
   CHECK_VULKAN(vkEndCommandBuffer(cmdBuf));
   CHECK_VULKAN(vkQueueSubmit(vCtx->queue, 1, &submitInfo, frame.fence.resource->fence));
+
+  auto cpuStop = glfwGetTime();
+  cpuTimeAcc += (cpuStop - cpuStart);
+  cpuTimeAccN++;
+
+  if (10 < cpuTimeAccN || 0.5 < (cpuTimeAcc / cpuTimeAccN)) {
+    auto fps = cpuTimeAccN / (glfwGetTime() - fpsStart);
+    fpsStart = glfwGetTime();
+
+    snprintf(fpsString, sizeof(fpsString), "FPS %.2f CPU %.2fms GPU %.2fms",
+             fps,
+             1000.f*(cpuTimeAcc / cpuTimeAccN),
+             1e-6f*(gpuTimeAcc / gpuTimeAccN));
+
+    cpuTimeAcc = 0.0;
+    gpuTimeAcc = 0.0;
+    cpuTimeAccN = 0;
+    gpuTimeAccN = 0;
+  }
 }
 
 void App::present()
