@@ -74,6 +74,10 @@ public:
 
   bool nvxRaytracing = false;
 private:
+#ifdef _DEBUG
   bool debugLayer = true;
+#else
+  bool debugLayer = false;
+#endif
   VkDebugUtilsMessengerEXT debugCallbackHandle;
 };
