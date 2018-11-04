@@ -12,7 +12,7 @@ struct Mat3f;
 class App;
 class RenderTextureManager;
 
-class Renderer
+class RenderSolid
 {
 public:
   enum struct Texturing {
@@ -21,13 +21,10 @@ public:
     ColorGradient
   };
 
-  //bool outlines = false;
-  bool solid = true;
-  //bool tangentSpaceCoordSys = false;
   Texturing texturing = Texturing::None;
   
-  Renderer(Logger logger, App* app);
-  ~Renderer();
+  RenderSolid(Logger logger, App* app);
+  ~RenderSolid();
 
   void init();
 
@@ -41,6 +38,7 @@ public:
 private:
   Logger logger;
   App* app = nullptr;
+  Texturing inDescSet = Texturing::None;
 
   struct MeshData
   {
@@ -50,38 +48,21 @@ private:
 
     RenderBufferHandle vtx;
     RenderBufferHandle nrm;
-    RenderBufferHandle tan;
-    RenderBufferHandle bnm;
     RenderBufferHandle tex;
     RenderBufferHandle col;
 
     RenderBufferHandle indices;
     uint32_t triangleCount = 0;
-
-    RenderBufferHandle lines;
-    uint32_t lineCount = 0;
-
-
   };
   Vector<MeshData> meshData;
   Vector<MeshData> newMeshData;
 
-  struct {
-    RenderBufferHandle vtxCol;
-    ShaderHandle shader;
-    PipelineHandle pipeline;
-  } coordSys;
-
+  void updateDescriptorSets();
 
   PipelineHandle vanillaPipeline;
   PipelineHandle texturedPipeline;
-  PipelineHandle wireFrontFacePipeline;
-  PipelineHandle wireBothFacesPipeline;
-  PipelineHandle linePipeline;
-
 
   ShaderHandle vanillaShader;
-  ShaderHandle flatShader;
   ShaderHandle texturedShader;
 
   uint32_t viewport[4];

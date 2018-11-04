@@ -16,7 +16,7 @@
 #include "Common.h"
 #include "Mesh.h"
 #include "LinAlgOps.h"
-#include "Renderer.h"
+#include "RenderSolid.h"
 #include "Raycaster.h"
 #include "HandlePicking.h"
 #include "App.h"
@@ -130,7 +130,7 @@ namespace {
       if (key == GLFW_KEY_R && action == GLFW_PRESS) app->raytrace = !app->raytrace;
       if (key == GLFW_KEY_W && action == GLFW_PRESS)  app->viewOutlines = !app->viewOutlines;
       if (key == GLFW_KEY_L && action == GLFW_PRESS)  app->viewLines = !app->viewLines;
-      if (key == GLFW_KEY_S && action == GLFW_PRESS)  app->renderer->solid = !app->renderer->solid;
+      if (key == GLFW_KEY_S && action == GLFW_PRESS)  app->viewSolid = !app->viewSolid;
       if (key == GLFW_KEY_A && action == GLFW_PRESS) app->viewTangents = !app->viewTangents;
       if (key == GLFW_KEY_C && action == GLFW_PRESS) {
         switch (app->triangleColor)
@@ -143,10 +143,10 @@ namespace {
         app->updateColor = true;
       }
       if (key == GLFW_KEY_T && action == GLFW_PRESS) {
-        switch (app->renderer->texturing) {
-        case Renderer::Texturing::None: app->renderer->texturing = Renderer::Texturing::Checker; break;
-        case Renderer::Texturing::Checker: app->renderer->texturing = Renderer::Texturing::ColorGradient; break;
-        case Renderer::Texturing::ColorGradient: app->renderer->texturing = Renderer::Texturing::None; break;
+        switch (app->renderSolid->texturing) {
+        case RenderSolid::Texturing::None: app->renderSolid->texturing = RenderSolid::Texturing::Checker; break;
+        case RenderSolid::Texturing::Checker: app->renderSolid->texturing = RenderSolid::Texturing::ColorGradient; break;
+        case RenderSolid::Texturing::ColorGradient: app->renderSolid->texturing = RenderSolid::Texturing::None; break;
         }
       }
       if (key == GLFW_KEY_F && action == GLFW_PRESS) {
@@ -248,7 +248,7 @@ namespace {
         if (ImGui::MenuItem("View selection", "CTRL+SHIFT+S")) { app->moveToSelection = true; }
         ImGui::Separator();
         if (ImGui::MenuItem("Raytracing", "R", &app->raytrace, app->vCtx->nvxRaytracing)) {}
-        if (ImGui::MenuItem("Solid", "S", &app->renderer->solid)) {}
+        if (ImGui::MenuItem("Solid", "S", &app->viewSolid)) {}
         if (ImGui::MenuItem("Lines", "L", &app->viewLines)) {}
         if (ImGui::MenuItem("Outlines", "W", &app->viewOutlines)) {}
         if (ImGui::MenuItem("Tangent coordsys", "C", &app->viewTangents)) {}
@@ -267,13 +267,13 @@ namespace {
         }
         if (ImGui::BeginMenu("Texturing")) {
           bool sel[3] = {
-            app->renderer->texturing == Renderer::Texturing::None,
-            app->renderer->texturing == Renderer::Texturing::Checker,
-            app->renderer->texturing == Renderer::Texturing::ColorGradient,
+            app->renderSolid->texturing == RenderSolid::Texturing::None,
+            app->renderSolid->texturing == RenderSolid::Texturing::Checker,
+            app->renderSolid->texturing == RenderSolid::Texturing::ColorGradient,
           };
-          if (ImGui::MenuItem("None", "T", &sel[0])) app->renderer->texturing = Renderer::Texturing::None;
-          if (ImGui::MenuItem("Checker", "T", &sel[1])) app->renderer->texturing = Renderer::Texturing::Checker;
-          if (ImGui::MenuItem("Color gradient", "T", &sel[2])) app->renderer->texturing = Renderer::Texturing::ColorGradient;
+          if (ImGui::MenuItem("None", "T", &sel[0])) app->renderSolid->texturing = RenderSolid::Texturing::None;
+          if (ImGui::MenuItem("Checker", "T", &sel[1])) app->renderSolid->texturing = RenderSolid::Texturing::Checker;
+          if (ImGui::MenuItem("Color gradient", "T", &sel[2])) app->renderSolid->texturing = RenderSolid::Texturing::ColorGradient;
           ImGui::EndMenu();
         }
         ImGui::EndMenu();
@@ -614,7 +614,7 @@ int main(int argc, char** argv)
   }
   CHECK_VULKAN(vkDeviceWaitIdle(app->vCtx->device));
   app->items.meshes.resize(0);
-  if(app->renderer) app->renderer->update(app->items.meshes);
+  if(app->renderSolid) app->renderSolid->update(app->items.meshes);
   if(app->raycaster) app->raycaster->update(app->items.meshes);
 
   ImGui_ImplGlfw_Shutdown();

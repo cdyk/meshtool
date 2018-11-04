@@ -94,7 +94,7 @@
     <ClCompile Include="..\app\App.cpp" />
     <ClCompile Include="..\app\main.cpp" />
     <ClCompile Include="..\app\Raycaster.cpp" />
-    <ClCompile Include="..\app\Renderer.cpp" />
+    <ClCompile Include="..\app\RenderSolid.cpp" />
     <ClCompile Include="..\app\RenderOutlines.cpp" />
     <ClCompile Include="..\app\RenderTangents.cpp" />
     <ClCompile Include="..\app\RenderTextureManager.cpp" />
@@ -112,7 +112,7 @@
   <ItemGroup>
     <ClInclude Include="..\app\App.h" />
     <ClInclude Include="..\app\Raycaster.h" />
-    <ClInclude Include="..\app\Renderer.h" />
+    <ClInclude Include="..\app\RenderSolid.h" />
     <ClInclude Include="..\app\RenderOutlines.h" />
     <ClInclude Include="..\app\RenderResource.h" />
     <ClInclude Include="..\app\RenderTangents.h" />

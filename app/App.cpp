@@ -8,7 +8,7 @@
 #include "Viewer.h"
 #include "Common.h"
 #include "VulkanContext.h"
-#include "Renderer.h"
+#include "RenderSolid.h"
 #include "RenderOutlines.h"
 #include "RenderTangents.h"
 #include "Raycaster.h"
@@ -62,9 +62,6 @@ App::App(Logger l, GLFWwindow* window, uint32_t w, uint32_t h) :
 
   resize(w, h);
 
-  renderer = new Renderer(logger, this);
-  renderer->init();
-
   imGuiRenderer = new ImGuiRenderer(logger, this);
   imGuiRenderer->init();
 }
@@ -74,7 +71,7 @@ App::~App()
   imGuiRenderer->shutdown();
   delete imGuiRenderer;
 
-  delete renderer;
+  delete renderSolid;
 
   rendererPass = RenderPassHandle();
   rendererFrameBuffers.resize(0);
@@ -232,6 +229,19 @@ void App::render(const Vec4f& viewport)
 
   raytrace = raytrace && vCtx->nvxRaytracing;
 
+  bool reallySolid = !raytrace && viewSolid;
+  if (reallySolid) {
+    if (!renderSolid) {
+      renderSolid = new RenderSolid(logger, this);
+      renderSolid->init();
+    }
+    renderSolid->update(items.meshes);
+  }
+  else if (renderSolid) {
+    delete renderSolid;
+    renderSolid = nullptr;
+  }
+
   bool reallyLines = viewLines;
   for (auto * mesh : items.meshes) {
     reallyLines = mesh->lineCount && reallyLines;
@@ -271,10 +281,6 @@ void App::render(const Vec4f& viewport)
   else if (raycaster) {
     delete raycaster;
     raycaster = nullptr;
-  }
-
-  if (raytrace == false) {
-    renderer->update(items.meshes);
   }
 
   auto & frame = vCtx->frameManager->frame();
@@ -319,8 +325,8 @@ void App::render(const Vec4f& viewport)
 
 
     vkCmdBeginRenderPass(cmdBuf, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    if (raytrace == false) {
-      renderer->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP);
+    if (renderSolid) {
+      renderSolid->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP);
     }
     if (renderOutlines) {
       renderOutlines->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP, viewOutlines, viewLines);

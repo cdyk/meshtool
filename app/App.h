@@ -1,7 +1,7 @@
 #pragma once
 #include <mutex>
 #include "Common.h"
-#include "Renderer.h"
+#include "RenderSolid.h"
 
 #if 0
 
@@ -27,7 +27,7 @@ struct Mesh;
 class Viewer;
 class RenderOutlines;
 class RenderTangents;
-class Renderer;
+class RenderSolid;
 class Raycaster;
 class ImGuiRenderer;
 struct GLFWwindow;
@@ -65,6 +65,7 @@ public:
   TriangleColor triangleColor = TriangleColor::ModelColor;
   bool raytrace = false;
 
+  bool viewSolid = true;
   bool viewLines = true;
   bool viewOutlines = false;
   bool viewTangents = false;
@@ -88,8 +89,8 @@ public:
 
   Logger logger;
   GLFWwindow* window = nullptr;
-  Renderer* renderer = nullptr;
   Raycaster* raycaster = nullptr;
+  RenderSolid* renderSolid = nullptr;
   RenderOutlines* renderOutlines = nullptr;
   RenderTangents* renderTangents = nullptr;
   ImGuiRenderer* imGuiRenderer = nullptr;
