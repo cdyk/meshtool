@@ -128,7 +128,7 @@ namespace {
     }
     else if (mods == 0) {
       if (key == GLFW_KEY_R && action == GLFW_PRESS) app->raytrace = !app->raytrace;
-      if (key == GLFW_KEY_W && action == GLFW_PRESS)  app->renderer->outlines = !app->renderer->outlines;
+      if (key == GLFW_KEY_W && action == GLFW_PRESS)  app->outlines = !app->outlines;
       if (key == GLFW_KEY_S && action == GLFW_PRESS)  app->renderer->solid = !app->renderer->solid;
       if (key == GLFW_KEY_A && action == GLFW_PRESS) app->renderer->tangentSpaceCoordSys = !app->renderer->tangentSpaceCoordSys;
       if (key == GLFW_KEY_C && action == GLFW_PRESS) {
@@ -248,7 +248,7 @@ namespace {
         ImGui::Separator();
         if (ImGui::MenuItem("Raytracing", "R", &app->raytrace, app->vCtx->nvxRaytracing)) {}
         if (ImGui::MenuItem("Solid", "S", &app->renderer->solid)) {}
-        if (ImGui::MenuItem("Outlines", "W", &app->renderer->outlines)) {}
+        if (ImGui::MenuItem("Outlines", "W", &app->outlines)) {}
         if (ImGui::MenuItem("Tangent coordsys", "C", &app->renderer->tangentSpaceCoordSys)) {}
         if (ImGui::BeginMenu("Color")) {
           bool sel[4] = {

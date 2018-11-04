@@ -25,6 +25,7 @@ struct GLFWwindow;
 
 struct Mesh;
 class Viewer;
+class RenderOutlines;
 class Renderer;
 class Raycaster;
 class ImGuiRenderer;
@@ -62,6 +63,8 @@ public:
 
   TriangleColor triangleColor = TriangleColor::ModelColor;
   bool raytrace = false;
+  bool outlines = false;
+  bool lines = true;
   bool updateColor = true;
   bool selectAll = false;
   bool selectNone = false;
@@ -83,6 +86,7 @@ public:
   GLFWwindow* window = nullptr;
   Renderer* renderer = nullptr;
   Raycaster* raycaster = nullptr;
+  RenderOutlines* renderOutlines = nullptr;
   ImGuiRenderer* imGuiRenderer = nullptr;
   VulkanContext* vCtx = nullptr;
 

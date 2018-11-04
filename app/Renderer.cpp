@@ -702,23 +702,23 @@ void Renderer::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4f& 
       }
     }
 
-    if (outlines) {
-      VkBuffer buffers[2] = {
-        item.vtx.resource->buffer,
-        item.col.resource->buffer };
-      VkDeviceSize offsets[ARRAYSIZE(buffers)] = { 0, 0 };
-      vkCmdBindVertexBuffers(cmdBuf, 0, ARRAYSIZE(buffers), buffers, offsets);
+    //if (outlines) {
+    //  VkBuffer buffers[2] = {
+    //    item.vtx.resource->buffer,
+    //    item.col.resource->buffer };
+    //  VkDeviceSize offsets[ARRAYSIZE(buffers)] = { 0, 0 };
+    //  vkCmdBindVertexBuffers(cmdBuf, 0, ARRAYSIZE(buffers), buffers, offsets);
 
-      if (solid) {
-        vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, wireFrontFacePipeline.resource->pipe);
-        vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
-      }
-      else {
-        vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, wireBothFacesPipeline.resource->pipe);
-        vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
-      }
-      vkCmdDraw(cmdBuf, 3 * item.triangleCount, 1, 0, 0);
-    }
+    //  if (solid) {
+    //    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, wireFrontFacePipeline.resource->pipe);
+    //    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
+    //  }
+    //  else {
+    //    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, wireBothFacesPipeline.resource->pipe);
+    //    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
+    //  }
+    //  vkCmdDraw(cmdBuf, 3 * item.triangleCount, 1, 0, 0);
+    //}
 
     if (tangentSpaceCoordSys) {
       VkBuffer buffers[5] = {
@@ -735,14 +735,14 @@ void Renderer::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4f& 
       vkCmdDraw(cmdBuf, 6, 3 * item.triangleCount, 0, 0);
     }
 
-    if (item.lineCount) {
-      VkBuffer buffers[1] = { item.lines.resource->buffer };
-      VkDeviceSize offsets[1] = { 0 };
-      vkCmdBindVertexBuffers(cmdBuf, 0, 1, buffers, offsets);
-      vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.resource->pipe);
-      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
-      vkCmdDraw(cmdBuf, 2 * item.lineCount, 1, 0, 0);
-    }
+    //if (item.lineCount) {
+    //  VkBuffer buffers[1] = { item.lines.resource->buffer };
+    //  VkDeviceSize offsets[1] = { 0 };
+    //  vkCmdBindVertexBuffers(cmdBuf, 0, 1, buffers, offsets);
+    //  vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.resource->pipe);
+    //  vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, linePipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
+    //  vkCmdDraw(cmdBuf, 2 * item.lineCount, 1, 0, 0);
+    //}
    
   }
 }

@@ -194,6 +194,21 @@ VkCommandBuffer VulkanFrameManager::createPrimaryCommandBuffer()
   return cmdBuf;
 }
 
+void  VulkanFrameManager::stageAndCopyBuffer(RenderBufferHandle dst, const void* src, VkDeviceSize size)
+{
+  auto device = vCtx->device;
+
+  auto staging = vCtx->resources->createStagingBuffer(size);
+
+  void * ptr = nullptr;
+  CHECK_VULKAN(vkMapMemory(device, staging.resource->mem, 0, size, 0, &ptr));
+  std::memcpy(ptr, src, size);
+  vkUnmapMemory(device, staging.resource->mem);
+
+  copyBuffer(dst, staging, size);
+}
+
+
 void VulkanFrameManager::copyBuffer(RenderBufferHandle dst, RenderBufferHandle src, VkDeviceSize size)
 {
   auto cmdBuf = createPrimaryCommandBuffer();

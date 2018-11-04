@@ -20,6 +20,7 @@ public:
   void resize(uint32_t w, uint32_t h);
 
   VkCommandBuffer createPrimaryCommandBuffer();
+  void stageAndCopyBuffer(RenderBufferHandle dst, const void* src, VkDeviceSize size);
   void copyBuffer(RenderBufferHandle dst, RenderBufferHandle src, VkDeviceSize size);
   void transitionImageLayout(ImageHandle image, VkImageLayout layout);
   void copyBufferToImage(ImageHandle dst, RenderBufferHandle src, uint32_t w, uint32_t h);

@@ -61,6 +61,9 @@
     <ClCompile Include="..\app\Raycaster.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\app\RenderOutlines.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\libs\imgui\examples\imgui_impl_glfw.h">
@@ -116,6 +119,9 @@
     </ClInclude>
     <ClInclude Include="..\shaders\raytrace.binding.h">
       <Filter>shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="..\app\RenderOutlines.h">
+      <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

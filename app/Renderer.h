@@ -21,7 +21,7 @@ public:
     ColorGradient
   };
 
-  bool outlines = false;
+  //bool outlines = false;
   bool solid = true;
   bool tangentSpaceCoordSys = false;
   Texturing texturing = Texturing::None;

@@ -9,6 +9,7 @@
 #include "Common.h"
 #include "VulkanContext.h"
 #include "Renderer.h"
+#include "RenderOutlines.h"
 #include "Raycaster.h"
 #include "ImGuiRenderer.h"
 #include "LinAlgOps.h"
@@ -230,6 +231,24 @@ void App::render(const Vec4f& viewport)
 
   raytrace = raytrace && vCtx->nvxRaytracing;
 
+  bool reallyLines = lines;
+  for (auto * mesh : items.meshes) {
+    reallyLines = mesh->lineCount && reallyLines;
+  }
+
+  if (reallyLines || outlines) {
+    if (!renderOutlines) {
+      renderOutlines = new RenderOutlines(logger, this);
+      renderOutlines->init();
+    }
+    renderOutlines->update(items.meshes);
+  }
+  else if (renderOutlines) {
+    delete renderOutlines;
+    renderOutlines = nullptr;
+  }
+
+
   if (raytrace) {
     if (raycaster == nullptr) {
       raycaster = new Raycaster(logger, this);
@@ -268,8 +287,7 @@ void App::render(const Vec4f& viewport)
   clearValues[1].depthStencil.depth = 1.f;
 
   auto PM = mul(P, M);
-  if (raytrace == false) {
-
+  {
     VkRenderPassBeginInfo beginInfo = {};
     beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     beginInfo.renderPass = rendererPass.resource->pass;
@@ -289,7 +307,12 @@ void App::render(const Vec4f& viewport)
 
 
     vkCmdBeginRenderPass(cmdBuf, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    renderer->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP);
+    if (raytrace == false) {
+      renderer->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP);
+    }
+    if (renderOutlines) {
+      renderOutlines->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP, outlines, lines);
+    }
     vkCmdEndRenderPass(cmdBuf);
   }
 
