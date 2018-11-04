@@ -128,9 +128,10 @@ namespace {
     }
     else if (mods == 0) {
       if (key == GLFW_KEY_R && action == GLFW_PRESS) app->raytrace = !app->raytrace;
-      if (key == GLFW_KEY_W && action == GLFW_PRESS)  app->outlines = !app->outlines;
+      if (key == GLFW_KEY_W && action == GLFW_PRESS)  app->viewOutlines = !app->viewOutlines;
+      if (key == GLFW_KEY_L && action == GLFW_PRESS)  app->viewLines = !app->viewLines;
       if (key == GLFW_KEY_S && action == GLFW_PRESS)  app->renderer->solid = !app->renderer->solid;
-      if (key == GLFW_KEY_A && action == GLFW_PRESS) app->renderer->tangentSpaceCoordSys = !app->renderer->tangentSpaceCoordSys;
+      if (key == GLFW_KEY_A && action == GLFW_PRESS) app->viewTangents = !app->viewTangents;
       if (key == GLFW_KEY_C && action == GLFW_PRESS) {
         switch (app->triangleColor)
         {
@@ -248,8 +249,9 @@ namespace {
         ImGui::Separator();
         if (ImGui::MenuItem("Raytracing", "R", &app->raytrace, app->vCtx->nvxRaytracing)) {}
         if (ImGui::MenuItem("Solid", "S", &app->renderer->solid)) {}
-        if (ImGui::MenuItem("Outlines", "W", &app->outlines)) {}
-        if (ImGui::MenuItem("Tangent coordsys", "C", &app->renderer->tangentSpaceCoordSys)) {}
+        if (ImGui::MenuItem("Lines", "L", &app->viewLines)) {}
+        if (ImGui::MenuItem("Outlines", "W", &app->viewOutlines)) {}
+        if (ImGui::MenuItem("Tangent coordsys", "C", &app->viewTangents)) {}
         if (ImGui::BeginMenu("Color")) {
           bool sel[4] = {
             app->triangleColor == TriangleColor::Single,

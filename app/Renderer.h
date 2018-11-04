@@ -23,7 +23,7 @@ public:
 
   //bool outlines = false;
   bool solid = true;
-  bool tangentSpaceCoordSys = false;
+  //bool tangentSpaceCoordSys = false;
   Texturing texturing = Texturing::None;
   
   Renderer(Logger logger, App* app);

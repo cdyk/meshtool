@@ -10,6 +10,7 @@
 #include "VulkanContext.h"
 #include "Renderer.h"
 #include "RenderOutlines.h"
+#include "RenderTangents.h"
 #include "Raycaster.h"
 #include "ImGuiRenderer.h"
 #include "LinAlgOps.h"
@@ -231,12 +232,12 @@ void App::render(const Vec4f& viewport)
 
   raytrace = raytrace && vCtx->nvxRaytracing;
 
-  bool reallyLines = lines;
+  bool reallyLines = viewLines;
   for (auto * mesh : items.meshes) {
     reallyLines = mesh->lineCount && reallyLines;
   }
 
-  if (reallyLines || outlines) {
+  if (reallyLines || viewOutlines) {
     if (!renderOutlines) {
       renderOutlines = new RenderOutlines(logger, this);
       renderOutlines->init();
@@ -248,6 +249,17 @@ void App::render(const Vec4f& viewport)
     renderOutlines = nullptr;
   }
 
+  if (viewTangents) {
+    if (!renderTangents) {
+      renderTangents = new RenderTangents(logger, this);
+      renderTangents->init();
+    }
+    renderTangents->update(items.meshes);
+  }
+  else if (renderTangents) {
+    delete renderTangents;
+    renderTangents = nullptr;
+  }
 
   if (raytrace) {
     if (raycaster == nullptr) {
@@ -311,7 +323,10 @@ void App::render(const Vec4f& viewport)
       renderer->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP);
     }
     if (renderOutlines) {
-      renderOutlines->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP, outlines, lines);
+      renderOutlines->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP, viewOutlines, viewLines);
+    }
+    if (renderTangents) {
+      renderTangents->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP);
     }
     vkCmdEndRenderPass(cmdBuf);
   }

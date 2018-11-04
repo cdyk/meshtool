@@ -720,20 +720,20 @@ void Renderer::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4f& 
     //  vkCmdDraw(cmdBuf, 3 * item.triangleCount, 1, 0, 0);
     //}
 
-    if (tangentSpaceCoordSys) {
-      VkBuffer buffers[5] = {
-        coordSys.vtxCol.resource->buffer,
-        item.vtx.resource->buffer,
-        item.tan.resource->buffer,
-        item.bnm.resource->buffer,
-        item.nrm.resource->buffer,
-      };
-      VkDeviceSize offsets[5] = { 0, 0, 0, 0, 0 };
-      vkCmdBindVertexBuffers(cmdBuf, 0, 5, buffers, offsets);
-      vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, coordSys.pipeline.resource->pipe);
-      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, coordSys.pipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
-      vkCmdDraw(cmdBuf, 6, 3 * item.triangleCount, 0, 0);
-    }
+    //if (tangentSpaceCoordSys) {
+    //  VkBuffer buffers[5] = {
+    //    coordSys.vtxCol.resource->buffer,
+    //    item.vtx.resource->buffer,
+    //    item.tan.resource->buffer,
+    //    item.bnm.resource->buffer,
+    //    item.nrm.resource->buffer,
+    //  };
+    //  VkDeviceSize offsets[5] = { 0, 0, 0, 0, 0 };
+    //  vkCmdBindVertexBuffers(cmdBuf, 0, 5, buffers, offsets);
+    //  vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, coordSys.pipeline.resource->pipe);
+    //  vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, coordSys.pipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
+    //  vkCmdDraw(cmdBuf, 6, 3 * item.triangleCount, 0, 0);
+    //}
 
     //if (item.lineCount) {
     //  VkBuffer buffers[1] = { item.lines.resource->buffer };
