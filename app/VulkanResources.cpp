@@ -1,4 +1,5 @@
 #include <cassert>
+#include <vulkan/spirv.h>
 #include "VulkanContext.h"
 #include "VulkanResources.h"
 
@@ -403,8 +404,57 @@ DescriptorSetHandle VulkanResources::createDescriptorSet(VkDescriptorSetLayout d
   return descSetHandle;
 }
 
+namespace {
 
-ShaderHandle VulkanResources::createShader(uint32_t* spv, size_t siz, VkShaderStageFlagBits stage)
+  VkShaderStageFlagBits getShaderStage(SpvExecutionModel executionModel)
+  {
+    switch (executionModel) {
+    case SpvExecutionModelVertex: return VK_SHADER_STAGE_VERTEX_BIT;
+    case SpvExecutionModelTessellationControl: return VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT;
+    case SpvExecutionModelTessellationEvaluation: return VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT;
+    case SpvExecutionModelGeometry: return VK_SHADER_STAGE_GEOMETRY_BIT;
+    case SpvExecutionModelFragment: return VK_SHADER_STAGE_FRAGMENT_BIT;
+      //case SpvExecutionModelGLCompute: return VK_SHADER_STAGE_;
+      //case SpvExecutionModelKernel: return VK_SHADER_STAGE;
+    case SpvExecutionModelTaskNV: return VK_SHADER_STAGE_TASK_BIT_NV;
+    case SpvExecutionModelMeshNV: return VK_SHADER_STAGE_MESH_BIT_NV;
+    case SpvExecutionModelRayGenerationNVX: return VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+    case SpvExecutionModelIntersectionNVX: return VK_SHADER_STAGE_INTERSECTION_BIT_NVX;
+    case SpvExecutionModelAnyHitNVX: return VK_SHADER_STAGE_ANY_HIT_BIT_NVX;
+    case SpvExecutionModelClosestHitNVX: return VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
+    case SpvExecutionModelMissNVX: return VK_SHADER_STAGE_MISS_BIT_NVX;
+    case SpvExecutionModelCallableNVX: return VK_SHADER_STAGE_CALLABLE_BIT_NVX;
+    default:
+      assert(false && "Unsupported execution model");
+      return (VkShaderStageFlagBits)0;
+    }
+  }
+
+  void introspect(Shader* shader, const uint32_t*spv, const size_t words)
+  {
+    assert(5 <= words);
+    assert(spv[0] == SpvMagicNumber);
+
+    auto idBound = spv[3];
+    auto * instruction = spv + 5;
+    while (instruction != spv + words) {
+      auto opCode = instruction[0] & 0xffffu;
+      auto wordCount = (instruction[0] >> 16) & 0xffffu;
+      switch (opCode) {
+      case SpvOpEntryPoint:
+        assert(2 <= wordCount);
+        shader->stageCreateInfo.stage = getShaderStage(SpvExecutionModel(instruction[1]));
+        break;
+      }
+      assert(instruction + wordCount <= spv + words);
+      instruction += wordCount;
+    }
+  }
+
+}
+
+
+ShaderHandle VulkanResources::createShader(uint32_t* spv, size_t siz)
 {
   auto device = vCtx->device;
 
@@ -413,7 +463,9 @@ ShaderHandle VulkanResources::createShader(uint32_t* spv, size_t siz, VkShaderSt
 
   auto & stageInfo = shader->stageCreateInfo;
   stageInfo.pName = "main";
-  stageInfo.stage = stage;
+
+  introspect(shader, spv, siz / sizeof(uint32_t));
+  assert(stageInfo.stage != 0);
 
   VkShaderModuleCreateInfo moduleCreateInfo{ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
   moduleCreateInfo.codeSize = siz;

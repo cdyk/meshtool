@@ -64,9 +64,9 @@ void RenderSolid::init()
   auto * vCtx = app->vCtx;
   auto * resources = vCtx->resources;
 
-  vertexShader = resources->createShader(vanillaVS, sizeof(vanillaVS), VK_SHADER_STAGE_VERTEX_BIT);
-  solidShader = resources->createShader(vanillaPS, sizeof(vanillaPS), VK_SHADER_STAGE_FRAGMENT_BIT);
-  texturedShader = resources->createShader(texturedPS, sizeof(texturedPS), VK_SHADER_STAGE_FRAGMENT_BIT);
+  vertexShader = resources->createShader(vanillaVS, sizeof(vanillaVS));
+  solidShader = resources->createShader(vanillaPS, sizeof(vanillaPS));
+  texturedShader = resources->createShader(texturedPS, sizeof(texturedPS));
 
   renaming.resize(10);
   for (size_t i = 0; i < renaming.size(); i++) {

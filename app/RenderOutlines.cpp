@@ -60,8 +60,8 @@ void RenderOutlines::init()
   auto * vCtx = app->vCtx;
   auto * resources = vCtx->resources;
 
-  vertexShader = resources->createShader(flatVS, sizeof(flatVS), VK_SHADER_STAGE_VERTEX_BIT);
-  fragmentShader = resources->createShader(flatPS, sizeof(flatPS), VK_SHADER_STAGE_FRAGMENT_BIT);
+  vertexShader = resources->createShader(flatVS, sizeof(flatVS));
+  fragmentShader = resources->createShader(flatPS, sizeof(flatPS));
 
   renaming.resize(10);
   for (size_t i = 0; i < renaming.size(); i++) {

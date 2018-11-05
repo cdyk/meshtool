@@ -154,7 +154,7 @@ public:
 
   DescriptorSetHandle createDescriptorSet(VkDescriptorSetLayout descLayout);
 
-  ShaderHandle createShader(uint32_t* spv, size_t siz, VkShaderStageFlagBits stage);
+  ShaderHandle createShader(uint32_t* spv, size_t siz);
   RenderPassHandle createRenderPass(VkAttachmentDescription* attachments, uint32_t attachmentCount,
                                     VkSubpassDescription* subpasses, uint32_t subpassCount,
                                     VkSubpassDependency* dependency);

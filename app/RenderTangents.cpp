@@ -50,8 +50,8 @@ void RenderTangents::init()
   auto * vCtx = app->vCtx;
   auto * resources = vCtx->resources;
 
-  vertexShader = resources->createShader(coordSysVS, sizeof(coordSysVS), VK_SHADER_STAGE_VERTEX_BIT);
-  fragmentShader = resources->createShader(flatPS, sizeof(flatPS), VK_SHADER_STAGE_FRAGMENT_BIT);
+  vertexShader = resources->createShader(coordSysVS, sizeof(coordSysVS));
+  fragmentShader = resources->createShader(flatPS, sizeof(flatPS));
 
   renaming.resize(10);
   for (size_t i = 0; i < renaming.size(); i++) {

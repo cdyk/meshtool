@@ -162,9 +162,9 @@ void Raycaster::buildPipeline()
   logger(0, "rtprops.maxRecursionDepth=%d", rtProps.maxRecursionDepth);
   logger(0, "rtprops.maxGeometryCount=%d", rtProps.maxGeometryCount);
 
-  rgenShader = resources->createShader(raytrace_rgen, sizeof(raytrace_rgen), VK_SHADER_STAGE_RAYGEN_BIT_NVX);
-  chitShader = resources->createShader(raytrace_rchit, sizeof(raytrace_rchit), VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX);
-  missShader = resources->createShader(raytrace_rmiss, sizeof(raytrace_rmiss), VK_SHADER_STAGE_MISS_BIT_NVX);
+  rgenShader = resources->createShader(raytrace_rgen, sizeof(raytrace_rgen));
+  chitShader = resources->createShader(raytrace_rchit, sizeof(raytrace_rchit));
+  missShader = resources->createShader(raytrace_rmiss, sizeof(raytrace_rmiss));
 
   VkPipelineShaderStageCreateInfo stages[] = {
     rgenShader.resource->stageCreateInfo,
