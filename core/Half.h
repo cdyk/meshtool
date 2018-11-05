@@ -22,8 +22,9 @@ uint16_t halfFromFloat(float f)
     return buildHalf(sign, 0, 0); // flush to zero
   }
   else if (exponent < 127 - 14) {
-    auto shift = (23 - 10) + 127 - 15 - exponent;
-    return buildHalf(sign, 0, mantissa >> shift); // FIXME: denorms
+    auto shift = (23 - 10) + 127 - 15 + 1 - exponent;
+    mantissa |= 1 << 23;  // add implicit one.
+    return buildHalf(sign, 0, mantissa >> shift);
   }
   else if (exponent < 127 + 16) {
     auto exp = exponent - (127 - 15);

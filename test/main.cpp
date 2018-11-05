@@ -163,20 +163,20 @@ int main(int argc, char** argv)
     } values[] =
     {
       {buildHalf(0, 0x0F, 0x0), 1.f},
-      {buildHalf(0, 0x0F, 0x1), 1.0009765625f},   // half epsilon
+      {buildHalf(0, 0x0F, 0x1), 1.0009765625f},     // half epsilon
       {buildHalf(1, 0x10, 0x0), -2.f},
-      {buildHalf(0, 0x1E, 0x3FF), 65504.f},     // max value
-      {buildHalf(0, 0x01, 0x0), 6.10352e-5f},   // 2^-14 min pos normal
-      {buildHalf(0, 0x00, 0x3FF), 6.101e-5f},   // 2^-14 - 2^-24 = max subnormal (adjusted for lack of rounding)
-      {buildHalf(0, 0x00, 0x1), 9e-8f},         // 2^-24 min subnormal (adjusted for lack of rounding)
-      {buildHalf(0, 0x1F, 0x0), 655050.f},        // larger than max -> infinity
+      {buildHalf(0, 0x1E, 0x3FF), 65504.f},         // max value
+      {buildHalf(0, 0x01, 0x0), 6.10352e-5f},       // 2^-14 min pos normal
+      {buildHalf(0, 0x00, 0x3FF), 6.09756e-5f},     // 2^-14 - 2^-24 = max subnormal
+      {buildHalf(0, 0x00, 0x1), 5.96047e-8f},       // 2^-24 min subnormal
+      {buildHalf(0, 0x1F, 0x0), 655050.f},          // larger than max -> infinity
       {buildHalf(0, 0x1F, 0x0), std::numeric_limits<float>::infinity()},  // larger than max -> infinity
       {buildHalf(0, 0x1F, 0x1), std::numeric_limits<float>::quiet_NaN()},
-      {buildHalf(1, 0x1E, 0x3FF), -65504.f},     // max value
-      {buildHalf(1, 0x01, 0x0), -6.10352e-5f},   // 2^-14 min pos normal
-      {buildHalf(1, 0x00, 0x3FF), -6.101e-5f},   // 2^-14 - 2^-24 = max subnormal (adjusted for lack of rounding)
-      {buildHalf(1, 0x00, 0x1), -9e-8f},         // 2^-24 min subnormal (adjusted for lack of rounding)
-      {buildHalf(1, 0x1F, 0x0), -655050.f},        // larger than max -> infinity
+      {buildHalf(1, 0x1E, 0x3FF), -65504.f},        // max value
+      {buildHalf(1, 0x01, 0x0), -6.10352e-5f},      // 2^-14 min pos normal
+      {buildHalf(1, 0x00, 0x3FF), -6.09756e-5f},    // 2^-14 - 2^-24 = max subnormal
+      {buildHalf(1, 0x00, 0x1), -5.96047e-8f},      // 2^-24 min subnormal
+      {buildHalf(1, 0x1F, 0x0), -655050.f},         // larger than max -> infinity
       {buildHalf(1, 0x1F, 0x0), -std::numeric_limits<float>::infinity()},  // larger than max -> infinity
       {buildHalf(1, 0x1F, 0x1), -std::numeric_limits<float>::quiet_NaN()}
     };
