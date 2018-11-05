@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <functional>
+#include <initializer_list>
 #include "mem/Allocators.h"
 
 typedef void(*Logger)(unsigned level, const char* msg, ...);
@@ -123,6 +124,15 @@ public:
     fill = other.size();
     _accommodate(sizeof(T), fill, true);
     for(size_t i=0; i<fill; i++) new(&(*this)[i]) T(other[i]);
+  }
+
+  Vector(std::initializer_list<T> init)
+  {
+    assert(fill == 0);
+    fill = init.size();
+    _accommodate(sizeof(T), fill, false);
+    T * dst = data();
+    for (const T& val : init) new(dst++) T(val);
   }
 
   Vector& operator=(const Vector& other) {
