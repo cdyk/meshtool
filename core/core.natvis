@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?> 
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+  <Type Name="Vector&lt;*&gt;">
+    <DisplayString>Size: {ptr? ((size_t*)ptr)[-1]:0}</DisplayString>
+    <Expand>
+      <Item Name="[size]">ptr? ((size_t*)ptr)[-1]:0</Item>
+      <Item Name="[fill]">fill</Item>
+      <ArrayItems>
+        <Size>ptr ? ((size_t*)ptr)[-1] : 0</Size>
+        <ValuePointer>($T1 *)ptr</ValuePointer>
+      </ArrayItems>
+    </Expand>
+  </Type>
+</AutoVisualizer>

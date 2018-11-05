@@ -4,6 +4,10 @@
 #include <initializer_list>
 #include "mem/Allocators.h"
 
+#ifndef ARRAYSIZE
+#define ARRAYSIZE(a) (sizeof(a)/sizeof((a)[0]))
+#endif
+
 typedef void(*Logger)(unsigned level, const char* msg, ...);
 
 

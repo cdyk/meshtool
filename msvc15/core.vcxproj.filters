@@ -112,4 +112,7 @@
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
+  <ItemGroup>
+    <Natvis Include="..\core\core.natvis" />
+  </ItemGroup>
 </Project>

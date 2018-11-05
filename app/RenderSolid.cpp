@@ -168,7 +168,7 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
       {
         MappedBuffer<Vertex> vtxMap(vCtx, vtxStaging);
         if (mesh->nrmCount) {
-          if (mesh->texCount) {
+          if (false && mesh->texCount) {
             for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
               vtxMap.mem[i] = Vertex(mesh->vtx[mesh->triVtxIx[i]],
                                      mesh->nrm[mesh->triNrmIx[i]],
@@ -232,6 +232,9 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
         getAverageCacheMissRatioPerTriangle(fifo4, fifo8, fifo16, fifo32, indices.data(), indices.size32());
         logger(0, "AMCR FIFO4=%.2f, FIFO8=%.2f, FIFO16=%.2f, FIFO32=%.2f", fifo4, fifo8, fifo16, fifo32);
 
+        Vector<uint32_t> reindices(indices.size());
+
+        linearSpeedVertexCacheOptimisation(reindices.data(), indices.data(), indices.size32());
 
         meshData.indices = resources->createIndexDeviceBuffer(sizeof(uint32_t)*indices.size());
         auto stage = resources->createStagingBuffer(sizeof(uint32_t)*indices.size());

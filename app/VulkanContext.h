@@ -8,9 +8,7 @@
 #define CHECK_VULKAN(a) do { VkResult rv = (a); assert(rv == VK_SUCCESS && #a);} while(0)
 #define CHECK_BOOL(a) do { bool rv = (a); assert(rv && #a);} while(0)
 
-#ifndef ARRAYSIZE
-#define ARRAYSIZE(a) (sizeof(a)/sizeof((a)[0]))
-#endif
+
 
 class ISurfaceManager
 {
