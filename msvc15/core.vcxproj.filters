@@ -64,6 +64,9 @@
     <ClCompile Include="..\core\MeshIndexing.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\core\VertexCache.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\core\Common.h">
@@ -104,6 +107,9 @@
     </ClInclude>
     <ClInclude Include="..\core\Half.h">
       <Filter>src\topo</Filter>
+    </ClInclude>
+    <ClInclude Include="..\core\VertexCache.h">
+      <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

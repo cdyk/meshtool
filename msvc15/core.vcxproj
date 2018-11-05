@@ -136,6 +136,7 @@
     <ClCompile Include="..\core\spatial\R3PointKdTree.cpp" />
     <ClCompile Include="..\core\Tasks.cpp" />
     <ClCompile Include="..\core\topo\HalfEdgeMesh.cpp" />
+    <ClCompile Include="..\core\VertexCache.cpp" />
     <ClCompile Include="..\core\Viewer.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -151,6 +152,7 @@
     <ClInclude Include="..\core\ResourceManager.h" />
     <ClInclude Include="..\core\spatial\R3PointKdTree.h" />
     <ClInclude Include="..\core\topo\HalfEdgeMesh.h" />
+    <ClInclude Include="..\core\VertexCache.h" />
     <ClInclude Include="..\core\Viewer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

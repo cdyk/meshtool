@@ -8,6 +8,13 @@
 #include "RenderTextureManager.h"
 #include "LinAlgOps.h"
 #include "Half.h"
+#include "VertexCache.h"
+
+//#define TRASH_INDICES
+#ifdef TRASH_INDICES
+#include <algorithm>
+#include <random>
+#endif
 
 struct ObjectBuffer
 {
@@ -216,6 +223,16 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
       }
 
       if (indices.any()) {
+#ifdef TRASH_INDICES
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle((Vec3f*)indices.begin(), (Vec3f*)indices.end(), g);
+#endif
+        float fifo4, fifo8, fifo16, fifo32;
+        getAverageCacheMissRatioPerTriangle(fifo4, fifo8, fifo16, fifo32, indices.data(), indices.size32());
+        logger(0, "AMCR FIFO4=%.2f, FIFO8=%.2f, FIFO16=%.2f, FIFO32=%.2f", fifo4, fifo8, fifo16, fifo32);
+
+
         meshData.indices = resources->createIndexDeviceBuffer(sizeof(uint32_t)*indices.size());
         auto stage = resources->createStagingBuffer(sizeof(uint32_t)*indices.size());
         {
