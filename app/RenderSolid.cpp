@@ -228,13 +228,15 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
         std::mt19937 g(rd());
         std::shuffle((Vec3f*)indices.begin(), (Vec3f*)indices.end(), g);
 #endif
-        float fifo4, fifo8, fifo16, fifo32;
-        getAverageCacheMissRatioPerTriangle(fifo4, fifo8, fifo16, fifo32, indices.data(), indices.size32());
-        logger(0, "AMCR FIFO4=%.2f, FIFO8=%.2f, FIFO16=%.2f, FIFO32=%.2f", fifo4, fifo8, fifo16, fifo32);
-
         Vector<uint32_t> reindices(indices.size());
 
-        linearSpeedVertexCacheOptimisation(reindices.data(), indices.data(), indices.size32());
+        float fifo4, fifo8, fifo16, fifo32;
+        getAverageCacheMissRatioPerTriangle(fifo4, fifo8, fifo16, fifo32, indices.data(), indices.size32());
+        logger(0, "IN  AMCR FIFO4=%.2f, FIFO8=%.2f, FIFO16=%.2f, FIFO32=%.2f", fifo4, fifo8, fifo16, fifo32);
+        linearSpeedVertexCacheOptimisation(logger, reindices.data(), indices.data(), indices.size32());
+        getAverageCacheMissRatioPerTriangle(fifo4, fifo8, fifo16, fifo32, reindices.data(), indices.size32());
+        logger(0, "OPT AMCR FIFO4=%.2f, FIFO8=%.2f, FIFO16=%.2f, FIFO32=%.2f", fifo4, fifo8, fifo16, fifo32);
+        indices.swap(reindices);
 
         meshData.indices = resources->createIndexDeviceBuffer(sizeof(uint32_t)*indices.size());
         auto stage = resources->createStagingBuffer(sizeof(uint32_t)*indices.size());

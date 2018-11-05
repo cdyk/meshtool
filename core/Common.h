@@ -123,6 +123,14 @@ public:
   Vector(size_t size) { resize(size); }
   ~Vector() { resize(0); }
 
+  Vector(size_t size, const T& init) {
+    assert(fill == 0);
+    fill = size;
+    _accommodate(sizeof(T), fill, false);
+    for (size_t i = 0; i < fill; i++) new(&(*this)[i]) T(init);
+  }
+
+
   Vector(const Vector& other) {
     assert(fill == 0);
     fill = other.size();
