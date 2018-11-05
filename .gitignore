@@ -1,4 +1,5 @@
 *.glsl.h
+*.vert.h
 
 # Prerequisites
 *.d

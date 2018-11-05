@@ -188,8 +188,8 @@ PipelineHandle VulkanResources::createPipeline()
 }
 
 
-PipelineHandle VulkanResources::createPipeline(Vector<VkVertexInputBindingDescription>& inputBind,
-                                               Vector<VkVertexInputAttributeDescription>& inputAttrib,
+PipelineHandle VulkanResources::createPipeline(const Vector<VkVertexInputBindingDescription>& inputBind,
+                                               const Vector<VkVertexInputAttributeDescription>& inputAttrib,
                                                VkPipelineLayoutCreateInfo& pipelineLayoutInfo_,
                                                VkDescriptorSetLayoutCreateInfo& descLayoutInfo,
                                                RenderPassHandle renderPass,

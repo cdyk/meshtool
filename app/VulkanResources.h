@@ -136,8 +136,8 @@ public:
 
   PipelineHandle createPipeline();
 
-  PipelineHandle createPipeline(Vector<VkVertexInputBindingDescription>& inputBind,
-                                Vector<VkVertexInputAttributeDescription>& inputAttrib,
+  PipelineHandle createPipeline(const Vector<VkVertexInputBindingDescription>& inputBind,
+                                const Vector<VkVertexInputAttributeDescription>& inputAttrib,
                                 VkPipelineLayoutCreateInfo& pipelineLayoutInfo,
                                 VkDescriptorSetLayoutCreateInfo& descLayoutInfo,
                                 RenderPassHandle renderPass,

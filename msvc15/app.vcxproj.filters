@@ -161,6 +161,9 @@
     <CustomBuild Include="..\shaders\coordSysVS.glsl">
       <Filter>shaders</Filter>
     </CustomBuild>
+    <CustomBuild Include="..\shaders\solid.vert">
+      <Filter>shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\shaders\raytrace.common.glsl">

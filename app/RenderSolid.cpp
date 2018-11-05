@@ -18,9 +18,10 @@ struct ObjectBuffer
 
 namespace {
 
-  uint32_t vanillaVS[]
-#include "vanillaVS.glsl.h"
-    ;
+  uint32_t solid_vert[] = {
+#include "solid.vert.h"
+  };
+
 
   uint32_t vanillaPS[]
 #include "vanillaPS.glsl.h"
@@ -29,6 +30,30 @@ namespace {
   uint32_t texturedPS[]
 #include "texturedPS.glsl.h"
     ;
+
+  struct Vertex
+  {
+    Vec3f pos;
+    Vec3f nrm;
+    Vec2f tex;
+    uint8_t color[4];
+
+    Vertex(const Vec3f& p,
+           const Vec3f& n,
+           const Vec2f& t,
+           const uint32_t c)
+    {
+      pos = p;
+      nrm = n;
+      tex = t;
+      color[0] = (c >> 16) & 0xff;
+      color[1] = (c >> 8) & 0xff;
+      color[2] = (c) & 0xff;
+      color[3] = 255;
+    }
+
+  };
+  static_assert(sizeof(Vertex) == 4 * 8 + 4);
 
   struct RGBA8
   {
@@ -64,7 +89,7 @@ void RenderSolid::init()
   auto * vCtx = app->vCtx;
   auto * resources = vCtx->resources;
 
-  vertexShader = resources->createShader(vanillaVS, sizeof(vanillaVS));
+  vertexShader = resources->createShader(solid_vert, sizeof(solid_vert));
   solidShader = resources->createShader(vanillaPS, sizeof(vanillaPS));
   texturedShader = resources->createShader(texturedPS, sizeof(texturedPS));
 
@@ -118,78 +143,71 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
       logger(0, "Created new Renderer.MeshData item.");
     }
     auto & meshData = newMeshData.back();
-    if (meshData.geometryGeneration != mesh->geometryGeneration) {
+    if (meshData.geometryGeneration != mesh->geometryGeneration || meshData.colorGeneration != mesh->colorGeneration) {
       meshData.geometryGeneration = mesh->geometryGeneration;
-      meshData.colorGeneration = 0; // trigger update
+      meshData.colorGeneration = mesh->colorGeneration;
 
       meshData.triangleCount = mesh->triCount;
-      meshData.vtx = resources->createVertexDeviceBuffer(sizeof(Vec3f) * 3 * meshData.triangleCount);
-      meshData.nrm = resources->createVertexDeviceBuffer(sizeof(Vec3f) * 3 * meshData.triangleCount);
-      meshData.tex = resources->createVertexDeviceBuffer(sizeof(Vec2f) * 3 * meshData.triangleCount);
-      meshData.col = resources->createVertexDeviceBuffer(sizeof(uint32_t) * 3 * meshData.triangleCount);
+      meshData.vtx = resources->createVertexDeviceBuffer(sizeof(Vertex) * 3 * meshData.triangleCount);
 
       Vector<uint32_t> indices;
+      auto vtxStaging = resources->createStagingBuffer(meshData.vtx.resource->requestedSize);
+
       {
-        auto vtxStaging = resources->createStagingBuffer(meshData.vtx.resource->requestedSize);
-        auto nrmStaging = resources->createStagingBuffer(meshData.nrm.resource->requestedSize);
-        auto texStaging = resources->createStagingBuffer(meshData.tex.resource->requestedSize);
-        {
-          MappedBuffer<Vec3f> vtxMap(vCtx, vtxStaging);
-          MappedBuffer<Vec3f> nrmMap(vCtx, nrmStaging);
-          MappedBuffer<Vec2f> texMap(vCtx, texStaging);
-
-          if (mesh->nrmCount) {
-            if (mesh->texCount) {
-              for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
-                vtxMap.mem[i] = mesh->vtx[mesh->triVtxIx[i]];
-                nrmMap.mem[i] = mesh->nrm[mesh->triNrmIx[i]];
-                texMap.mem[i] = 10.f*mesh->tex[mesh->triTexIx[i]];
-              }
+        MappedBuffer<Vertex> vtxMap(vCtx, vtxStaging);
+        if (mesh->nrmCount) {
+          if (mesh->texCount) {
+            for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
+              vtxMap.mem[i] = Vertex(mesh->vtx[mesh->triVtxIx[i]],
+                                     mesh->nrm[mesh->triNrmIx[i]],
+                                     10.f*mesh->tex[mesh->triTexIx[i]],
+                                     mesh->triColor[i / 3]);
             }
-            else {
+          }
+          else {
 
-              Vector<uint32_t> newVertices;
+            Vector<uint32_t> newVertices;
 
-              uniqueIndices(logger, indices, newVertices, mesh->triVtxIx, mesh->triNrmIx, 3*mesh->triCount);
+            uniqueIndices(logger, indices, newVertices, mesh->triVtxIx, mesh->triNrmIx, 3 * mesh->triCount);
 
-              for (uint32_t i = 0; i < newVertices.size32(); i++) {
-                auto ix = newVertices[i];
-                vtxMap.mem[i] = mesh->vtx[mesh->triVtxIx[ix]];
-                nrmMap.mem[i] = mesh->nrm[mesh->triNrmIx[ix]];
-                texMap.mem[i] = Vec2f(0.5f);
+            for (uint32_t i = 0; i < newVertices.size32(); i++) {
+              auto ix = newVertices[i];
+              vtxMap.mem[i] = Vertex(mesh->vtx[mesh->triVtxIx[ix]],
+                                     mesh->nrm[mesh->triNrmIx[ix]],
+                                     Vec2f(0.5f),
+                                     0xdddddd);
+            }
+          }
+        }
+        else {
+          if (mesh->texCount) {
+            for (unsigned i = 0; i < mesh->triCount; i++) {
+              Vec3f p[3];
+              for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
+              auto n = cross(p[1] - p[0], p[2] - p[0]);
+              for (unsigned k = 0; k < 3; k++) {
+                vtxMap.mem[3 * i + k] = Vertex(p[k],
+                                               n,
+                                               10.f*mesh->tex[mesh->triTexIx[3 * i + k]],
+                                               mesh->triColor[i]);
               }
             }
           }
           else {
-            if (mesh->texCount) {
-              for (unsigned i = 0; i < mesh->triCount; i++) {
-                Vec3f p[3];
-                for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
-                auto n = cross(p[1] - p[0], p[2] - p[0]);
-                for (unsigned k = 0; k < 3; k++) {
-                  vtxMap.mem[3 * i + k] = p[k];
-                  nrmMap.mem[3 * i + k] = n;
-                  texMap.mem[3 * i + k] = 10.f*mesh->tex[mesh->triTexIx[3 * i + k]];
-                }
-              }
-            }
-            else {
-              for (unsigned i = 0; i < mesh->triCount; i++) {
-                Vec3f p[3];
-                for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
-                auto n = cross(p[1] - p[0], p[2] - p[0]);
-                for (unsigned k = 0; k < 3; k++) {
-                  vtxMap.mem[3 * i + k] = p[k];
-                  nrmMap.mem[3 * i + k] = n;
-                  texMap.mem[3 * i + k] = Vec2f(0.5f);
-                }
+            for (unsigned i = 0; i < mesh->triCount; i++) {
+              Vec3f p[3];
+              for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
+              auto n = cross(p[1] - p[0], p[2] - p[0]);
+              for (unsigned k = 0; k < 3; k++) {
+                vtxMap.mem[3 * i + k] = Vertex(p[k],
+                                               n,
+                                               Vec2f(0.5f),
+                                               mesh->triColor[i]);
               }
             }
           }
-          vCtx->frameManager->copyBuffer(meshData.vtx, vtxStaging, meshData.vtx.resource->requestedSize);
-          vCtx->frameManager->copyBuffer(meshData.nrm, nrmStaging, meshData.nrm.resource->requestedSize);
-          vCtx->frameManager->copyBuffer(meshData.tex, texStaging, meshData.tex.resource->requestedSize);
         }
+        vCtx->frameManager->copyBuffer(meshData.vtx, vtxStaging, meshData.vtx.resource->requestedSize);
       }
 
       if (indices.any()) {
@@ -206,30 +224,6 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
       }
 
       logger(0, "Updated geometry of MeshData item");
-    }
-
-    if (meshData.colorGeneration != mesh->colorGeneration) {
-      meshData.colorGeneration = mesh->colorGeneration;
-
-      auto stagingBuf = vCtx->resources->createStagingBuffer(meshData.col.resource->requestedSize);
-      {
-        MappedBuffer<RGBA8> map(vCtx, stagingBuf);
-        for (unsigned i = 0; i < meshData.triangleCount; i++) {
-          auto color = meshData.src->currentColor[i];
-
-          RGBA8 col;
-          col.r = (color >> 16) & 0xff;
-          col.g = (color >> 8) & 0xff;
-          col.b = (color) & 0xff;
-          col.a = 255;
-
-          map.mem[3 * i + 0] = col;
-          map.mem[3 * i + 1] = col;
-          map.mem[3 * i + 2] = col;
-        }
-      }
-      vCtx->frameManager->copyBuffer(meshData.col, stagingBuf, meshData.col.resource->requestedSize);
-      logger(0, "Updated color of MeshData item");
     }
   }
   meshData.swap(newMeshData);
@@ -295,24 +289,22 @@ void RenderSolid::buildPipelines(RenderPassHandle pass)
     for (unsigned i = 0; i < inputAttrib.size(); i++) {
       inputAttrib[i] = { 0 };
       inputAttrib[i].location = i;
-      inputAttrib[i].binding = i;
     }
+    inputAttrib[0].offset = offsetof(Vertex, Vertex::pos);
     inputAttrib[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    inputAttrib[1].offset = offsetof(Vertex, Vertex::nrm);
     inputAttrib[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+    inputAttrib[2].offset = offsetof(Vertex, Vertex::tex);
     inputAttrib[2].format = VK_FORMAT_R32G32_SFLOAT;
+    inputAttrib[3].offset = offsetof(Vertex, Vertex::color);
     inputAttrib[3].format = VK_FORMAT_R8G8B8A8_UNORM;
 
-    Vector<VkVertexInputBindingDescription> inputBind(4);
-    for (unsigned i = 0; i < inputBind.size(); i++) {
-      inputBind[i] = { 0 };
-      inputBind[i].binding = i;
-      inputBind[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    }
-    inputBind[0].stride = sizeof(Vec3f);
-    inputBind[1].stride = sizeof(Vec3f);
-    inputBind[2].stride = sizeof(Vec2f);
-    inputBind[3].stride = sizeof(uint32_t);
-    vanillaPipeline = resources->createPipeline(inputBind,
+    VkVertexInputBindingDescription inputBinding{};
+    inputBinding.binding = 0;
+    inputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    inputBinding.stride = sizeof(Vertex);
+
+    vanillaPipeline = resources->createPipeline({ inputBinding },
                                                 inputAttrib,
                                                 pipeLayoutInfo,
                                                 objBufLayoutInfo,
@@ -445,12 +437,8 @@ void RenderSolid::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4
       map.mem->Ncol2 = Vec4f(N.cols[2], 0.f);
     }
 
-    VkBuffer buffers[4] = {
-      item.vtx.resource->buffer,
-      item.nrm.resource->buffer,
-      item.tex.resource->buffer,
-      item.col.resource->buffer };
-    VkDeviceSize offsets[ARRAYSIZE(buffers)] = { 0, 0, 0, 0 };
+    VkBuffer buffers[1] = { item.vtx.resource->buffer };
+    VkDeviceSize offsets[ARRAYSIZE(buffers)] = { 0 };
     vkCmdBindVertexBuffers(cmdBuf, 0, ARRAYSIZE(buffers), buffers, offsets);
 
     if (texturing != Texturing::None) {

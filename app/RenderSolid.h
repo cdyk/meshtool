@@ -47,9 +47,6 @@ private:
     uint32_t colorGeneration = 0;
 
     RenderBufferHandle vtx;
-    RenderBufferHandle nrm;
-    RenderBufferHandle tex;
-    RenderBufferHandle col;
 
     RenderBufferHandle indices;
     uint32_t triangleCount = 0;
