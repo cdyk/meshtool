@@ -48,12 +48,10 @@ RenderTangents::RenderTangents(Logger logger, App* app) :
 void RenderTangents::init()
 {
   auto * vCtx = app->vCtx;
+  auto * resources = vCtx->resources;
 
-  Vector<ShaderInputSpec> stages(2);
-  stages[0] = { coordSysVS, sizeof(coordSysVS), VK_SHADER_STAGE_VERTEX_BIT };
-  stages[1] = { flatPS, sizeof(flatPS), VK_SHADER_STAGE_FRAGMENT_BIT };
-  shader = vCtx->resources->createShader(stages);
-
+  vertexShader = resources->createShader(coordSysVS, sizeof(coordSysVS), VK_SHADER_STAGE_VERTEX_BIT);
+  fragmentShader = resources->createShader(flatPS, sizeof(flatPS), VK_SHADER_STAGE_FRAGMENT_BIT);
 
   renaming.resize(10);
   for (size_t i = 0; i < renaming.size(); i++) {
@@ -235,7 +233,7 @@ void RenderTangents::buildPipelines(RenderPassHandle pass)
                                          pipeLayoutInfo,
                                          objBufLayoutInfo,
                                          pass,
-                                         shader,
+                                         {vertexShader, fragmentShader},
                                          cullNothingRasInfo,
                                          VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
     logger(0, "Built RenderTangents pipeline.");

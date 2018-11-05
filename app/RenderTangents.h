@@ -41,7 +41,10 @@ private:
   Vector<MeshData> newMeshData;
 
   RenderBufferHandle coordSysVtxCol;
-  ShaderHandle shader;
+
+  ShaderHandle vertexShader;
+  ShaderHandle fragmentShader;
+
   PipelineHandle pipeline;
 
   uint32_t viewport[4];

@@ -24,7 +24,9 @@ private:
 
   VkPhysicalDeviceRaytracingPropertiesNVX rtProps;
 
-  ShaderHandle shader;
+  ShaderHandle rgenShader;
+  ShaderHandle chitShader;
+  ShaderHandle missShader;
   PipelineHandle pipeline;
 
   VkDescriptorPool descPool = VK_NULL_HANDLE;

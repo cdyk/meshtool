@@ -22,10 +22,10 @@ namespace {
   void destroyShader(void* data, Shader* shader)
   {
     auto device = ((VulkanContext*)data)->device;
-    for (size_t i = 0; i < shader->stageCreateInfo.size(); i++) {
-      vkDestroyShaderModule(device, shader->stageCreateInfo[i].module, nullptr);
+    if (shader->stageCreateInfo.module) {
+      vkDestroyShaderModule(device, shader->stageCreateInfo.module, nullptr);
     }
-    shader->stageCreateInfo.resize(0);
+    shader->stageCreateInfo.module = nullptr;
   }
 
   void destroyPipeline(void* data, Pipeline* pipe)
@@ -188,13 +188,13 @@ PipelineHandle VulkanResources::createPipeline()
 
 
 PipelineHandle VulkanResources::createPipeline(Vector<VkVertexInputBindingDescription>& inputBind,
-                                                     Vector<VkVertexInputAttributeDescription>& inputAttrib,
-                                                     VkPipelineLayoutCreateInfo& pipelineLayoutInfo_,
-                                                     VkDescriptorSetLayoutCreateInfo& descLayoutInfo,
-                                                     RenderPassHandle renderPass,
-                                                     ShaderHandle shader,
-                                                     const VkPipelineRasterizationStateCreateInfo& rasterizationInfo,
-                                                     VkPrimitiveTopology primitiveTopology)
+                                               Vector<VkVertexInputAttributeDescription>& inputAttrib,
+                                               VkPipelineLayoutCreateInfo& pipelineLayoutInfo_,
+                                               VkDescriptorSetLayoutCreateInfo& descLayoutInfo,
+                                               RenderPassHandle renderPass,
+                                               Vector<ShaderHandle> shaders,
+                                               const VkPipelineRasterizationStateCreateInfo& rasterizationInfo,
+                                               VkPrimitiveTopology primitiveTopology)
 {
   auto pipeHandle = pipelineResources.createResource();
   auto * pipe = pipeHandle.resource;
@@ -300,6 +300,12 @@ PipelineHandle VulkanResources::createPipeline(Vector<VkVertexInputBindingDescri
   viewportCI.pScissors = nullptr;
   viewportCI.pViewports = nullptr;
 
+
+  Vector<VkPipelineShaderStageCreateInfo> stages(shaders.size());
+  for (size_t i = 0; i < shaders.size(); i++) {
+    stages[i] = shaders[i].resource->stageCreateInfo;
+  }
+
   VkGraphicsPipelineCreateInfo pipelineCI;
   pipelineCI.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
   pipelineCI.pNext = nullptr;
@@ -316,8 +322,8 @@ PipelineHandle VulkanResources::createPipeline(Vector<VkVertexInputBindingDescri
   pipelineCI.pDynamicState = &dynamicState;
   pipelineCI.pViewportState = &viewportCI;
   pipelineCI.pDepthStencilState = &depthStencilCI;
-  pipelineCI.pStages = shader.resource->stageCreateInfo.data();
-  pipelineCI.stageCount = uint32_t(shader.resource->stageCreateInfo.size());
+  pipelineCI.pStages = stages.data();
+  pipelineCI.stageCount = stages.size32();
   pipelineCI.renderPass = renderPass.resource->pass;
   pipelineCI.subpass = 0;
 
@@ -397,38 +403,23 @@ DescriptorSetHandle VulkanResources::createDescriptorSet(VkDescriptorSetLayout d
   return descSetHandle;
 }
 
-ShaderHandle VulkanResources::createShader(Vector<ShaderInputSpec>& spec, const char* name)
+
+ShaderHandle VulkanResources::createShader(uint32_t* spv, size_t siz, VkShaderStageFlagBits stage)
 {
-  //char buf[256];
+  auto device = vCtx->device;
 
   auto shaderHandle = shaderResources.createResource();
   auto * shader = shaderHandle.resource;
 
-  shader->stageCreateInfo.resize(spec.size());
-  for (size_t i = 0; i < spec.size(); i++) {
-    auto& info = shader->stageCreateInfo[i];
-    info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    info.pNext = nullptr;
-    info.pSpecializationInfo = nullptr;
-    info.flags = 0;
-    info.pName = "main";
-    info.stage = spec[i].stage;
+  auto & stageInfo = shader->stageCreateInfo;
+  stageInfo.pName = "main";
+  stageInfo.stage = stage;
 
-    VkShaderModuleCreateInfo moduleCreateInfo;
-    moduleCreateInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    moduleCreateInfo.pNext = nullptr;
-    moduleCreateInfo.flags = 0;
-    moduleCreateInfo.codeSize = spec[i].siz;
-    moduleCreateInfo.pCode = spec[i].spv;
-    auto rv = vkCreateShaderModule(vCtx->device, &moduleCreateInfo, nullptr, &info.module);
-    assert(rv == VK_SUCCESS);
+  VkShaderModuleCreateInfo moduleCreateInfo{ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+  moduleCreateInfo.codeSize = siz;
+  moduleCreateInfo.pCode = spv;
+  CHECK_VULKAN(vkCreateShaderModule(device, &moduleCreateInfo, nullptr, &stageInfo.module));
 
-    //if (name) {
-    //  snprintf(buf, sizeof(buf), "%s:stage%d", name, int(i));
-    //  annotate(VK_DEBUG_REPORT_OBJECT_TYPE_SHADER_MODULE_EXT, uint64_t(shader->stageCreateInfo[i].module), buf);
-    //}
-
-  }
   return shaderHandle;
 }
 

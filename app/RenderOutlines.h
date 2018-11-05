@@ -46,10 +46,13 @@ private:
   Vector<MeshData> meshData;
   Vector<MeshData> newMeshData;
 
+  ShaderHandle vertexShader;
+  ShaderHandle fragmentShader;
+
+
   PipelineHandle linePipeline;
 
 
-  ShaderHandle flatShader;
 
   uint32_t viewport[4];
   uint32_t frameCount;

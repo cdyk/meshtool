@@ -62,19 +62,11 @@ RenderSolid::RenderSolid(Logger logger, App* app) :
 void RenderSolid::init()
 {
   auto * vCtx = app->vCtx;
+  auto * resources = vCtx->resources;
 
-  {
-    Vector<ShaderInputSpec> stages(2);
-    stages[0] = { vanillaVS, sizeof(vanillaVS), VK_SHADER_STAGE_VERTEX_BIT };
-    stages[1] = { vanillaPS, sizeof(vanillaPS), VK_SHADER_STAGE_FRAGMENT_BIT };
-    vanillaShader = vCtx->resources->createShader(stages);
-  }
-  {
-    Vector<ShaderInputSpec> stages(2);
-    stages[0] = { vanillaVS, sizeof(vanillaVS), VK_SHADER_STAGE_VERTEX_BIT };
-    stages[1] = { texturedPS, sizeof(texturedPS), VK_SHADER_STAGE_FRAGMENT_BIT };
-    texturedShader = vCtx->resources->createShader(stages);
-  }
+  vertexShader = resources->createShader(vanillaVS, sizeof(vanillaVS), VK_SHADER_STAGE_VERTEX_BIT);
+  solidShader = resources->createShader(vanillaPS, sizeof(vanillaPS), VK_SHADER_STAGE_FRAGMENT_BIT);
+  texturedShader = resources->createShader(texturedPS, sizeof(texturedPS), VK_SHADER_STAGE_FRAGMENT_BIT);
 
   renaming.resize(10);
   for (size_t i = 0; i < renaming.size(); i++) {
@@ -254,6 +246,7 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
 void RenderSolid::buildPipelines(RenderPassHandle pass)
 {
   auto * vCtx = app->vCtx;
+  auto * resources = vCtx->resources;
 
   VkDescriptorSetLayoutBinding objBufLayoutBinding[1];
   objBufLayoutBinding[0] = {};
@@ -319,13 +312,13 @@ void RenderSolid::buildPipelines(RenderPassHandle pass)
     inputBind[1].stride = sizeof(Vec3f);
     inputBind[2].stride = sizeof(Vec2f);
     inputBind[3].stride = sizeof(uint32_t);
-    vanillaPipeline = vCtx->resources->createPipeline(inputBind,
-                                                      inputAttrib,
-                                                      pipeLayoutInfo,
-                                                      objBufLayoutInfo,
-                                                      pass,
-                                                      vanillaShader,
-                                                      cullBackDepthBiasRasInfo);
+    vanillaPipeline = resources->createPipeline(inputBind,
+                                                inputAttrib,
+                                                pipeLayoutInfo,
+                                                objBufLayoutInfo,
+                                                pass,
+                                                { vertexShader, solidShader },
+                                                cullBackDepthBiasRasInfo);
   }
 
   {
@@ -351,13 +344,13 @@ void RenderSolid::buildPipelines(RenderPassHandle pass)
     inputBind[2].stride = sizeof(Vec2f);
     inputBind[3].stride = sizeof(uint32_t);
 
-    texturedPipeline = vCtx->resources->createPipeline(inputBind,
-                                                       inputAttrib,
-                                                       pipeLayoutInfo,
-                                                       objBufSamplerLayoutInfo,
-                                                       pass,
-                                                       texturedShader,
-                                                       cullBackDepthBiasRasInfo);
+    texturedPipeline = resources->createPipeline(inputBind,
+                                                 inputAttrib,
+                                                 pipeLayoutInfo,
+                                                 objBufSamplerLayoutInfo,
+                                                 pass,
+                                                 { vertexShader, texturedShader },
+                                                 cullBackDepthBiasRasInfo);
   }
 
   for (size_t i = 0; i < renaming.size(); i++) {

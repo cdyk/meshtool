@@ -151,6 +151,7 @@ VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
 void Raycaster::buildPipeline()
 {
   auto * vCtx = app->vCtx;
+  auto * resources = vCtx->resources;
 
   rtProps = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAYTRACING_PROPERTIES_NVX };
   VkPhysicalDeviceProperties2 props2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
@@ -161,16 +162,17 @@ void Raycaster::buildPipeline()
   logger(0, "rtprops.maxRecursionDepth=%d", rtProps.maxRecursionDepth);
   logger(0, "rtprops.maxGeometryCount=%d", rtProps.maxGeometryCount);
 
+  rgenShader = resources->createShader(raytrace_rgen, sizeof(raytrace_rgen), VK_SHADER_STAGE_RAYGEN_BIT_NVX);
+  chitShader = resources->createShader(raytrace_rchit, sizeof(raytrace_rchit), VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX);
+  missShader = resources->createShader(raytrace_rmiss, sizeof(raytrace_rmiss), VK_SHADER_STAGE_MISS_BIT_NVX);
 
-  Vector<ShaderInputSpec> stages(3);
-  stages[0] = { raytrace_rgen, sizeof(raytrace_rgen), VK_SHADER_STAGE_RAYGEN_BIT_NVX };
-  stages[1] = { raytrace_rchit, sizeof(raytrace_rchit), VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX };
-  stages[2] = { raytrace_rmiss, sizeof(raytrace_rmiss), VK_SHADER_STAGE_MISS_BIT_NVX };
+  VkPipelineShaderStageCreateInfo stages[] = {
+    rgenShader.resource->stageCreateInfo,
+    chitShader.resource->stageCreateInfo,
+    missShader.resource->stageCreateInfo,
+  };
+  uint32_t groupNumbers[ARRAYSIZE(stages)] = { 0, 1, 2 };
 
-  uint32_t groupNumbers[4] = { 0, 1, 2 };
-
-  shader = vCtx->resources->createShader(stages);
-  assert(shader.resource->stageCreateInfo.size() == stages.size());
 
   pipeline = vCtx->resources->createPipeline();
   auto * pipe = pipeline.resource;
@@ -190,8 +192,8 @@ void Raycaster::buildPipeline()
   {
 
     VkRaytracingPipelineCreateInfoNVX info = { VK_STRUCTURE_TYPE_RAYTRACING_PIPELINE_CREATE_INFO_NVX };
-    info.pStages = shader.resource->stageCreateInfo.data();
-    info.stageCount = shader.resource->stageCreateInfo.size32();
+    info.pStages = stages;
+    info.stageCount = ARRAYSIZE(stages);
     info.pGroupNumbers = groupNumbers;
     info.maxRecursionDepth = 10;
     info.layout = pipe->pipeLayout;

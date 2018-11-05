@@ -5,12 +5,6 @@
 
 class VulkanContext;
 
-struct ShaderInputSpec {
-  uint32_t* spv;
-  size_t siz;
-  VkShaderStageFlagBits stage;
-};
-
 struct DescriptorSet : ResourceBase
 {
   DescriptorSet(ResourceManagerBase& manager): ResourceBase(manager) {}
@@ -21,7 +15,7 @@ typedef ResourceHandle<DescriptorSet> DescriptorSetHandle;
 struct Shader : ResourceBase
 {
   Shader(ResourceManagerBase& manager) : ResourceBase(manager) {}
-  Vector<VkPipelineShaderStageCreateInfo> stageCreateInfo;
+  VkPipelineShaderStageCreateInfo stageCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
 };
 typedef ResourceHandle<Shader> ShaderHandle;
 
@@ -147,7 +141,7 @@ public:
                                 VkPipelineLayoutCreateInfo& pipelineLayoutInfo,
                                 VkDescriptorSetLayoutCreateInfo& descLayoutInfo,
                                 RenderPassHandle renderPass,
-                                ShaderHandle shader,
+                                Vector<ShaderHandle> shaders,
                                 const VkPipelineRasterizationStateCreateInfo& rasterizationInfo,
                                 VkPrimitiveTopology primitiveTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
@@ -160,12 +154,10 @@ public:
 
   DescriptorSetHandle createDescriptorSet(VkDescriptorSetLayout descLayout);
 
-  ShaderHandle createShader(Vector<ShaderInputSpec>& spec, const char* name = nullptr);
+  ShaderHandle createShader(uint32_t* spv, size_t siz, VkShaderStageFlagBits stage);
   RenderPassHandle createRenderPass(VkAttachmentDescription* attachments, uint32_t attachmentCount,
                                     VkSubpassDescription* subpasses, uint32_t subpassCount,
                                     VkSubpassDependency* dependency);
-  //RenderImageHandle wrapRenderImageView(VkImageView view);
-
 
   ImageHandle createImage(VkImageCreateInfo& imageCreateInfo);
   ImageHandle createImage(uint32_t w, uint32_t h, VkImageUsageFlags usageFlags, VkFormat format);

@@ -58,13 +58,10 @@ RenderOutlines::RenderOutlines(Logger logger, App* app) :
 void RenderOutlines::init()
 {
   auto * vCtx = app->vCtx;
+  auto * resources = vCtx->resources;
 
-  {
-    Vector<ShaderInputSpec> stages(2);
-    stages[0] = { flatVS, sizeof(flatVS), VK_SHADER_STAGE_VERTEX_BIT };
-    stages[1] = { flatPS, sizeof(flatPS), VK_SHADER_STAGE_FRAGMENT_BIT };
-    flatShader = vCtx->resources->createShader(stages);
-  }
+  vertexShader = resources->createShader(flatVS, sizeof(flatVS), VK_SHADER_STAGE_VERTEX_BIT);
+  fragmentShader = resources->createShader(flatPS, sizeof(flatPS), VK_SHADER_STAGE_FRAGMENT_BIT);
 
   renaming.resize(10);
   for (size_t i = 0; i < renaming.size(); i++) {
@@ -217,7 +214,7 @@ void RenderOutlines::buildPipelines(RenderPassHandle pass)
                                                  pipeLayoutInfo,
                                                  objBufLayoutInfo,
                                                  pass,
-                                                 flatShader,
+                                                 {vertexShader, fragmentShader},
                                                  cullNothingRasInfo,
                                                  VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
 

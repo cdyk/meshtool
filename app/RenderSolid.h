@@ -62,7 +62,8 @@ private:
   PipelineHandle vanillaPipeline;
   PipelineHandle texturedPipeline;
 
-  ShaderHandle vanillaShader;
+  ShaderHandle vertexShader;
+  ShaderHandle solidShader;
   ShaderHandle texturedShader;
 
   uint32_t viewport[4];
