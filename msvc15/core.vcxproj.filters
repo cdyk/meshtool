@@ -102,5 +102,8 @@
     <ClInclude Include="..\core\MeshIndexing.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="..\core\Half.h">
+      <Filter>src\topo</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -7,6 +7,7 @@
 #include "VulkanContext.h"
 #include "RenderTextureManager.h"
 #include "LinAlgOps.h"
+#include "Half.h"
 
 struct ObjectBuffer
 {
@@ -34,8 +35,8 @@ namespace {
   struct Vertex
   {
     Vec3f pos;
-    Vec3f nrm;
-    Vec2f tex;
+    uint8_t nrm[4];
+    uint16_t tex[2];
     uint8_t color[4];
 
     Vertex(const Vec3f& p,
@@ -44,16 +45,20 @@ namespace {
            const uint32_t c)
     {
       pos = p;
-      nrm = n;
-      tex = t;
+      auto nn = normalize(n);
+      nrm[0] = uint8_t(127.f*nn.x + 127.f);
+      nrm[1] = uint8_t(127.f*nn.y + 127.f);
+      nrm[2] = uint8_t(127.f*nn.z + 127.f);
+      tex[0] = halfFromFloat(t.x);
+      tex[1] = halfFromFloat(t.y);
       color[0] = (c >> 16) & 0xff;
       color[1] = (c >> 8) & 0xff;
       color[2] = (c) & 0xff;
       color[3] = 255;
     }
-
   };
-  static_assert(sizeof(Vertex) == 4 * 8 + 4);
+  //static_assert(sizeof(Vertex) == 3 * 8);
+ 
 
   struct RGBA8
   {
@@ -284,66 +289,40 @@ void RenderSolid::buildPipelines(RenderPassHandle pass)
   cullBackDepthBiasRasInfo.depthBiasClamp = 0;
   cullBackDepthBiasRasInfo.depthBiasSlopeFactor = 1;
   cullBackDepthBiasRasInfo.lineWidth = 1.0f;
-  {
-    Vector<VkVertexInputAttributeDescription> inputAttrib(4);
-    for (unsigned i = 0; i < inputAttrib.size(); i++) {
-      inputAttrib[i] = { 0 };
-      inputAttrib[i].location = i;
-    }
-    inputAttrib[0].offset = offsetof(Vertex, Vertex::pos);
-    inputAttrib[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-    inputAttrib[1].offset = offsetof(Vertex, Vertex::nrm);
-    inputAttrib[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    inputAttrib[2].offset = offsetof(Vertex, Vertex::tex);
-    inputAttrib[2].format = VK_FORMAT_R32G32_SFLOAT;
-    inputAttrib[3].offset = offsetof(Vertex, Vertex::color);
-    inputAttrib[3].format = VK_FORMAT_R8G8B8A8_UNORM;
 
-    VkVertexInputBindingDescription inputBinding{};
-    inputBinding.binding = 0;
-    inputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    inputBinding.stride = sizeof(Vertex);
+  Vector<VkVertexInputAttributeDescription> inputAttrib(4);
+  for (unsigned i = 0; i < inputAttrib.size(); i++) {
+    inputAttrib[i] = { 0 };
+    inputAttrib[i].location = i;
+  }
+  inputAttrib[0].offset = offsetof(Vertex, Vertex::pos);
+  inputAttrib[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+  inputAttrib[1].offset = offsetof(Vertex, Vertex::nrm);
+  inputAttrib[1].format = VK_FORMAT_R8G8B8A8_UINT;
+  inputAttrib[2].offset = offsetof(Vertex, Vertex::tex);
+  inputAttrib[2].format = VK_FORMAT_R16G16_SFLOAT;
+  inputAttrib[3].offset = offsetof(Vertex, Vertex::color);
+  inputAttrib[3].format = VK_FORMAT_R8G8B8A8_UNORM;
 
-    vanillaPipeline = resources->createPipeline({ inputBinding },
+  VkVertexInputBindingDescription inputBinding{};
+  inputBinding.binding = 0;
+  inputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+  inputBinding.stride = sizeof(Vertex);
+
+  vanillaPipeline = resources->createPipeline({ inputBinding },
                                                 inputAttrib,
                                                 pipeLayoutInfo,
                                                 objBufLayoutInfo,
                                                 pass,
                                                 { vertexShader, solidShader },
                                                 cullBackDepthBiasRasInfo);
-  }
-
-  {
-    Vector<VkVertexInputAttributeDescription> inputAttrib(4);
-    for (unsigned i = 0; i < inputAttrib.size(); i++) {
-      inputAttrib[i] = { 0 };
-      inputAttrib[i].location = i;
-      inputAttrib[i].binding = i;
-    }
-    inputAttrib[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-    inputAttrib[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    inputAttrib[2].format = VK_FORMAT_R32G32_SFLOAT;
-    inputAttrib[3].format = VK_FORMAT_R8G8B8A8_UNORM;
-
-    Vector<VkVertexInputBindingDescription> inputBind(4);
-    for (unsigned i = 0; i < inputBind.size(); i++) {
-      inputBind[i] = { 0 };
-      inputBind[i].binding = i;
-      inputBind[i].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-    }
-    inputBind[0].stride = sizeof(Vec3f);
-    inputBind[1].stride = sizeof(Vec3f);
-    inputBind[2].stride = sizeof(Vec2f);
-    inputBind[3].stride = sizeof(uint32_t);
-
-    texturedPipeline = resources->createPipeline(inputBind,
-                                                 inputAttrib,
-                                                 pipeLayoutInfo,
-                                                 objBufSamplerLayoutInfo,
-                                                 pass,
-                                                 { vertexShader, texturedShader },
-                                                 cullBackDepthBiasRasInfo);
-  }
+  texturedPipeline = resources->createPipeline({ inputBinding },
+                                               inputAttrib,
+                                               pipeLayoutInfo,
+                                               objBufSamplerLayoutInfo,
+                                               pass,
+                                               { vertexShader, texturedShader },
+                                               cullBackDepthBiasRasInfo);
 
   for (size_t i = 0; i < renaming.size(); i++) {
     renaming[i].objBufDescSet = vCtx->resources->createDescriptorSet(vanillaPipeline.resource->descLayout);

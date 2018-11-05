@@ -9,7 +9,7 @@ layout(std140, binding = 0) uniform ObjBuf{
 
 
 layout(location = 0) in vec3 pos;
-layout(location = 1) in vec3 nrm;
+layout(location = 1) in uvec3 nrm;
 layout(location = 2) in vec2 tex;
 layout(location = 3) in vec4 inColor;
 
@@ -19,7 +19,8 @@ layout(location = 2) out vec2 texCoord;
 
 
 void main() {
-  normal = normalize(objBuf.N * nrm);
+  normal = normalize(objBuf.N * ((1.f/127.f)*nrm - vec3(1)));
+  //albedo = vec4(abs(nrm), 1);//  inColor;
   albedo = inColor;
   texCoord = tex;
   gl_Position = objBuf.MP * vec4(pos, 1);

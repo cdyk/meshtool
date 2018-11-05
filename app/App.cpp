@@ -377,7 +377,7 @@ void App::render(const Vec4f& viewport)
   cpuTimeAcc += (cpuStop - cpuStart);
   cpuTimeAccN++;
 
-  if (10 < cpuTimeAccN || 0.5 < (cpuTimeAcc / cpuTimeAccN)) {
+  if (100 < cpuTimeAccN || 0.5 < (cpuTimeAcc / cpuTimeAccN)) {
     auto fps = cpuTimeAccN / (glfwGetTime() - fpsStart);
     fpsStart = glfwGetTime();
 

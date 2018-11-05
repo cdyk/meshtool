@@ -141,6 +141,7 @@
   <ItemGroup>
     <ClInclude Include="..\core\adt\KeyedHeap.h" />
     <ClInclude Include="..\core\Common.h" />
+    <ClInclude Include="..\core\Half.h" />
     <ClInclude Include="..\core\HandlePicking.h" />
     <ClInclude Include="..\core\LinAlg.h" />
     <ClInclude Include="..\core\LinAlgOps.h" />
