@@ -168,12 +168,12 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
       {
         MappedBuffer<Vertex> vtxMap(vCtx, vtxStaging);
         if (mesh->nrmCount) {
-          if (false && mesh->texCount) {
+          if (mesh->texCount) {
             for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
               vtxMap.mem[i] = Vertex(mesh->vtx[mesh->triVtxIx[i]],
                                      mesh->nrm[mesh->triNrmIx[i]],
                                      10.f*mesh->tex[mesh->triTexIx[i]],
-                                     mesh->triColor[i / 3]);
+                                     mesh->currentColor[i / 3]);
             }
           }
           else {
@@ -201,7 +201,7 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
                 vtxMap.mem[3 * i + k] = Vertex(p[k],
                                                n,
                                                10.f*mesh->tex[mesh->triTexIx[3 * i + k]],
-                                               mesh->triColor[i]);
+                                               mesh->currentColor[i]);
               }
             }
           }
@@ -214,7 +214,7 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
                 vtxMap.mem[3 * i + k] = Vertex(p[k],
                                                n,
                                                Vec2f(0.5f),
-                                               mesh->triColor[i]);
+                                               mesh->currentColor[i]);
               }
             }
           }
@@ -233,7 +233,7 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
         float fifo4, fifo8, fifo16, fifo32;
         getAverageCacheMissRatioPerTriangle(fifo4, fifo8, fifo16, fifo32, indices.data(), indices.size32());
         logger(0, "IN  AMCR FIFO4=%.2f, FIFO8=%.2f, FIFO16=%.2f, FIFO32=%.2f", fifo4, fifo8, fifo16, fifo32);
-        linearSpeedVertexCacheOptimisation(logger, reindices.data(), indices.data(), indices.size32());
+        //linearSpeedVertexCacheOptimisation(logger, reindices.data(), indices.data(), indices.size32());
         getAverageCacheMissRatioPerTriangle(fifo4, fifo8, fifo16, fifo32, reindices.data(), indices.size32());
         logger(0, "OPT AMCR FIFO4=%.2f, FIFO8=%.2f, FIFO16=%.2f, FIFO32=%.2f", fifo4, fifo8, fifo16, fifo32);
         indices.swap(reindices);
@@ -250,7 +250,7 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
         meshData.indices = RenderBufferHandle();
       }
 
-      logger(0, "Updated geometry of MeshData item");
+      logger(0, "RenderSolid: Updated MeshData item");
     }
   }
   meshData.swap(newMeshData);
