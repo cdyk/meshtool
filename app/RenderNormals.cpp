@@ -27,6 +27,13 @@ namespace {
 #include "flatPS.glsl.h"
     ;
 
+  struct Vertex {
+    Vec3f p;
+    Vec3f n;
+    uint32_t color;
+    uint32_t dummy;
+  };
+
   struct Vec3fRGBA8
   {
     Vec3f p;
@@ -89,18 +96,24 @@ void RenderNormals::update(Vector<Mesh*>& meshes)
       logger(0, "Created new RenderNormals.MeshData item.");
     }
     auto & meshData = newMeshData.back();
-    if (meshData.geometryGeneration != mesh->geometryGeneration) {
+    if (meshData.geometryGeneration != mesh->geometryGeneration || meshData.colorGeneration != mesh->colorGeneration) {
       meshData.geometryGeneration = mesh->geometryGeneration;
+      meshData.colorGeneration = mesh->colorGeneration;
 
       meshData.vertexCount = 3*mesh->triCount;
-      meshData.vtxNrm = resources->createVertexDeviceBuffer(2 * sizeof(Vec3f) * meshData.vertexCount);
+      meshData.vtxNrm = resources->createVertexDeviceBuffer(sizeof(Vertex) * meshData.vertexCount);
 
       auto vtxNrmStaging = resources->createStagingBuffer(meshData.vtxNrm.resource->requestedSize);
       {
-        MappedBuffer<Vec3f> vtxNrmMap(vCtx, vtxNrmStaging);
-        for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
-          vtxNrmMap.mem[2 * i + 0] = mesh->vtx[mesh->triVtxIx[i]];
-          vtxNrmMap.mem[2 * i + 1] = mesh->nrm[mesh->triNrmIx[i]];
+        MappedBuffer<Vertex> vtxNrmMap(vCtx, vtxNrmStaging);
+        for (unsigned t = 0; t < mesh->triCount; t++) {
+          bool selected = mesh->selected[mesh->TriObjIx[t]];
+          for (unsigned i = 0; i < 3; i++) {
+            auto k = 3 * t + i;
+            vtxNrmMap.mem[k].p = mesh->vtx[mesh->triVtxIx[k]];
+            vtxNrmMap.mem[k].n = mesh->nrm[mesh->triNrmIx[k]];
+            vtxNrmMap.mem[k].color = selected ? 0xffff88 : 0xff4444;
+          }
         }
       }
       vCtx->frameManager->copyBuffer(meshData.vtxNrm, vtxNrmStaging, meshData.vtxNrm.resource->requestedSize);
@@ -147,17 +160,22 @@ void RenderNormals::buildPipelines(RenderPassHandle pass)
   cullNothingRasInfo.depthBiasEnable = VK_FALSE;
   cullNothingRasInfo.lineWidth = 1.0f;
   {
-    Vector<VkVertexInputAttributeDescription> inputAttrib(2);
+    Vector<VkVertexInputAttributeDescription> inputAttrib(3);
     inputAttrib[0] = { 0 };
     inputAttrib[0].location = 0;
     inputAttrib[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+    inputAttrib[0].offset = offsetof(Vertex, Vertex::p);
     inputAttrib[1] = { 0 };
     inputAttrib[1].location = 1;
     inputAttrib[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-    inputAttrib[1].offset = sizeof(Vec3f);
+    inputAttrib[1].offset = offsetof(Vertex, Vertex::n);
+    inputAttrib[2] = { 0 };
+    inputAttrib[2].location = 2;
+    inputAttrib[2].format = VK_FORMAT_R8G8B8A8_UNORM;
+    inputAttrib[2].offset = offsetof(Vertex, Vertex::color);
 
     VkVertexInputBindingDescription inputBind{ 0 };
-    inputBind.stride = sizeof(Vec3f) + sizeof(Vec3f);
+    inputBind.stride = sizeof(Vertex);
     inputBind.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
 
     pipeline = resources->createPipeline({ inputBind },
@@ -228,7 +246,7 @@ void RenderNormals::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Ve
       map.mem->Ncol0 = Vec4f(N.cols[0], 0.f);
       map.mem->Ncol1 = Vec4f(N.cols[1], 0.f);
       map.mem->Ncol2 = Vec4f(N.cols[2], 0.f);
-      map.mem->scale = 0.05f;
+      map.mem->scale = 0.01f;
     }
     
 

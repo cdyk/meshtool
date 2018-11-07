@@ -32,6 +32,7 @@ private:
   {
     Mesh* src = nullptr;
     uint32_t geometryGeneration = 0;
+    uint32_t colorGeneration = 0;
     RenderBufferHandle vtxNrm;
     uint32_t vertexCount = 0;
   };
