@@ -10,6 +10,7 @@
 #include "VulkanContext.h"
 #include "RenderSolid.h"
 #include "RenderOutlines.h"
+#include "RenderNormals.h"
 #include "RenderTangents.h"
 #include "Raycaster.h"
 #include "ImGuiRenderer.h"
@@ -271,6 +272,19 @@ void App::render(const Vec4f& viewport)
     renderTangents = nullptr;
   }
 
+  if (viewNormals) {
+    if (!renderNormals) {
+      renderNormals = new RenderNormals(logger, this);
+      renderNormals->init();
+    }
+    renderNormals->update(items.meshes);
+  }
+  else if (renderNormals) {
+    delete renderNormals;
+    renderNormals = nullptr;
+  }
+
+
   if (raytrace) {
     if (raycaster == nullptr) {
       raycaster = new Raycaster(logger, this);
@@ -325,15 +339,10 @@ void App::render(const Vec4f& viewport)
 
 
     vkCmdBeginRenderPass(cmdBuf, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    if (renderSolid) {
-      renderSolid->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP);
-    }
-    if (renderOutlines) {
-      renderOutlines->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP, viewOutlines, viewLines);
-    }
-    if (renderTangents) {
-      renderTangents->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP);
-    }
+    if (renderSolid) renderSolid->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP);
+    if (renderOutlines) renderOutlines->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP, viewOutlines, viewLines);
+    if (renderNormals) renderNormals->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP);
+    if (renderTangents) renderTangents->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP);
     vkCmdEndRenderPass(cmdBuf);
   }
 

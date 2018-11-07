@@ -132,6 +132,7 @@ namespace {
       if (key == GLFW_KEY_L && action == GLFW_PRESS)  app->viewLines = !app->viewLines;
       if (key == GLFW_KEY_S && action == GLFW_PRESS)  app->viewSolid = !app->viewSolid;
       if (key == GLFW_KEY_A && action == GLFW_PRESS) app->viewTangents = !app->viewTangents;
+      if (key == GLFW_KEY_N && action == GLFW_PRESS) app->viewNormals = !app->viewNormals;
       if (key == GLFW_KEY_C && action == GLFW_PRESS) {
         switch (app->triangleColor)
         {
@@ -252,6 +253,7 @@ namespace {
         if (ImGui::MenuItem("Lines", "L", &app->viewLines)) {}
         if (ImGui::MenuItem("Outlines", "W", &app->viewOutlines)) {}
         if (ImGui::MenuItem("Tangent coordsys", "C", &app->viewTangents)) {}
+        if (ImGui::MenuItem("Normal vectors", "N", &app->viewNormals)) {}
         if (ImGui::BeginMenu("Color")) {
           bool sel[4] = {
             app->triangleColor == TriangleColor::Single,

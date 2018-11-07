@@ -27,6 +27,7 @@ struct Mesh;
 class Viewer;
 class RenderOutlines;
 class RenderTangents;
+class RenderNormals;
 class RenderSolid;
 class Raycaster;
 class ImGuiRenderer;
@@ -62,12 +63,13 @@ public:
   float thickness = 8;
   float menuHeight = 0.f;
 
-  TriangleColor triangleColor = TriangleColor::ModelColor;
+  TriangleColor triangleColor = TriangleColor::SmoothingGroup;
   bool raytrace = false;
 
   bool viewSolid = true;
   bool viewLines = true;
   bool viewOutlines = false;
+  bool viewNormals = true;
   bool viewTangents = false;
 
   bool updateColor = true;
@@ -93,6 +95,7 @@ public:
   RenderSolid* renderSolid = nullptr;
   RenderOutlines* renderOutlines = nullptr;
   RenderTangents* renderTangents = nullptr;
+  RenderNormals* renderNormals = nullptr;
   ImGuiRenderer* imGuiRenderer = nullptr;
   VulkanContext* vCtx = nullptr;
 
