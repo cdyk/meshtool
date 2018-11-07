@@ -159,14 +159,18 @@ int main(int argc, char** argv)
     };
     tasks.pushBack(app->tasks.enqueue(f));
   }
+
+  auto fence = app->tasks.enqueueFence(tasks.data(), tasks.size32());
+
   TaskFunc taskFunc = [](bool& cancel) { runObjReader(logger, "..\\models\\suzanne.obj"); };
   auto id = app->tasks.enqueue(taskFunc);
 
 
   app->tasks.wait(id);
 
-  app->tasks.waitAll();
+  app->tasks.wait(fence);
   assert(moo.load() == tasks.size32());
+  app->tasks.waitAll();
 
   while (!app->done);
   
