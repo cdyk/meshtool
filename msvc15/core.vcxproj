@@ -151,6 +151,7 @@
     <ClInclude Include="..\core\MeshIndexing.h" />
     <ClInclude Include="..\core\ResourceManager.h" />
     <ClInclude Include="..\core\spatial\R3PointKdTree.h" />
+    <ClInclude Include="..\core\Tasks.h" />
     <ClInclude Include="..\core\topo\HalfEdgeMesh.h" />
     <ClInclude Include="..\core\VertexCache.h" />
     <ClInclude Include="..\core\Viewer.h" />

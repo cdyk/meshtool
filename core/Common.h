@@ -26,23 +26,6 @@ public:
 
 
 
-typedef std::function<void(void)> TaskFunc;
-typedef unsigned TaskId;
-struct TasksImpl;
-
-struct Tasks
-{
-  ~Tasks();
-
-  void init(Logger logger);
-  TaskId enqueue(TaskFunc& func);
-  void wait(TaskId id);
-  void update();
-  void cleanup();
-
-  TasksImpl* impl = nullptr;
-};
-
 template<typename T>
 struct ListHeader
 {

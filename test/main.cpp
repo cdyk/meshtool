@@ -13,6 +13,7 @@
 #include <limits>
 
 #include "Common.h"
+#include "Tasks.h"
 #include "Half.h"
 #include "Mesh.h"
 #include "LinAlgOps.h"
@@ -145,8 +146,10 @@ int main(int argc, char** argv)
   app = new App();
   app->tasks.init(logger);
 
-  TaskFunc taskFunc = []() {runObjReader(logger, "..\\models\\suzanne.obj"); };
-  app->tasks.enqueue(taskFunc);
+  TaskFunc taskFunc = [](bool& cancel)->bool { runObjReader(logger, "..\\models\\suzanne.obj"); return true; };
+  auto id = app->tasks.enqueue(taskFunc);
+
+  app->tasks.wait(id);
 
   while (!app->done);
   

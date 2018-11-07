@@ -458,7 +458,7 @@ int main(int argc, char** argv)
       for(auto & c :argLower) c = std::tolower(c);
       auto l = argLower.rfind(".obj");
       if (l != std::string::npos) {
-        TaskFunc taskFunc = [arg]() {runObjReader(logger, arg); };
+        TaskFunc taskFunc = [arg](bool& cancel) -> bool {runObjReader(logger, arg); return true; };
         app->tasks.enqueue(taskFunc);
       }
     }
@@ -479,7 +479,6 @@ int main(int argc, char** argv)
       app->viewer->update();
     }
 
-    app->tasks.update();
     checkQueues();
 
     app->startFrame();

@@ -111,6 +111,9 @@
     <ClInclude Include="..\core\VertexCache.h">
       <Filter>src</Filter>
     </ClInclude>
+    <ClInclude Include="..\core\Tasks.h">
+      <Filter>src</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Natvis Include="..\core\core.natvis" />

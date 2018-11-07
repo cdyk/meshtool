@@ -1,85 +1,99 @@
 #include "Common.h"
+#include "Tasks.h"
 #include <list>
 #include <thread>
-
-// Mock-up of a task system - justs spawns a thread per task for now
-
-struct Task
-{
-  Task(TaskFunc& func, TaskId id) : func(func), thread(&Task::run, this), id(id) {}
-
-  TaskFunc func;
-  std::thread thread;
-  TaskId id;
-  bool done = false;
-
-  void run()
-  {
-    func();
-    done = true;
-  }
-
-};
-
-struct TasksImpl
-{
-  Logger logger;
-  std::list<Task> tasks;
-
-  TaskId nextId = 0;
-};
+#include <cassert>
 
 
 void Tasks::init(Logger logger)
 {
-  impl = new TasksImpl;
+  assert(this->logger == nullptr);
+  this->logger = logger;
+
+  workers.resize(std::thread::hardware_concurrency());
+  for (auto & w : workers) {
+    w = std::move(std::thread(&Tasks::worker, this));
+  }
+  logger(0, "Tasks: initialized with %d worker threads.", workers.size());
 }
+
+void Tasks::worker()
+{
+  Task * task = nullptr;
+  while (running)
+  {
+    {
+      std::unique_lock<std::mutex> guard(lock);
+      if (task) {
+        taskPool.release(task);
+        task = nullptr;
+      }
+      while (running && queue.empty()) {
+        workAdded.wait(guard);
+      }
+      if (queue.any()) task = queue.popBack();
+    }
+    if (task) {
+      task->state = Task::State::Running;
+      task->func(task->cancel);
+      workFinished.notify_all();
+    }
+  }
+}
+
 
 Tasks::~Tasks()
 {
   cleanup();
-  delete  impl;
-  impl = nullptr;
 }
 
 TaskId Tasks::enqueue(TaskFunc& func)
 {
-  impl->tasks.emplace_back(func, impl->nextId);
-  return impl->nextId++;
+  std::lock_guard<std::mutex> guard(lock);
+  auto * task = taskPool.alloc();
+  task->generation = generation++;
+  task->func = func;
+  task->state = Task::State::Queued;
+  queue.pushBack(task);
+  workAdded.notify_one();
+  return TaskId{ taskPool.getIndex(task), task->generation };
 }
 
-void  Tasks::wait(TaskId id)
+bool Tasks::poll(TaskId id)
 {
-  for (auto it = impl->tasks.begin(); it != impl->tasks.end();) {
-    if (it->id == id) {
-      it->thread.join();
-      it = impl->tasks.erase(it);
-    }
-    else {
-      ++it;
-    }
-  }
+  std::unique_lock<std::mutex> guard(lock);
+  auto * task = taskPool.fromIndex(id.index);
+  if (task->generation != id.generation) return true;
+  if (task->state != Task::State::Running && task->state != Task::State::Queued) return true;
+  return false;
 }
 
-void  Tasks::update()
+bool Tasks::wait(TaskId id)
 {
-  for (auto it = impl->tasks.begin(); it != impl->tasks.end();) {
-    if (it->done) {
-      it->thread.join();
-      it = impl->tasks.erase(it);
-    }
-    else {
-      ++it;
-    }
-  }
+  std::unique_lock<std::mutex> guard(lock);
+  auto * task = taskPool.fromIndex(id.index);
+  if (task->generation != id.generation) return true;
+  if (task->state != Task::State::Running && task->state != Task::State::Queued) return true;
 
+  workFinished.wait(guard, [task]() { return task->state != Task::State::Running && task->state != Task::State::Queued; });
+
+  return true;
 }
 
 
 void  Tasks::cleanup()
 {
-  for (auto it = impl->tasks.begin(); it != impl->tasks.end(); it++) {
-    if(it->thread.joinable()) it->thread.join();
+  {
+    std::lock_guard<std::mutex> guard(lock);
+    for (auto * item : queue) {
+      item->cancel = true;
+    }
+    running = false;
+    workAdded.notify_all();
+    workFinished.notify_all();
   }
-  impl->tasks.clear();
+  for (auto & w : workers) {
+    w.join();
+  }
+  workers.clear();
 }

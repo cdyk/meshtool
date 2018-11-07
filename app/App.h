@@ -2,6 +2,7 @@
 #include <mutex>
 #include "Common.h"
 #include "RenderSolid.h"
+#include "Tasks.h"
 
 #if 0
 
