@@ -7,21 +7,21 @@ typedef std::function<void(bool&)> TaskFunc;
 
 struct TaskId
 {
-  uint32_t index;
-  uint32_t generation;
+  uint16_t index = 0;
+  uint16_t generation = 0;  // a valid task will never get generation=1;
 };
 
 struct Task
 {
+  TaskFunc func;
   enum struct State {
     Uninitialized,
     Queued,
     Running
   };
-  uint32_t generation = 0;
+  uint16_t generation = 0;
   State state = State::Uninitialized;
   bool cancel = false;
-  TaskFunc func;
 };
 
 class Tasks
@@ -33,15 +33,17 @@ public:
   TaskId enqueue(TaskFunc& func);
   bool poll(TaskId id);
   bool wait(TaskId id);
+  void waitAll();
   void cleanup();
 
 private:
   Logger logger = nullptr;
   std::mutex lock;
+  uint32_t activeTasks = 0;
   std::condition_variable workAdded;
   std::condition_variable workFinished;
   Pool<Task> taskPool;
-  uint32_t generation = 1;
+  uint16_t generation = 1;
   Vector<Task*> queue;
   Vector<std::thread> workers;
   bool running = true;

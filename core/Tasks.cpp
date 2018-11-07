@@ -27,6 +27,8 @@ void Tasks::worker()
       if (task) {
         taskPool.release(task);
         task = nullptr;
+        activeTasks--;
+        workFinished.notify_all();
       }
       while (running && queue.empty()) {
         workAdded.wait(guard);
@@ -35,8 +37,9 @@ void Tasks::worker()
     }
     if (task) {
       task->state = Task::State::Running;
-      task->func(task->cancel);
-      workFinished.notify_all();
+      if(task->func) task->func(task->cancel);
+      task->~Task();
+      task->state = Task::State::Uninitialized;
     }
   }
 }
@@ -50,13 +53,18 @@ Tasks::~Tasks()
 TaskId Tasks::enqueue(TaskFunc& func)
 {
   std::lock_guard<std::mutex> guard(lock);
-  auto * task = taskPool.alloc();
+  auto * task = new(taskPool.alloc()) Task();
   task->generation = generation++;
+  if (generation == 0) generation++;
   task->func = func;
   task->state = Task::State::Queued;
   queue.pushBack(task);
+  activeTasks++;
   workAdded.notify_one();
-  return TaskId{ taskPool.getIndex(task), task->generation };
+  auto index = taskPool.getIndex(task);
+  assert(index <= 0xFFFFu);
+
+  return TaskId{ uint16_t(index), task->generation };
 }
 
 bool Tasks::poll(TaskId id)
@@ -71,13 +79,24 @@ bool Tasks::poll(TaskId id)
 bool Tasks::wait(TaskId id)
 {
   std::unique_lock<std::mutex> guard(lock);
-  auto * task = taskPool.fromIndex(id.index);
-  if (task->generation != id.generation) return true;
-  if (task->state != Task::State::Running && task->state != Task::State::Queued) return true;
-
-  workFinished.wait(guard, [task]() { return task->state != Task::State::Running && task->state != Task::State::Queued; });
-
+  while (true) {
+    auto * task = taskPool.fromIndex(id.index);
+    if (task->generation != id.generation) return true;
+    if (task->state != Task::State::Running && task->state != Task::State::Queued) return true;
+    logger(0, "waiting.. state=%d", task->state);
+    workFinished.wait(guard);
+    logger(0, "woken");
+  }
   return true;
+}
+
+void Tasks::waitAll()
+{
+  std::unique_lock<std::mutex> guard(lock);
+  while (true) {
+    if (activeTasks == 0) return;
+    workFinished.wait(guard);
+  }
 }
 
 

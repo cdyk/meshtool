@@ -2,6 +2,7 @@
 #define NOMINMAX
 #include <Windows.h>
 
+#include <atomic>
 #include <cctype>
 #include <cstdio>
 #include <chrono>
@@ -146,10 +147,26 @@ int main(int argc, char** argv)
   app = new App();
   app->tasks.init(logger);
 
-  TaskFunc taskFunc = [](bool& cancel)->bool { runObjReader(logger, "..\\models\\suzanne.obj"); return true; };
+  
+  std::atomic<uint32_t> moo = 0;
+  uint32_t foo = 0;
+  Vector<TaskId> tasks;
+  for(uint32_t i=0; i<100; i++) {
+
+    TaskFunc f = [id=foo++, &moo](bool&) {
+      std::this_thread::sleep_for(std::chrono::milliseconds((std::rand() & 0x1f) + 10));
+      moo++;
+    };
+    tasks.pushBack(app->tasks.enqueue(f));
+  }
+  TaskFunc taskFunc = [](bool& cancel) { runObjReader(logger, "..\\models\\suzanne.obj"); };
   auto id = app->tasks.enqueue(taskFunc);
 
+
   app->tasks.wait(id);
+
+  app->tasks.waitAll();
+  assert(moo.load() == tasks.size32());
 
   while (!app->done);
   
