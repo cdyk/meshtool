@@ -17,8 +17,13 @@ void VulkanFrameManager::init()
   surfaceFormat = chooseFormat(requestedFormats, VK_COLORSPACE_SRGB_NONLINEAR_KHR);
 
   Vector<VkPresentModeKHR> requestedPresentModes;
-  requestedPresentModes.pushBack(VK_PRESENT_MODE_FIFO_KHR);
+  requestedPresentModes.pushBack(VK_PRESENT_MODE_IMMEDIATE_KHR);  // no vsync.
   presentMode = choosePresentMode(requestedPresentModes);
+
+#ifndef _DEBUG
+  // Not advertised but works on nv hardware
+  presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+#endif
 
   auto * res = vCtx->resources;
   auto device = vCtx->device;
