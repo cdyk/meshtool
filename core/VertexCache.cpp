@@ -164,6 +164,59 @@ struct LinSpd
 
   void updateVertexCache(uint32_t t)
   {
+#if 1
+    // LRU implementation
+    for (uint32_t i = 0; i < 3; i++) {
+      auto v = input[3 * t + i];
+
+      auto M = unsigned(ARRAYSIZE(cache));
+
+      // try to find position of v in cache, or end of cache if not found.
+      unsigned vpos = 0;
+      for (; vpos < M && cache[vpos] != v; vpos++) {}
+
+      if (vpos != M) assert(cache[vpos] == v);
+
+      // remove element at M and free position 0 by moving everything inbetween down
+      for (unsigned i = vpos; 0 < i; i--) {
+        cache[i] = cache[i - 1];
+      }
+      cache[0] = v;
+    }
+
+    // Assert that no vertex is present twice in the cache.
+    for (uint32_t i = 0; i < cacheSize; i++) {
+      if (cache[i] == ~0u) continue;
+      for (uint32_t j = i + 1; j < cacheSize; j++) {
+        assert(cache[i] != cache[j] && "Vertex present twice in cache");
+      }
+    }
+
+    // update cache pos
+    for (uint32_t i = 0; i < cacheSize; i++) {
+      if (cache[i] == ~0u) continue;
+      vtx[cache[i]].cachePos = i;
+    }
+
+    // evict three last items in cache
+    for (uint32_t i = 0; i < 3; i++) {
+      if (cache[cacheSize + i] == ~0u) continue;
+      vtx[cache[cacheSize + i]].cachePos = ~0u;
+      vtx[cache[cacheSize + i]].score = 0.f;
+    }
+
+
+    for (uint32_t i = 0; i < cacheSize; i++) {
+      if (cache[i] == ~0u) continue;
+      assert(vtx[cache[i]].cachePos == i);
+
+      for (uint32_t j = i + 1; j < cacheSize; j++) {
+        assert(cache[i] != cache[j]);
+      }
+    }
+
+#else
+    // FIFO implementation
     for (uint32_t i = 0; i < 3; i++) {
       auto v = input[3 * t + i];
 
@@ -192,6 +245,7 @@ struct LinSpd
         cachePointer = (cachePointer + 1) % uint32_t(ARRAYSIZE(cache));
       }
     }
+#endif
   }
   
   uint32_t updateScoresAndFindBestCandidate()
