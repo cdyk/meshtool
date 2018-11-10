@@ -46,6 +46,9 @@ void getAverageCacheMissRatioPerTriangle(float& fifo4, float& fifo8, float& fifo
 }
 
 
+// Implementation of Tom Forsyth's Linear-Speed Vertex Cache Optimisation
+// https://tomforsyth1000.github.io/papers/fast_vert_cache_opt.html
+
 struct LinSpd
 {
 
