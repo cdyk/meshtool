@@ -139,7 +139,8 @@ namespace {
         case TriangleColor::Single: app->triangleColor = TriangleColor::ModelColor; break;
         case TriangleColor::ModelColor: app->triangleColor = TriangleColor::ObjectId; break;
         case TriangleColor::ObjectId: app->triangleColor = TriangleColor::SmoothingGroup; break;
-        case TriangleColor::SmoothingGroup: app->triangleColor = TriangleColor::Single; break;
+        case TriangleColor::SmoothingGroup: app->triangleColor = TriangleColor::TriangleOrder; break;
+        case TriangleColor::TriangleOrder : app->triangleColor = TriangleColor::Single; break;
         }
         app->updateColor = true;
       }
@@ -255,16 +256,18 @@ namespace {
         if (ImGui::MenuItem("Tangent coordsys", "C", &app->viewTangents)) {}
         if (ImGui::MenuItem("Normal vectors", "N", &app->viewNormals)) {}
         if (ImGui::BeginMenu("Color")) {
-          bool sel[4] = {
+          bool sel[5] = {
             app->triangleColor == TriangleColor::Single,
             app->triangleColor == TriangleColor::ModelColor,
             app->triangleColor == TriangleColor::ObjectId,
             app->triangleColor == TriangleColor::SmoothingGroup,
+            app->triangleColor == TriangleColor::TriangleOrder,
           };
           if (ImGui::MenuItem("Nothing", nullptr, &sel[0])) { app->triangleColor = TriangleColor::Single; app->updateColor = true; }
           if (ImGui::MenuItem("Model color", nullptr, &sel[1])) { app->triangleColor = TriangleColor::ModelColor; app->updateColor = true; }
           if (ImGui::MenuItem("Object id", nullptr, &sel[2])) { app->triangleColor = TriangleColor::ObjectId; app->updateColor = true; }
           if (ImGui::MenuItem("Smoothing group", nullptr, &sel[3])) { app->triangleColor = TriangleColor::SmoothingGroup; app->updateColor = true; }
+          if (ImGui::MenuItem("Triangle order", nullptr, &sel[3])) { app->triangleColor = TriangleColor::TriangleOrder; app->updateColor = true; }
           ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Texturing")) {
@@ -602,6 +605,16 @@ int main(int argc, char** argv)
             }
             else {
               m->currentColor[i] = colors[m->triSmoothGroupIx[i] % (sizeof(colors) / sizeof(uint32_t))];
+            }
+          }
+          break;
+        case TriangleColor::TriangleOrder:
+          for (uint32_t i = 0; i < m->triCount; i++) {
+            if (m->selected[m->TriObjIx[i]]) {
+              m->currentColor[i] = 0xffddffff;
+            }
+            else {
+              m->currentColor[i] = colors[(i >> 8) % ARRAYSIZE(colors)];
             }
           }
           break;

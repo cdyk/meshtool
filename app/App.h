@@ -39,7 +39,8 @@ enum TriangleColor
   Single,
   ModelColor,
   ObjectId,
-  SmoothingGroup
+  SmoothingGroup,
+  TriangleOrder,
 };
 
 class App
@@ -64,13 +65,13 @@ public:
   float thickness = 8;
   float menuHeight = 0.f;
 
-  TriangleColor triangleColor = TriangleColor::SmoothingGroup;
+  TriangleColor triangleColor = TriangleColor::TriangleOrder;
   bool raytrace = false;
 
   bool viewSolid = true;
   bool viewLines = true;
   bool viewOutlines = false;
-  bool viewNormals = true;
+  bool viewNormals = false;
   bool viewTangents = false;
 
   bool updateColor = true;
