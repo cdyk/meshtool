@@ -168,7 +168,7 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
       {
         MappedBuffer<Vertex> vtxMap(vCtx, vtxStaging);
         if (mesh->nrmCount) {
-          if (mesh->texCount) {
+          if (false && mesh->texCount) {
             for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
               vtxMap.mem[i] = Vertex(mesh->vtx[mesh->triVtxIx[i]],
                                      mesh->nrm[mesh->triNrmIx[i]],
@@ -233,7 +233,7 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
         float fifo4, fifo8, fifo16, fifo32;
         getAverageCacheMissRatioPerTriangle(fifo4, fifo8, fifo16, fifo32, indices.data(), indices.size32());
         logger(0, "IN  AMCR FIFO4=%.2f, FIFO8=%.2f, FIFO16=%.2f, FIFO32=%.2f", fifo4, fifo8, fifo16, fifo32);
-        //linearSpeedVertexCacheOptimisation(logger, reindices.data(), indices.data(), indices.size32());
+        linearSpeedVertexCacheOptimisation(logger, reindices.data(), indices.data(), indices.size32());
         getAverageCacheMissRatioPerTriangle(fifo4, fifo8, fifo16, fifo32, reindices.data(), indices.size32());
         logger(0, "OPT AMCR FIFO4=%.2f, FIFO8=%.2f, FIFO16=%.2f, FIFO32=%.2f", fifo4, fifo8, fifo16, fifo32);
         indices.swap(reindices);

@@ -71,7 +71,7 @@ struct LinSpd
   uint32_t cache[cacheSize + 3];
   uint32_t cachePointer = 0;
 
-  static const uint32_t maxValence = 8;
+  static const uint32_t maxValence = 16;
   float valenceScore[maxValence];
 
 
@@ -98,22 +98,60 @@ struct LinSpd
   }
 
   
-
-  
-
-  uint32_t emit(uint32_t t)
+  void findMaxVertexIndex()
   {
-    assert(tri[t].active);
-    tri[t].active = 0;
+    for (auto * ix = input; ix != input + 3 * Nt; ix++) {
+      maxIx = maxIx < *ix ? *ix : maxIx;
+    }
+    maxIx++;
+  }
 
+  void buildVertexTriangleList()
+  {
+    for (uint32_t t = 0; t < Nt; t++) {
+      for (uint32_t i = 0; i < 3; i++) {
+        auto v = input[3 * t + i];
+        vtx[v].activeTriangles++;
+        if (maxFoundValence < vtx[v].activeTriangles) {
+          maxFoundValence = vtx[v].activeTriangles;
+        }
+      }
+    }
+    uint32_t offset = 0;
+    for (uint32_t v = 0; v < maxIx; v++) {
+      vtx[v].offset = offset;
+
+      offset += vtx[v].activeTriangles;
+
+      vtx[v].activeTriangles = 0;
+    }
+    assert(offset == 3 * Nt);
+
+    vtxTri.resize(3 * Nt);
+    for (uint32_t t = 0; t < Nt; t++) {
+      for (uint32_t i = 0; i < 3; i++) {
+        auto v = input[3 * t + i];
+        vtxTri[vtx[v].offset + vtx[v].activeTriangles] = t;
+        vtx[v].activeTriangles++;
+      }
+    }
+  }
+
+  void removeTriangleFromVertexTriangleList(uint32_t t)
+  {
     // detach triangle from vertices.
     for (uint32_t i = 0; i < 3; i++) {
       auto v = input[3 * t + i];
+
       bool found = false;
       assert(vtx[v].activeTriangles);
+
+      // offsets into vtxtri and reduce number of active triangles.
       auto oa = vtx[v].offset;
       auto ob = oa + (--vtx[v].activeTriangles);
       for (uint32_t o = oa; o <= ob; o++) {
+
+        // and let triangle at tail take t's place.
         if (vtxTri[o] == t) {
           vtxTri[o] = vtxTri[ob];
           found = true;
@@ -122,25 +160,42 @@ struct LinSpd
       }
       assert(found);
     }
+  }
 
-    // update cache
+  void updateVertexCache(uint32_t t)
+  {
     for (uint32_t i = 0; i < 3; i++) {
       auto v = input[3 * t + i];
+
+      // search for hit
       bool hit = false;
       for (auto & e : cache) {
         if (e == v) { hit = true; break; }
       }
+
+      // if not cache hit
       if (!hit) {
+        // push all items backwards, done by updating vertex's cache position
         for (auto & v : cache) {
           if (v == ~0) continue;
           assert(v < maxIx);
           vtx[v].cachePos++;
         }
+        auto w = cache[cachePointer];
+        if (w != ~0) {
+          vtx[v].score = 0.f;
+        }
+
+        // insert v at front
         cache[cachePointer] = v;
+        vtx[v].cachePos = 0;
         cachePointer = (cachePointer + 1) % uint32_t(ARRAYSIZE(cache));
       }
     }
-
+  }
+  
+  uint32_t updateScoresAndFindBestCandidate()
+  {
     // update score and find candidate
     for (auto & e : cache) {
       if (e == ~0u) continue;
@@ -157,13 +212,14 @@ struct LinSpd
 
       auto oa = vtx[e].offset;
       auto ob = oa + vtx[e].activeTriangles;
+
       for (uint32_t o = oa; o < ob; o++) {
         auto t = vtxTri[o];
         auto & T = tri[t];
         assert(T.active);
         T.score = vtx[input[3 * t + 0]].score +
-                  vtx[input[3 * t + 1]].score +
-                  vtx[input[3 * t + 2]].score;
+          vtx[input[3 * t + 1]].score +
+          vtx[input[3 * t + 2]].score;
         if (candidateScore < T.score) {
           candidateScore = T.score;
           candidate = t;
@@ -171,14 +227,15 @@ struct LinSpd
       }
     }
 
-    output[3 * emitted + 0] = input[3 * t + 0];
-    output[3 * emitted + 1] = input[3 * t + 1];
-    output[3 * emitted + 2] = input[3 * t + 2];
-    emitted++;
+    if (candidate == ~0u) {
+      for (auto & e : cache) {
+        if (e == ~0u) continue;
+        assert(vtx[e].activeTriangles == 0);
+      }
+    }
 
     return candidate;
   }
-
 
 
   void run()
@@ -189,7 +246,7 @@ struct LinSpd
 
     valenceScore[0] = 0.f;
     for (uint32_t i = 1; i < maxValence; i++) {
-      valenceScore[i] = powf(i + 1.f, -0.5f);
+      valenceScore[i] = 2.f*std::pow(float(i), -0.5f);
     }
 
     for (auto & e : cache) e = ~0u;
@@ -197,14 +254,14 @@ struct LinSpd
     findMaxVertexIndex();
     vtx.resize(maxIx);
     tri.resize(Nt);
-    findAdjacency();
+    buildVertexTriangleList();
 
-    logger(0, "Nt=%d, maxIx=%d, maxValence=%d", Nt, maxIx, maxFoundValence);
 
+    uint32_t dry = 0;
     uint32_t candidate = 0;
     while (emitted < Nt) {
 
-      if ((emitted % 10000) == 0) {
+      if ((emitted % 100000) == 0) {
         logger(0, "Emitted %d", emitted);
         uint32_t g = 0;
         for (uint32_t t = 0; t < Nt; t++) {
@@ -214,19 +271,30 @@ struct LinSpd
       }
 
       if (candidate == ~0u) {
-        float bestScore = -1.f;
+        dry++;
         for (uint32_t t = 0; t < Nt; t++) {
-          auto & T = tri[t];
-          if (T.active && bestScore < T.score) {
-            bestScore = T.score;
-            candidate = t;
+          if (tri[t].active) {
+            candidate = t; break;
           }
         }
       }
       assert(candidate != ~0u);
 
-      candidate = emit(candidate);
+      assert(tri[candidate].active);
+      tri[candidate].active = 0;
+      output[3 * emitted + 0] = input[3 * candidate + 0];
+      output[3 * emitted + 1] = input[3 * candidate + 1];
+      output[3 * emitted + 2] = input[3 * candidate + 2];
+      emitted++;
+
+
+      removeTriangleFromVertexTriangleList(candidate);
+      updateVertexCache(candidate);
+
+      candidate = updateScoresAndFindBestCandidate();
     }
+
+    logger(0, "Nt=%d, maxIx=%d, maxValence=%d, dry=%.3f", Nt, maxIx, maxFoundValence, float(dry)/Nt);
 
     // sanity check : make sure all input triangles are present in output
 #if 0
@@ -249,44 +317,6 @@ struct LinSpd
     }
 #endif
   }
-
-  void findMaxVertexIndex()
-  {
-    for (auto * ix = input; ix != input + 3 * Nt; ix++) {
-      maxIx = maxIx < *ix ? *ix : maxIx;
-    }
-    maxIx++;
-  }
-
-  void findAdjacency()
-  {
-    Vector<uint32_t> head(maxIx, ~0u);
-    Vector<uint32_t> next(3 * Nt, ~0u);
-
-    for (uint32_t i = 0; i < 3*Nt; i++) {
-      auto v = input[i];
-      assert(v < maxIx);
-      next[i] = head[v];
-      head[v] = i;
-    }
-
-    vtxTri.resize(3 * Nt);
-    uint32_t offset = 0;
-    for (uint32_t v = 0; v < maxIx; v++) {
-      vtx[v].offset = offset;
-      for (auto ti = head[v]; ti != ~0u; ti = next[ti]) {
-        assert(ti < 3 * Nt);
-        assert(offset < 3 * Nt);
-        vtxTri[offset++] = ti / 3;
-      }
-      vtx[v].activeTriangles = offset - vtx[v].offset;
-      if (maxFoundValence < vtx[v].activeTriangles) {
-        maxFoundValence = vtx[v].activeTriangles;
-      }
-    }
-  }
-
-
 
 };
 
