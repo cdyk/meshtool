@@ -1,3 +1,4 @@
+#include <chrono>
 #include "VertexCache.h"
 #include "Common.h"
 
@@ -188,12 +189,12 @@ struct LinSpd
     }
 
     // Assert that no vertex is present twice in the cache.
-    for (uint32_t i = 0; i < cacheSize; i++) {
-      if (cache[i] == ~0u) continue;
-      for (uint32_t j = i + 1; j < cacheSize; j++) {
-        assert(cache[i] != cache[j] && "Vertex present twice in cache");
-      }
-    }
+    //for (uint32_t i = 0; i < cacheSize; i++) {
+    //  if (cache[i] == ~0u) continue;
+    //  for (uint32_t j = i + 1; j < cacheSize; j++) {
+    //    assert(cache[i] != cache[j] && "Vertex present twice in cache");
+    //  }
+    //}
 
     // update cache pos
     for (uint32_t i = 0; i < cacheSize; i++) {
@@ -208,15 +209,13 @@ struct LinSpd
       vtx[cache[cacheSize + i]].score = 0.f;
     }
 
-
-    for (uint32_t i = 0; i < cacheSize; i++) {
-      if (cache[i] == ~0u) continue;
-      assert(vtx[cache[i]].cachePos == i);
-
-      for (uint32_t j = i + 1; j < cacheSize; j++) {
-        assert(cache[i] != cache[j]);
-      }
-    }
+    //for (uint32_t i = 0; i < cacheSize; i++) {
+    //  if (cache[i] == ~0u) continue;
+    //  assert(vtx[cache[i]].cachePos == i);
+    //  for (uint32_t j = i + 1; j < cacheSize; j++) {
+    //    assert(cache[i] != cache[j]);
+    //  }
+    //}
 
 #else
     // FIFO implementation
@@ -297,6 +296,7 @@ struct LinSpd
 
   void run()
   {
+    auto time0 = std::chrono::high_resolution_clock::now();
     for (uint32_t i = 3; i < cacheSize; i++) {
       cachePosScore[i] = powf(1.0f - (i - 3) * (1.0f / (cacheSize - 3)), 1.5f);
     }
@@ -348,8 +348,9 @@ struct LinSpd
 
       candidate = updateScoresAndFindBestCandidate();
     }
-
-    logger(0, "Nt=%d, maxIx=%d, maxValence=%d, dry=%.3f", Nt, maxIx, maxFoundValence, float(dry)/Nt);
+    auto time1 = std::chrono::high_resolution_clock::now();
+    auto e = std::chrono::duration_cast<std::chrono::milliseconds>((time1 - time0)).count();
+    logger(0, "Nt=%d, maxIx=%d, maxValence=%d, dry=%.3f, time=%lldms", Nt, maxIx, maxFoundValence, float(dry)/Nt, e);
 
     // sanity check : make sure all input triangles are present in output
 #if 0
