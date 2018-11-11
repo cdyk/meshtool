@@ -316,6 +316,7 @@ struct LinSpd
 
     uint32_t dry = 0;
     uint32_t candidate = 0;
+    uint32_t nextCandidate = 1;
     while (emitted < Nt) {
 
       if ((emitted % 100000) == 0) {
@@ -329,11 +330,8 @@ struct LinSpd
 
       if (candidate == ~0u) {
         dry++;
-        for (uint32_t t = 0; t < Nt; t++) {
-          if (tri[t].active) {
-            candidate = t; break;
-          }
-        }
+        for (; nextCandidate < Nt && tri[nextCandidate].active == false; nextCandidate++) {}
+        candidate = nextCandidate++;
       }
       assert(candidate != ~0u);
 
