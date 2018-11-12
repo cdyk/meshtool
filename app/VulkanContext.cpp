@@ -146,6 +146,9 @@ VulkanContext::VulkanContext(Logger logger,
         if (std::strcmp(e.extensionName, VK_NVX_RAYTRACING_EXTENSION_NAME) == 0) {
           nvxRaytracing = true;
         }
+        else if (std::strcmp(e.extensionName, VK_NV_MESH_SHADER_EXTENSION_NAME) == 0) {
+          nvMeshShader = true;
+        }
       }
 
 
@@ -228,24 +231,48 @@ VulkanContext::VulkanContext(Logger logger,
 
     Vector<const char*> requestedDeviceExtensions;
     requestedDeviceExtensions.pushBack(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+    requestedDeviceExtensions.pushBack(VK_KHR_16BIT_STORAGE_EXTENSION_NAME);
+    requestedDeviceExtensions.pushBack(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
     if (nvxRaytracing) {
       requestedDeviceExtensions.pushBack(VK_NVX_RAYTRACING_EXTENSION_NAME);
       requestedDeviceExtensions.pushBack(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
     }
+    if (nvMeshShader) {
+      requestedDeviceExtensions.pushBack(VK_NV_MESH_SHADER_EXTENSION_NAME);
+    }
 
-    VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptorIndexing = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT };
-    VkPhysicalDeviceFeatures2 features2 = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
 
     VkPhysicalDeviceFeatures enabledFeatures{};
     enabledFeatures.fillModeNonSolid = 1;
     enabledFeatures.samplerAnisotropy = 1;
+
+    VkPhysicalDevice16BitStorageFeatures features16 = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_16BIT_STORAGE_FEATURES };
+    features16.storageBuffer16BitAccess = true;
+
+    VkPhysicalDevice8BitStorageFeaturesKHR features8 = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES_KHR };
+    features8.storageBuffer8BitAccess = true;
+    features8.pNext = &features16;
+    
+    VkPhysicalDeviceFeatures2 features2 = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2 };
+    features2.pNext = &features8;
+
+    VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptorIndexing = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT };
     if (nvxRaytracing) {
       enabledFeatures.vertexPipelineStoresAndAtomics = 1;
+      descriptorIndexing.pNext = features2.pNext;
       features2.pNext = &descriptorIndexing;
     }
 
-    // I guess this basically enables anything the device has to offer...
+    VkPhysicalDeviceMeshShaderFeaturesNV featuresMesh = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_NV };
+    featuresMesh.taskShader = true;
+    featuresMesh.meshShader = true;
+    if (nvMeshShader) {
+      featuresMesh.pNext = features2.pNext;
+      features2.pNext = &featuresMesh;
+    }
+
     vkGetPhysicalDeviceFeatures2(physicalDevice, &features2);
+
 
     VkDeviceCreateInfo deviceInfo = { VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO };
     deviceInfo.pNext = &features2;  // FIXME: Non-null ptr not checked on non-RTX.

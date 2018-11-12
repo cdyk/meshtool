@@ -9,6 +9,7 @@
 #include "LinAlgOps.h"
 #include "Half.h"
 #include "VertexCache.h"
+#include "ShaderStructs.h"
 
 //#define TRASH_INDICES
 #ifdef TRASH_INDICES
@@ -16,56 +17,20 @@
 #include <random>
 #endif
 
-struct ObjectBuffer
-{
-  Mat4f MVP;
-  Vec4f Ncol0;
-  Vec4f Ncol1;
-  Vec4f Ncol2;
-};
 
 namespace {
 
-  uint32_t solid_vert[] = {
-#include "solid.vert.h"
-  };
+  uint32_t vanilla_vert[]
+#include "vanilla.vert.h"
+  ;
 
+  uint32_t vanilla_frag[]
+#include "vanilla.frag.h"
+  ;
 
-  uint32_t vanillaPS[]
-#include "vanillaPS.glsl.h"
-    ;
-
-  uint32_t texturedPS[]
-#include "texturedPS.glsl.h"
-    ;
-
-  struct Vertex
-  {
-    Vec3f pos;
-    uint8_t nrm[4];
-    uint16_t tex[2];
-    uint8_t color[4];
-
-    Vertex(const Vec3f& p,
-           const Vec3f& n,
-           const Vec2f& t,
-           const uint32_t c)
-    {
-      pos = p;
-      auto nn = normalize(n);
-      nrm[0] = uint8_t(127.f*nn.x + 127.f);
-      nrm[1] = uint8_t(127.f*nn.y + 127.f);
-      nrm[2] = uint8_t(127.f*nn.z + 127.f);
-      tex[0] = halfFromFloat(t.x);
-      tex[1] = halfFromFloat(t.y);
-      color[0] = (c >> 16) & 0xff;
-      color[1] = (c >> 8) & 0xff;
-      color[2] = (c) & 0xff;
-      color[3] = 255;
-    }
-  };
-  //static_assert(sizeof(Vertex) == 3 * 8);
- 
+  uint32_t textured_frag[] 
+#include "textured.frag.h"
+  ;
 
   struct RGBA8
   {
@@ -101,9 +66,9 @@ void RenderSolid::init()
   auto * vCtx = app->vCtx;
   auto * resources = vCtx->resources;
 
-  vertexShader = resources->createShader(solid_vert, sizeof(solid_vert));
-  solidShader = resources->createShader(vanillaPS, sizeof(vanillaPS));
-  texturedShader = resources->createShader(texturedPS, sizeof(texturedPS));
+  vertexShader = resources->createShader(vanilla_vert, sizeof(vanilla_vert));
+  solidShader = resources->createShader(vanilla_frag, sizeof(vanilla_frag));
+  texturedShader = resources->createShader(textured_frag, sizeof(textured_frag));
 
   renaming.resize(10);
   for (size_t i = 0; i < renaming.size(); i++) {
@@ -160,7 +125,7 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
       meshData.colorGeneration = mesh->colorGeneration;
 
       meshData.triangleCount = mesh->triCount;
-      meshData.vtx = resources->createVertexDeviceBuffer(sizeof(Vertex) * 3 * meshData.triangleCount);
+      meshData.vtx = resources->createStorageBuffer(sizeof(Vertex) * 3 * meshData.triangleCount);
 
       Vector<uint32_t> indices;
       auto vtxStaging = resources->createStagingBuffer(meshData.vtx.resource->requestedSize);
@@ -269,31 +234,33 @@ void RenderSolid::buildPipelines(RenderPassHandle pass)
   auto * vCtx = app->vCtx;
   auto * resources = vCtx->resources;
 
-  VkDescriptorSetLayoutBinding objBufLayoutBinding[1];
+  VkDescriptorSetLayoutBinding objBufLayoutBinding[2];
   objBufLayoutBinding[0] = {};
   objBufLayoutBinding[0].binding = 0;
   objBufLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
   objBufLayoutBinding[0].descriptorCount = 1;
   objBufLayoutBinding[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+  objBufLayoutBinding[1] = {};
+  objBufLayoutBinding[1].binding = 1;
+  objBufLayoutBinding[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  objBufLayoutBinding[1].descriptorCount = 1;
+  objBufLayoutBinding[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
   VkDescriptorSetLayoutCreateInfo objBufLayoutInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-  objBufLayoutInfo.bindingCount = 1;
+  objBufLayoutInfo.bindingCount = ARRAYSIZE(objBufLayoutBinding);
   objBufLayoutInfo.pBindings = objBufLayoutBinding;
 
-  VkDescriptorSetLayoutBinding objBufSamplerLayoutBinding[2];
-  objBufSamplerLayoutBinding[0] = {};
-  objBufSamplerLayoutBinding[0].binding = 0;
-  objBufSamplerLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  objBufSamplerLayoutBinding[0].descriptorCount = 1;
-  objBufSamplerLayoutBinding[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-  objBufSamplerLayoutBinding[1].binding = 1;
-  objBufSamplerLayoutBinding[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-  objBufSamplerLayoutBinding[1].descriptorCount = 1;
-  objBufSamplerLayoutBinding[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-  objBufSamplerLayoutBinding[1].pImmutableSamplers = NULL;
+  VkDescriptorSetLayoutBinding objBufSamplerLayoutBinding[3];
+  objBufSamplerLayoutBinding[0] = objBufLayoutBinding[0];
+  objBufSamplerLayoutBinding[1] = objBufLayoutBinding[1];
+  objBufSamplerLayoutBinding[2] = {};
+  objBufSamplerLayoutBinding[2].binding = 2;
+  objBufSamplerLayoutBinding[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+  objBufSamplerLayoutBinding[2].descriptorCount = 1;
+  objBufSamplerLayoutBinding[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
   VkDescriptorSetLayoutCreateInfo objBufSamplerLayoutInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
-  objBufSamplerLayoutInfo.bindingCount = 2;
+  objBufSamplerLayoutInfo.bindingCount = ARRAYSIZE(objBufSamplerLayoutBinding);
   objBufSamplerLayoutInfo.pBindings = objBufSamplerLayoutBinding;
 
   VkPipelineLayoutCreateInfo pipeLayoutInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
@@ -312,34 +279,13 @@ void RenderSolid::buildPipelines(RenderPassHandle pass)
   cullBackDepthBiasRasInfo.depthBiasSlopeFactor = 1;
   cullBackDepthBiasRasInfo.lineWidth = 1.0f;
 
-  Vector<VkVertexInputAttributeDescription> inputAttrib(4);
-  for (unsigned i = 0; i < inputAttrib.size(); i++) {
-    inputAttrib[i] = { 0 };
-    inputAttrib[i].location = i;
-  }
-  inputAttrib[0].offset = offsetof(Vertex, Vertex::pos);
-  inputAttrib[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-  inputAttrib[1].offset = offsetof(Vertex, Vertex::nrm);
-  inputAttrib[1].format = VK_FORMAT_R8G8B8A8_UINT;
-  inputAttrib[2].offset = offsetof(Vertex, Vertex::tex);
-  inputAttrib[2].format = VK_FORMAT_R16G16_SFLOAT;
-  inputAttrib[3].offset = offsetof(Vertex, Vertex::color);
-  inputAttrib[3].format = VK_FORMAT_R8G8B8A8_UNORM;
-
-  VkVertexInputBindingDescription inputBinding{};
-  inputBinding.binding = 0;
-  inputBinding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-  inputBinding.stride = sizeof(Vertex);
-
-  vanillaPipeline = resources->createPipeline({ inputBinding },
-                                                inputAttrib,
-                                                pipeLayoutInfo,
-                                                objBufLayoutInfo,
-                                                pass,
-                                                { vertexShader, solidShader },
-                                                cullBackDepthBiasRasInfo);
-  texturedPipeline = resources->createPipeline({ inputBinding },
-                                               inputAttrib,
+  vanillaPipeline = resources->createPipeline({ }, { },
+                                              pipeLayoutInfo,
+                                              objBufLayoutInfo,
+                                              pass,
+                                              { vertexShader, solidShader },
+                                              cullBackDepthBiasRasInfo);
+  texturedPipeline = resources->createPipeline({ }, { },
                                                pipeLayoutInfo,
                                                objBufSamplerLayoutInfo,
                                                pass,
@@ -390,7 +336,7 @@ void RenderSolid::updateDescriptorSets()
     writes[2].descriptorCount = 1;
     writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     writes[2].dstArrayElement = 0;
-    writes[2].dstBinding = 1;
+    writes[2].dstBinding = 2;
     writes[2].pImageInfo = &imageInfo;
 
     vkUpdateDescriptorSets(device, ARRAYSIZE(writes), writes, 0, nullptr);
@@ -401,6 +347,7 @@ void RenderSolid::updateDescriptorSets()
 void RenderSolid::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP)
 {
   auto * vCtx = app->vCtx;
+  auto device = vCtx->device;
 
   if (!vanillaPipeline || vanillaPipeline.resource->pass != pass) buildPipelines(pass);
 
@@ -438,9 +385,19 @@ void RenderSolid::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4
       map.mem->Ncol2 = Vec4f(N.cols[2], 0.f);
     }
 
-    VkBuffer buffers[1] = { item.vtx.resource->buffer };
-    VkDeviceSize offsets[ARRAYSIZE(buffers)] = { 0 };
-    vkCmdBindVertexBuffers(cmdBuf, 0, ARRAYSIZE(buffers), buffers, offsets);
+    {
+      VkWriteDescriptorSet writes[2];
+      writes[0] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+      writes[0].dstSet = rename.objBufDescSet.resource->descSet;
+      writes[0].descriptorCount = 1;
+      writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      writes[0].pBufferInfo = &item.vtx.resource->descInfo;
+      writes[0].dstArrayElement = 0;
+      writes[0].dstBinding = 1;
+      writes[1] = writes[0];
+      writes[1].dstSet = rename.objBufSamplerDescSet.resource->descSet;
+      vkUpdateDescriptorSets(device, ARRAYSIZE(writes), writes, 0, nullptr);
+    }
 
     if (texturing != Texturing::None) {
       vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipe);

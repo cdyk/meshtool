@@ -71,6 +71,7 @@ public:
   VulkanTextureManager* textureManager = nullptr;
 
   bool nvxRaytracing = false;
+  bool nvMeshShader = false;
 private:
 #ifdef _DEBUG
   bool debugLayer = true;

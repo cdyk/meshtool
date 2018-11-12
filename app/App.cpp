@@ -229,6 +229,7 @@ void App::render(const Vec4f& viewport)
   auto * frameMgr = vCtx->frameManager;
   frameMgr->startFrame();
 
+  if (renderMode == RenderMode::MeshShader && !vCtx->nvMeshShader) renderMode = RenderMode::Normal;
   if (renderMode == RenderMode::Raytracing && !vCtx->nvxRaytracing) renderMode = RenderMode::Normal;
 
   if (viewSolid && renderMode == RenderMode::Normal) {
