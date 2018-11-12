@@ -127,7 +127,13 @@ namespace {
       if (key == GLFW_KEY_S && action == GLFW_PRESS) app->moveToSelection = true;
     }
     else if (mods == 0) {
-      if (key == GLFW_KEY_R && action == GLFW_PRESS) app->raytrace = !app->raytrace;
+      if (key == GLFW_KEY_R && action == GLFW_PRESS) {
+        switch (app->renderMode) {
+        case RenderMode::Normal: app->renderMode = RenderMode::MeshShader; break;
+        case RenderMode::MeshShader: app->renderMode = RenderMode::Raytracing; break;
+        case RenderMode::Raytracing: app->renderMode = RenderMode::Normal; break;
+        }
+      }
       if (key == GLFW_KEY_W && action == GLFW_PRESS)  app->viewOutlines = !app->viewOutlines;
       if (key == GLFW_KEY_L && action == GLFW_PRESS)  app->viewLines = !app->viewLines;
       if (key == GLFW_KEY_S && action == GLFW_PRESS)  app->viewSolid = !app->viewSolid;
@@ -249,12 +255,22 @@ namespace {
         if (ImGui::MenuItem("View all", "CTRL+SHIFT+A", nullptr)) { app->viewAll = true; }
         if (ImGui::MenuItem("View selection", "CTRL+SHIFT+S")) { app->moveToSelection = true; }
         ImGui::Separator();
-        if (ImGui::MenuItem("Raytracing", "R", &app->raytrace, app->vCtx->nvxRaytracing)) {}
         if (ImGui::MenuItem("Solid", "S", &app->viewSolid)) {}
         if (ImGui::MenuItem("Lines", "L", &app->viewLines)) {}
         if (ImGui::MenuItem("Outlines", "W", &app->viewOutlines)) {}
         if (ImGui::MenuItem("Tangent coordsys", "C", &app->viewTangents)) {}
         if (ImGui::MenuItem("Normal vectors", "N", &app->viewNormals)) {}
+        if (ImGui::BeginMenu("RenderMode", app->viewSolid)) {
+          bool sel[3] = {
+            app->renderMode == RenderMode::Normal,
+            app->renderMode == RenderMode::MeshShader,
+            app->renderMode == RenderMode::Raytracing,
+          };
+          if (ImGui::MenuItem("Normal", "R", &sel[0])) app->renderMode = RenderMode::Normal;
+          if (ImGui::MenuItem("Mesh shader", "R", &sel[1])) app->renderMode = RenderMode::MeshShader;
+          if (ImGui::MenuItem("Raytracing", "R", &sel[2], app->vCtx->nvxRaytracing)) app->renderMode = RenderMode::Raytracing;
+          ImGui::EndMenu();
+        }
         if (ImGui::BeginMenu("Color")) {
           bool sel[5] = {
             app->triangleColor == TriangleColor::Single,
@@ -271,14 +287,16 @@ namespace {
           ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Texturing")) {
-          bool sel[3] = {
-            app->renderSolid->texturing == RenderSolid::Texturing::None,
-            app->renderSolid->texturing == RenderSolid::Texturing::Checker,
-            app->renderSolid->texturing == RenderSolid::Texturing::ColorGradient,
-          };
-          if (ImGui::MenuItem("None", "T", &sel[0])) app->renderSolid->texturing = RenderSolid::Texturing::None;
-          if (ImGui::MenuItem("Checker", "T", &sel[1])) app->renderSolid->texturing = RenderSolid::Texturing::Checker;
-          if (ImGui::MenuItem("Color gradient", "T", &sel[2])) app->renderSolid->texturing = RenderSolid::Texturing::ColorGradient;
+          if (app->renderSolid) {
+            bool sel[3] = {
+              app->renderSolid->texturing == RenderSolid::Texturing::None,
+              app->renderSolid->texturing == RenderSolid::Texturing::Checker,
+              app->renderSolid->texturing == RenderSolid::Texturing::ColorGradient,
+            };
+            if (ImGui::MenuItem("None", "T", &sel[0])) app->renderSolid->texturing = RenderSolid::Texturing::None;
+            if (ImGui::MenuItem("Checker", "T", &sel[1])) app->renderSolid->texturing = RenderSolid::Texturing::Checker;
+            if (ImGui::MenuItem("Color gradient", "T", &sel[2])) app->renderSolid->texturing = RenderSolid::Texturing::ColorGradient;
+          }
           ImGui::EndMenu();
         }
         ImGui::EndMenu();
@@ -447,13 +465,13 @@ int main(int argc, char** argv)
   for (int i = 1; i < argc; i++) {
     auto arg = std::string(argv[i]);
     if (arg == "--raytrace") {
-      app->raytrace = true;
+      app->renderMode = RenderMode::Raytracing;
     }
-    else if (arg == "--no-raytrace") {
-      app->raytrace = false;
+    else if (arg == "--mesh-shader") {
+      app->renderMode = RenderMode::MeshShader;
     }
     else if (arg.substr(0, 2) == "--") {
-     
+    
 
     }
     else {

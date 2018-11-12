@@ -97,6 +97,7 @@
     <ClCompile Include="..\app\RenderNormals.cpp" />
     <ClCompile Include="..\app\RenderSolid.cpp" />
     <ClCompile Include="..\app\RenderOutlines.cpp" />
+    <ClCompile Include="..\app\RenderSolidMS.cpp" />
     <ClCompile Include="..\app\RenderTangents.cpp" />
     <ClCompile Include="..\app\RenderTextureManager.cpp" />
     <ClCompile Include="..\app\VulkanContext.cpp" />
@@ -117,6 +118,7 @@
     <ClInclude Include="..\app\RenderSolid.h" />
     <ClInclude Include="..\app\RenderOutlines.h" />
     <ClInclude Include="..\app\RenderResource.h" />
+    <ClInclude Include="..\app\RenderSolidMS.h" />
     <ClInclude Include="..\app\RenderTangents.h" />
     <ClInclude Include="..\app\RenderTextureManager.h" />
     <ClInclude Include="..\app\VulkanContext.h" />

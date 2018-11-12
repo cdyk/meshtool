@@ -30,6 +30,7 @@ class RenderOutlines;
 class RenderTangents;
 class RenderNormals;
 class RenderSolid;
+class RenderSolidMS;
 class Raycaster;
 class ImGuiRenderer;
 struct GLFWwindow;
@@ -41,6 +42,13 @@ enum TriangleColor
   ObjectId,
   SmoothingGroup,
   TriangleOrder,
+};
+
+enum RenderMode
+{
+  Normal,
+  MeshShader,
+  Raytracing
 };
 
 class App
@@ -66,7 +74,7 @@ public:
   float menuHeight = 0.f;
 
   TriangleColor triangleColor = TriangleColor::TriangleOrder;
-  bool raytrace = false;
+  RenderMode renderMode = RenderMode::Normal;
 
   bool viewSolid = true;
   bool viewLines = true;
@@ -95,6 +103,7 @@ public:
   GLFWwindow* window = nullptr;
   Raycaster* raycaster = nullptr;
   RenderSolid* renderSolid = nullptr;
+  RenderSolidMS* renderSolidMS = nullptr;
   RenderOutlines* renderOutlines = nullptr;
   RenderTangents* renderTangents = nullptr;
   RenderNormals* renderNormals = nullptr;
