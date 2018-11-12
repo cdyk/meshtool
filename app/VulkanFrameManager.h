@@ -34,6 +34,7 @@ public:
   struct FrameData
   {
     CommandPoolHandle commandPool;
+    DescriptorPoolHandle descriptorPool;
     VkCommandBuffer commandBuffer;
     FenceHandle fence;
     SemaphoreHandle imageAcquiredSemaphore;

@@ -20,6 +20,16 @@ namespace {
     if (descSet->descSet) vkFreeDescriptorSets(device, descPool, 1, &descSet->descSet);
   }
 
+  void destroyDescriptorPool(void* data, DescriptorPool* pool)
+  {
+    if (pool) {
+      auto device = ((VulkanContext*)data)->device;
+      auto descPool = ((VulkanContext*)data)->descPool;
+      vkDestroyDescriptorPool(device, pool->pool, nullptr);
+      pool->pool = nullptr;
+    }
+  }
+
   void destroyShader(void* data, Shader* shader)
   {
     auto device = ((VulkanContext*)data)->device;
@@ -123,6 +133,7 @@ VulkanResources::VulkanResources(VulkanContext* vCtx, Logger logger) :
   logger(logger),
   bufferResources(destroyBuffer, vCtx),
   descriptorSetResources(destroyDescriptorSet, vCtx),
+  descriptorPoolResources(destroyDescriptorPool, vCtx),
   shaderResources(destroyShader, vCtx),
   pipelineResources(destroyPipeline, vCtx),
   renderPassResources(destroyRenderPass, vCtx),
@@ -333,6 +344,14 @@ PipelineHandle VulkanResources::createPipeline(const Vector<VkVertexInputBinding
 
   logger(0, "Built pipeline");
   return pipeHandle;
+}
+
+DescriptorPoolHandle VulkanResources::createDescriptorPool(const VkDescriptorPoolCreateInfo* info)
+{
+  auto handle = descriptorPoolResources.createResource();
+  auto device = vCtx->device;
+  CHECK_VULKAN(vkCreateDescriptorPool(device, info, nullptr, &handle.resource->pool));
+  return handle;
 }
 
 RenderBufferHandle VulkanResources::createBuffer()

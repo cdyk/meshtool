@@ -28,6 +28,21 @@ void VulkanFrameManager::init()
   auto * res = vCtx->resources;
   auto device = vCtx->device;
 
+  Vector<VkDescriptorPoolSize> poolSizes =
+  {
+      { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+      { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+      { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+      { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+      { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+      { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+      { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+      { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+      { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+      { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+      { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+  };
+
   frameData.resize(framesInFlight);
   for (auto & frame : frameData) {
     frame.commandPool = res->createCommandPool(vCtx->queueFamilyIndex);
@@ -37,6 +52,12 @@ void VulkanFrameManager::init()
     cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cmdAllocInfo.commandBufferCount = 1;
     CHECK_VULKAN(vkAllocateCommandBuffers(vCtx->device, &cmdAllocInfo, &frame.commandBuffer));
+
+    VkDescriptorPoolCreateInfo descPoolInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+    descPoolInfo.maxSets = 1000 * poolSizes.size32();
+    descPoolInfo.poolSizeCount = poolSizes.size32();
+    descPoolInfo.pPoolSizes = poolSizes.data();
+    frame.descriptorPool = res->createDescriptorPool(&descPoolInfo);
 
     frame.imageAcquiredSemaphore = res->createSemaphore();
     frame.renderCompleteSemaphore = res->createSemaphore();
@@ -159,15 +180,20 @@ void VulkanFrameManager::resize(uint32_t w, uint32_t h)
 
 void VulkanFrameManager::startFrame()
 {
+  auto device = vCtx->device;
+
   frameIndex = frameIndex + 1;
   if (frameIndex < framesInFlight) frameIndex = 0;
+
+  auto & f = frame();
 
   CHECK_VULKAN(vkAcquireNextImageKHR(vCtx->device,
                                      swapChain.resource->swapChain, UINT64_MAX,
                                      frame().imageAcquiredSemaphore.resource->semaphore, VK_NULL_HANDLE, &swapChainIndex));
-  CHECK_VULKAN(vkWaitForFences(vCtx->device, 1, &frame().fence.resource->fence, VK_TRUE, UINT64_MAX));
-  CHECK_VULKAN(vkResetFences(vCtx->device, 1, &frame().fence.resource->fence));
-  CHECK_VULKAN(vkResetCommandPool(vCtx->device, frame().commandPool.resource->cmdPool, 0));
+  CHECK_VULKAN(vkWaitForFences(device, 1, &f.fence.resource->fence, VK_TRUE, UINT64_MAX));
+  CHECK_VULKAN(vkResetFences(device, 1, &f.fence.resource->fence));
+  CHECK_VULKAN(vkResetCommandPool(device, f.commandPool.resource->cmdPool, 0));
+  CHECK_VULKAN(vkResetDescriptorPool(device, f.descriptorPool.resource->pool, 0));
 }
 
 void VulkanFrameManager::presentFrame()

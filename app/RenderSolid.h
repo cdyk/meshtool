@@ -54,8 +54,6 @@ private:
   Vector<MeshData> meshData;
   Vector<MeshData> newMeshData;
 
-  void updateDescriptorSets();
-
   PipelineHandle vanillaPipeline;
   PipelineHandle texturedPipeline;
 
@@ -73,9 +71,6 @@ private:
   SamplerHandle texSampler;
 
   struct Rename {
-    FenceHandle ready;
-    DescriptorSetHandle objBufDescSet;
-    DescriptorSetHandle objBufSamplerDescSet;
     RenderBufferHandle objectBuffer;
   };
   Vector<Rename> renaming;

@@ -12,6 +12,14 @@ struct DescriptorSet : ResourceBase
 };
 typedef ResourceHandle<DescriptorSet> DescriptorSetHandle;
 
+struct DescriptorPool : ResourceBase
+{
+  DescriptorPool(ResourceManagerBase& manager) : ResourceBase(manager) {}
+  VkDescriptorPool pool = VK_NULL_HANDLE;
+};
+typedef ResourceHandle<DescriptorPool> DescriptorPoolHandle;
+
+
 struct Shader : ResourceBase
 {
   Shader(ResourceManagerBase& manager) : ResourceBase(manager) {}
@@ -168,6 +176,8 @@ public:
 
   SamplerHandle createSampler(VkSamplerCreateInfo& samplerCreateInfo);
 
+  DescriptorPoolHandle createDescriptorPool(const VkDescriptorPoolCreateInfo* info);
+
   FrameBufferHandle createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<ImageViewHandle>& attachments);
   CommandPoolHandle createCommandPool(uint32_t queueFamilyIx);
   FenceHandle createFence(bool signalled);
@@ -188,6 +198,7 @@ private:
 
   ResourceManager<Buffer> bufferResources;
   ResourceManager<DescriptorSet> descriptorSetResources;
+  ResourceManager<DescriptorPool> descriptorPoolResources;
   ResourceManager<Shader> shaderResources;
   ResourceManager<Pipeline> pipelineResources;
   ResourceManager<RenderPass> renderPassResources;
