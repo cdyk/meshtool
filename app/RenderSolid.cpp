@@ -130,14 +130,14 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
       auto vtxStaging = resources->createStagingBuffer(meshData.vtx.resource->requestedSize);
 
       {
-        MappedBuffer<Vertex> vtxMap(vCtx, vtxStaging);
+        auto * mem = (Vertex*)vtxStaging.resource->hostPtr;
         if (mesh->nrmCount) {
           if (false && mesh->texCount) {
             for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
-              vtxMap.mem[i] = Vertex(mesh->vtx[mesh->triVtxIx[i]],
-                                     mesh->nrm[mesh->triNrmIx[i]],
-                                     10.f*mesh->tex[mesh->triTexIx[i]],
-                                     mesh->currentColor[i / 3]);
+              mem[i] = Vertex(mesh->vtx[mesh->triVtxIx[i]],
+                              mesh->nrm[mesh->triNrmIx[i]],
+                              10.f*mesh->tex[mesh->triTexIx[i]],
+                              mesh->currentColor[i / 3]);
             }
           }
           else {
@@ -148,10 +148,10 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
 
             for (uint32_t i = 0; i < newVertices.size32(); i++) {
               auto ix = newVertices[i];
-              vtxMap.mem[i] = Vertex(mesh->vtx[mesh->triVtxIx[ix]],
-                                     mesh->nrm[mesh->triNrmIx[ix]],
-                                     Vec2f(0.5f),
-                                     0xdddddd);
+              mem[i] = Vertex(mesh->vtx[mesh->triVtxIx[ix]],
+                              mesh->nrm[mesh->triNrmIx[ix]],
+                              Vec2f(0.5f),
+                              0xdddddd);
             }
           }
         }
@@ -162,10 +162,10 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
               for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
               auto n = cross(p[1] - p[0], p[2] - p[0]);
               for (unsigned k = 0; k < 3; k++) {
-                vtxMap.mem[3 * i + k] = Vertex(p[k],
-                                               n,
-                                               10.f*mesh->tex[mesh->triTexIx[3 * i + k]],
-                                               mesh->currentColor[i]);
+                mem[3 * i + k] = Vertex(p[k],
+                                        n,
+                                        10.f*mesh->tex[mesh->triTexIx[3 * i + k]],
+                                        mesh->currentColor[i]);
               }
             }
           }
@@ -175,10 +175,10 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
               for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
               auto n = cross(p[1] - p[0], p[2] - p[0]);
               for (unsigned k = 0; k < 3; k++) {
-                vtxMap.mem[3 * i + k] = Vertex(p[k],
-                                               n,
-                                               Vec2f(0.5f),
-                                               mesh->currentColor[i]);
+                mem[3 * i + k] = Vertex(p[k],
+                                        n,
+                                        Vec2f(0.5f),
+                                        mesh->currentColor[i]);
               }
             }
           }
@@ -204,10 +204,7 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
 
         meshData.indices = resources->createIndexDeviceBuffer(sizeof(uint32_t)*indices.size());
         auto stage = resources->createStagingBuffer(sizeof(uint32_t)*indices.size());
-        {
-          MappedBuffer<uint32_t> map(vCtx, stage);
-          std::memcpy(map.mem, indices.data(), sizeof(uint32_t)*indices.size());
-        }
+        std::memcpy(stage.resource->hostPtr, indices.data(), sizeof(uint32_t)*indices.size());
         vCtx->frameManager->copyBuffer(meshData.indices, stage, sizeof(uint32_t)*indices.size());
       }
       else {
@@ -327,11 +324,11 @@ void RenderSolid::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4
     }
 
     {
-      MappedBuffer<ObjectBuffer> map(vCtx, rename.objectBuffer);
-      map.mem->MVP = MVP;
-      map.mem->Ncol0 = Vec4f(N.cols[0], 0.f);
-      map.mem->Ncol1 = Vec4f(N.cols[1], 0.f);
-      map.mem->Ncol2 = Vec4f(N.cols[2], 0.f);
+      auto * mem = (ObjectBuffer*)rename.objectBuffer.resource->hostPtr;
+      mem->MVP = MVP;
+      mem->Ncol0 = Vec4f(N.cols[0], 0.f);
+      mem->Ncol1 = Vec4f(N.cols[1], 0.f);
+      mem->Ncol2 = Vec4f(N.cols[2], 0.f);
     }
 
     if (texturing == Texturing::None) {
@@ -368,7 +365,7 @@ void RenderSolid::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4
       VkDescriptorSetAllocateInfo descAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
       descAllocInfo.descriptorPool = frame.descriptorPool.resource->pool;
       descAllocInfo.descriptorSetCount = 1;
-      descAllocInfo.pSetLayouts = &vanillaPipeline.resource->descLayout;
+      descAllocInfo.pSetLayouts = &texturedPipeline.resource->descLayout;
 
       VkDescriptorSet set = VK_NULL_HANDLE;
       CHECK_VULKAN(vkAllocateDescriptorSets(device, &descAllocInfo, &set));

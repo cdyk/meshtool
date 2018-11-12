@@ -33,6 +33,7 @@ struct Buffer : ResourceBase
   Buffer(ResourceManagerBase& manager) : ResourceBase(manager) {}
   VkBuffer buffer = VK_NULL_HANDLE;
   VkDeviceMemory mem = VK_NULL_HANDLE;
+  void * hostPtr = nullptr;
   size_t requestedSize = 0;
   size_t alignedSize = 0;
   VkDescriptorBufferInfo descInfo;
@@ -211,34 +212,4 @@ private:
   ResourceManager<Semaphore> semaphoreResources;
   ResourceManager<SwapChain> swapChainResources;
   ResourceManager<AccelerationStructure> accelerationStructures;
-
-};
-
-struct MappedBufferBase
-{
-  MappedBufferBase() = delete;
-  MappedBufferBase(const MappedBufferBase&) = delete;
-
-  VulkanContext* vCtx;
-  RenderBufferHandle h;
-  MappedBufferBase(void** ptr, VulkanContext* vCtx, RenderBufferHandle h);
-  ~MappedBufferBase();
-
-};
-
-template<typename T>
-struct MappedBuffer : MappedBufferBase
-{
-  MappedBuffer(VulkanContext* vCtx, RenderBufferHandle h) : MappedBufferBase((void**)&mem, vCtx, h) {}
-
-  T* mem;
-};
-
-struct DebugScope : NonCopyable
-{
-  VulkanContext* vCtx;
-  VkCommandBuffer cmdBuf;
-
-  DebugScope(VulkanContext* vCtx, VkCommandBuffer cmdBuf, const char* name);
-  ~DebugScope();
 };

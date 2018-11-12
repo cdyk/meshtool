@@ -112,10 +112,10 @@ void RenderOutlines::update(Vector<Mesh*>& meshes)
 
       auto vtxStaging = resources->createStagingBuffer(meshData.vtx.resource->requestedSize);
       {
-        MappedBuffer<Vec3f> map(vCtx, vtxStaging);
-        std::memcpy(map.mem, mesh->vtx, sizeof(Vec3f)*mesh->vtxCount);
+        auto * mem = (Vec3f*)vtxStaging.resource->hostPtr;
+        std::memcpy(mem, mesh->vtx, sizeof(Vec3f)*mesh->vtxCount);
         for (uint32_t e = 0; e < 2 * meshData.lineCount; e++) {
-          map.mem[meshData.lineOffset + e] = mesh->vtx[mesh->lineVtxIx[e]];
+          mem[meshData.lineOffset + e] = mesh->vtx[mesh->lineVtxIx[e]];
         }
       }
       frameManager->copyBuffer(meshData.vtx, vtxStaging, meshData.vtx.resource->requestedSize);
@@ -136,16 +136,16 @@ void RenderOutlines::update(Vector<Mesh*>& meshes)
         outlines.b = 0xff;
         outlines.a = 255;
 
-        MappedBuffer<RGBA8> map(vCtx, stagingBuf);
+        auto * mem = (RGBA8*)stagingBuf.resource->hostPtr;
         for (unsigned i = 0; i < meshData.lineOffset; i++) {
-          map.mem[i] = outlines;
+          mem[i] = outlines;
         }
         for (uint32_t e = 0; e < 2 * meshData.lineCount; e++) {
           auto c = meshData.src->lineColor[e / 2];
-          map.mem[meshData.lineOffset + e].r = (c >> 16) & 0xffu;
-          map.mem[meshData.lineOffset + e].g = (c >> 8) & 0xffu;
-          map.mem[meshData.lineOffset + e].b = (c >> 0) & 0xffu;
-          map.mem[meshData.lineOffset + e].a = 255u;
+          mem[meshData.lineOffset + e].r = (c >> 16) & 0xffu;
+          mem[meshData.lineOffset + e].g = (c >> 8) & 0xffu;
+          mem[meshData.lineOffset + e].b = (c >> 0) & 0xffu;
+          mem[meshData.lineOffset + e].a = 255u;
         }
       }
       vCtx->frameManager->copyBuffer(meshData.col, stagingBuf, meshData.col.resource->requestedSize);
@@ -272,11 +272,11 @@ void RenderOutlines::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const V
     }
 
     {
-      MappedBuffer<ObjectBuffer> map(vCtx, rename.objectBuffer);
-      map.mem->MVP = MVP;
-      map.mem->Ncol0 = Vec4f(N.cols[0], 0.f);
-      map.mem->Ncol1 = Vec4f(N.cols[1], 0.f);
-      map.mem->Ncol2 = Vec4f(N.cols[2], 0.f);
+      auto * mem = (ObjectBuffer*)rename.objectBuffer.resource->hostPtr;
+      mem->MVP = MVP;
+      mem->Ncol0 = Vec4f(N.cols[0], 0.f);
+      mem->Ncol1 = Vec4f(N.cols[1], 0.f);
+      mem->Ncol2 = Vec4f(N.cols[2], 0.f);
     }
 
     VkBuffer buffers[2] = { item.vtx.resource->buffer, item.col.resource->buffer };

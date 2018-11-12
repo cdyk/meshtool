@@ -230,12 +230,9 @@ void  VulkanFrameManager::stageAndCopyBuffer(RenderBufferHandle dst, const void*
   auto device = vCtx->device;
 
   auto staging = vCtx->resources->createStagingBuffer(size);
+  assert(staging.resource->hostPtr);
 
-  void * ptr = nullptr;
-  CHECK_VULKAN(vkMapMemory(device, staging.resource->mem, 0, size, 0, &ptr));
-  std::memcpy(ptr, src, size);
-  vkUnmapMemory(device, staging.resource->mem);
-
+  std::memcpy(staging.resource->hostPtr, src, size);
   copyBuffer(dst, staging, size);
 }
 

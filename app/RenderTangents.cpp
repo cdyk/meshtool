@@ -62,13 +62,13 @@ void RenderTangents::init()
   coordSysVtxCol = vCtx->resources->createVertexDeviceBuffer(2*sizeof(Vec3f) * 6);
   auto coordSysStaging = vCtx->resources->createStagingBuffer(coordSysVtxCol.resource->requestedSize);
   {
-    MappedBuffer<Vec3f> vtxMap(vCtx, coordSysStaging);
-    vtxMap.mem[0] = Vec3f(0, 0, 0); vtxMap.mem[1] = Vec3f(1, 0, 0);
-    vtxMap.mem[2] = Vec3f(1, 0, 0); vtxMap.mem[3] = Vec3f(1, 0, 0);
-    vtxMap.mem[4] = Vec3f(0, 0, 0); vtxMap.mem[5] = Vec3f(0, 1, 0);
-    vtxMap.mem[6] = Vec3f(0, 1, 0); vtxMap.mem[7] = Vec3f(0, 1, 0);
-    vtxMap.mem[8] = Vec3f(0, 0, 0); vtxMap.mem[9] = Vec3f(0.3f, 0.3f, 1);
-    vtxMap.mem[10] = Vec3f(0, 0, 1); vtxMap.mem[11] = Vec3f(0.3f, 0.3f, 1);
+    auto * mem = (Vec3f*)coordSysStaging.resource->hostPtr;
+    mem[0] = Vec3f(0, 0, 0); mem[1] = Vec3f(1, 0, 0);
+    mem[2] = Vec3f(1, 0, 0); mem[3] = Vec3f(1, 0, 0);
+    mem[4] = Vec3f(0, 0, 0); mem[5] = Vec3f(0, 1, 0);
+    mem[6] = Vec3f(0, 1, 0); mem[7] = Vec3f(0, 1, 0);
+    mem[8] = Vec3f(0, 0, 0); mem[9] = Vec3f(0.3f, 0.3f, 1);
+    mem[10] = Vec3f(0, 0, 1); mem[11] = Vec3f(0.3f, 0.3f, 1);
   }
   vCtx->frameManager->copyBuffer(coordSysVtxCol, coordSysStaging, coordSysVtxCol.resource->requestedSize);
 }
@@ -114,9 +114,9 @@ void RenderTangents::update(Vector<Mesh*>& meshes)
       auto tanStaging = resources->createStagingBuffer(meshData.tan.resource->requestedSize);
       auto bnmStaging = resources->createStagingBuffer(meshData.bnm.resource->requestedSize);
       {
-        MappedBuffer<Vec3f> vtxMap(vCtx, vtxStaging);
-        MappedBuffer<Vec3f> tanMap(vCtx, tanStaging);
-        MappedBuffer<Vec3f> bnmMap(vCtx, bnmStaging);
+        auto * vtxMap = (Vec3f*)vtxStaging.resource->hostPtr;
+        auto * tanMap = (Vec3f*)tanStaging.resource->hostPtr;
+        auto * bnmMap = (Vec3f*)bnmStaging.resource->hostPtr;
 
         if (mesh->nrm) {
           for (unsigned i = 0; i < mesh->triCount; i++) {
@@ -132,9 +132,9 @@ void RenderTangents::update(Vector<Mesh*>& meshes)
               auto n = normalize(mesh->nrm[mesh->triNrmIx[3 * i + k]]);
               auto uu = normalize(u - dot(u, n)*n);
               auto vv = normalize(v - dot(v, n)*n);
-              vtxMap.mem[3 * i + k] = p[k];
-              tanMap.mem[3 * i + k] = uu;
-              bnmMap.mem[3 * i + k] = vv;
+              vtxMap[3 * i + k] = p[k];
+              tanMap[3 * i + k] = uu;
+              bnmMap[3 * i + k] = vv;
             }
           }
         }
@@ -152,9 +152,9 @@ void RenderTangents::update(Vector<Mesh*>& meshes)
             auto uu = normalize(u - dot(u, n)*n);
             auto vv = normalize(v - dot(v, n)*n);
             for (unsigned k = 0; k < 3; k++) {
-              vtxMap.mem[3 * i + k] = p[k];
-              tanMap.mem[3 * i + k] = uu;
-              bnmMap.mem[3 * i + k] = vv;
+              vtxMap[3 * i + k] = p[k];
+              tanMap[3 * i + k] = uu;
+              bnmMap[3 * i + k] = vv;
             }
           }
         }
@@ -291,11 +291,11 @@ void RenderTangents::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const V
     }
 
     {
-      MappedBuffer<ObjectBuffer> map(vCtx, rename.objectBuffer);
-      map.mem->MVP = MVP;
-      map.mem->Ncol0 = Vec4f(N.cols[0], 0.f);
-      map.mem->Ncol1 = Vec4f(N.cols[1], 0.f);
-      map.mem->Ncol2 = Vec4f(N.cols[2], 0.f);
+      auto * mem = (ObjectBuffer*)rename.objectBuffer.resource->hostPtr;
+      mem->MVP = MVP;
+      mem->Ncol0 = Vec4f(N.cols[0], 0.f);
+      mem->Ncol1 = Vec4f(N.cols[1], 0.f);
+      mem->Ncol2 = Vec4f(N.cols[2], 0.f);
     }
     
 

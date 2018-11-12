@@ -208,10 +208,7 @@ void Raycaster::buildPipeline()
     
     bindingTable = vCtx->resources->createBuffer(tableSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
     {
-      char* ptr = nullptr;
-      MappedBufferBase map((void**)&ptr, vCtx, bindingTable);
-
-      CHECK_VULKAN(vCtx->vkGetRaytracingShaderHandlesNVX(vCtx->device, pipe->pipe, 0, groupCount, tableSize, ptr));
+      CHECK_VULKAN(vCtx->vkGetRaytracingShaderHandlesNVX(vCtx->device, pipe->pipe, 0, groupCount, tableSize, bindingTable.resource->hostPtr));
       //CHECK_VULKAN(vCtx->vkGetRaytracingShaderHandlesNVX(vCtx->device, pipe->pipe, 1, 1, bindingTableSize, ptr + 1 * rtProps.shaderHeaderSize));
       //CHECK_VULKAN(vCtx->vkGetRaytracingShaderHandlesNVX(vCtx->device, pipe->pipe, 2, 1, bindingTableSize, ptr + 2 * rtProps.shaderHeaderSize));
       // instanceShaderBindingTableRecordOffset stored in each instance of top-level acc struc
@@ -322,10 +319,10 @@ bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData,  c
                                             VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
   {
-    MappedBuffer<TriangleData> map(vCtx, meshData.triangleData);
+    auto * mem = (TriangleData*)meshData.triangleData.resource->hostPtr;
     if (mesh->nrmCount) {
       for (uint32_t t = 0; t < meshData.triangleCount; t++) {
-        auto & data = map.mem[t];
+        auto & data = mem[t];
         auto n0 = normalize(mesh->nrm[mesh->triNrmIx[3 * t + 0]]);
         auto n1 = normalize(mesh->nrm[mesh->triNrmIx[3 * t + 1]]);
         auto n2 = normalize(mesh->nrm[mesh->triNrmIx[3 * t + 2]]);
@@ -349,7 +346,7 @@ bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData,  c
         Vec3f p[3];
         for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * t + k]];
         auto n = normalize(cross(p[1] - p[0], p[2] - p[0]));
-        auto & data = map.mem[t];
+        auto & data = mem[t];
         data.n0x = n.x;// uint8_t(127.f*n0.x + 127.f);
         data.n0y = n.y;// uint8_t(127.f*n0.y + 127.f);
         data.n0z = n.z;// uint8_t(127.f*n0.z + 127.f);
@@ -602,16 +599,16 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
     auto l = normalize(mul(Ninv, Vec3f(1, 1, 0.2f)));
     auto u = normalize(mul(Ninv, Vec3f(0, 1, 0)));
 
-    MappedBuffer<SceneBuffer> map(vCtx, rename.sceneBuffer);
-    map.mem->Pinv = Pinv;
-    map.mem->lx = l.x;
-    map.mem->ly = l.y;
-    map.mem->lz = l.z;
-    map.mem->ux = u.x;
-    map.mem->uy = u.y;
-    map.mem->uz = u.z;
-    map.mem->rndState = rndState;
-    map.mem->stationaryFrames = stationaryFrames;
+    auto * mem = (SceneBuffer*)rename.sceneBuffer.resource->hostPtr;
+    mem->Pinv = Pinv;
+    mem->lx = l.x;
+    mem->ly = l.y;
+    mem->lz = l.z;
+    mem->ux = u.x;
+    mem->uy = u.y;
+    mem->uz = u.z;
+    mem->rndState = rndState;
+    mem->stationaryFrames = stationaryFrames;
   }
 
   auto offscreenImage = rename.offscreenImage.resource->image;

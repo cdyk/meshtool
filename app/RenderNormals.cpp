@@ -105,14 +105,14 @@ void RenderNormals::update(Vector<Mesh*>& meshes)
 
       auto vtxNrmStaging = resources->createStagingBuffer(meshData.vtxNrm.resource->requestedSize);
       {
-        MappedBuffer<Vertex> vtxNrmMap(vCtx, vtxNrmStaging);
+        auto * mem = (Vertex*)vtxNrmStaging.resource->hostPtr;
         for (unsigned t = 0; t < mesh->triCount; t++) {
           bool selected = mesh->selected[mesh->TriObjIx[t]];
           for (unsigned i = 0; i < 3; i++) {
             auto k = 3 * t + i;
-            vtxNrmMap.mem[k].p = mesh->vtx[mesh->triVtxIx[k]];
-            vtxNrmMap.mem[k].n = mesh->nrm[mesh->triNrmIx[k]];
-            vtxNrmMap.mem[k].color = selected ? 0xffff88 : 0xff4444;
+            mem[k].p = mesh->vtx[mesh->triVtxIx[k]];
+            mem[k].n = mesh->nrm[mesh->triNrmIx[k]];
+            mem[k].color = selected ? 0xffff88 : 0xff4444;
           }
         }
       }
@@ -241,12 +241,12 @@ void RenderNormals::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Ve
     }
 
     {
-      MappedBuffer<ObjectBuffer> map(vCtx, rename.objectBuffer);
-      map.mem->MVP = MVP;
-      map.mem->Ncol0 = Vec4f(N.cols[0], 0.f);
-      map.mem->Ncol1 = Vec4f(N.cols[1], 0.f);
-      map.mem->Ncol2 = Vec4f(N.cols[2], 0.f);
-      map.mem->scale = 0.01f;
+      auto * mem = (ObjectBuffer*)rename.objectBuffer.resource->hostPtr;
+      mem->MVP = MVP;
+      mem->Ncol0 = Vec4f(N.cols[0], 0.f);
+      mem->Ncol1 = Vec4f(N.cols[1], 0.f);
+      mem->Ncol2 = Vec4f(N.cols[2], 0.f);
+      mem->scale = 0.01f;
     }
     
 

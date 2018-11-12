@@ -72,7 +72,6 @@ void RenderSolidMS::init()
 
   renaming.resize(10);
   for (size_t i = 0; i < renaming.size(); i++) {
-    renaming[i].ready = vCtx->resources->createFence(true);
     renaming[i].objectBuffer = vCtx->resources->createUniformBuffer(sizeof(ObjectBuffer));
   }
 
@@ -131,14 +130,14 @@ void RenderSolidMS::update(Vector<Mesh*>& meshes)
       auto vtxStaging = resources->createStagingBuffer(meshData.vtx.resource->requestedSize);
 
       {
-        MappedBuffer<Vertex> vtxMap(vCtx, vtxStaging);
+        auto * mem = (Vertex*)vtxStaging.resource->hostPtr;
         if (mesh->nrmCount) {
           if (false && mesh->texCount) {
             for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
-              vtxMap.mem[i] = Vertex(mesh->vtx[mesh->triVtxIx[i]],
-                                     mesh->nrm[mesh->triNrmIx[i]],
-                                     10.f*mesh->tex[mesh->triTexIx[i]],
-                                     mesh->currentColor[i / 3]);
+              mem[i] = Vertex(mesh->vtx[mesh->triVtxIx[i]],
+                              mesh->nrm[mesh->triNrmIx[i]],
+                              10.f*mesh->tex[mesh->triTexIx[i]],
+                              mesh->currentColor[i / 3]);
             }
           }
           else {
@@ -149,10 +148,10 @@ void RenderSolidMS::update(Vector<Mesh*>& meshes)
 
             for (uint32_t i = 0; i < newVertices.size32(); i++) {
               auto ix = newVertices[i];
-              vtxMap.mem[i] = Vertex(mesh->vtx[mesh->triVtxIx[ix]],
-                                     mesh->nrm[mesh->triNrmIx[ix]],
-                                     Vec2f(0.5f),
-                                     0xdddddd);
+              mem[i] = Vertex(mesh->vtx[mesh->triVtxIx[ix]],
+                              mesh->nrm[mesh->triNrmIx[ix]],
+                              Vec2f(0.5f),
+                              0xdddddd);
             }
           }
         }
@@ -163,10 +162,10 @@ void RenderSolidMS::update(Vector<Mesh*>& meshes)
               for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
               auto n = cross(p[1] - p[0], p[2] - p[0]);
               for (unsigned k = 0; k < 3; k++) {
-                vtxMap.mem[3 * i + k] = Vertex(p[k],
-                                               n,
-                                               10.f*mesh->tex[mesh->triTexIx[3 * i + k]],
-                                               mesh->currentColor[i]);
+                mem[3 * i + k] = Vertex(p[k],
+                                        n,
+                                        10.f*mesh->tex[mesh->triTexIx[3 * i + k]],
+                                        mesh->currentColor[i]);
               }
             }
           }
@@ -176,10 +175,10 @@ void RenderSolidMS::update(Vector<Mesh*>& meshes)
               for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
               auto n = cross(p[1] - p[0], p[2] - p[0]);
               for (unsigned k = 0; k < 3; k++) {
-                vtxMap.mem[3 * i + k] = Vertex(p[k],
-                                               n,
-                                               Vec2f(0.5f),
-                                               mesh->currentColor[i]);
+                mem[3 * i + k] = Vertex(p[k],
+                                        n,
+                                        Vec2f(0.5f),
+                                        mesh->currentColor[i]);
               }
             }
           }
@@ -205,10 +204,7 @@ void RenderSolidMS::update(Vector<Mesh*>& meshes)
 
         meshData.indices = resources->createIndexDeviceBuffer(sizeof(uint32_t)*indices.size());
         auto stage = resources->createStagingBuffer(sizeof(uint32_t)*indices.size());
-        {
-          MappedBuffer<uint32_t> map(vCtx, stage);
-          std::memcpy(map.mem, indices.data(), sizeof(uint32_t)*indices.size());
-        }
+        std::memcpy(stage.resource->hostPtr, indices.data(), sizeof(uint32_t)*indices.size());
         vCtx->frameManager->copyBuffer(meshData.indices, stage, sizeof(uint32_t)*indices.size());
       }
       else {
@@ -291,56 +287,6 @@ void RenderSolidMS::buildPipelines(RenderPassHandle pass)
                                                pass,
                                                { vertexShader, texturedShader },
                                                cullBackDepthBiasRasInfo);
-
-  for (size_t i = 0; i < renaming.size(); i++) {
-    renaming[i].objBufDescSet = vCtx->resources->createDescriptorSet(vanillaPipeline.resource->descLayout);
-    renaming[i].objBufSamplerDescSet = vCtx->resources->createDescriptorSet(texturedPipeline.resource->descLayout);
-  }
-  updateDescriptorSets();
-
-}
-
-void RenderSolidMS::updateDescriptorSets()
-{
-  auto * vCtx = app->vCtx;
-  auto device = vCtx->device;
-
-  inDescSet = texturing;
-
-  VkWriteDescriptorSet writes[3];
-  for (auto & rename : renaming) {
-
-    writes[0] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    writes[0].dstSet = rename.objBufDescSet.resource->descSet;
-    writes[0].descriptorCount = 1;
-    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    writes[0].pBufferInfo = &rename.objectBuffer.resource->descInfo;
-    writes[0].dstArrayElement = 0;
-    writes[0].dstBinding = 0;
-
-    writes[1] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    writes[1].dstSet = rename.objBufSamplerDescSet.resource->descSet;
-    writes[1].descriptorCount = 1;
-    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    writes[1].dstArrayElement = 0;
-    writes[1].dstBinding = 0;
-    writes[1].pBufferInfo = &rename.objectBuffer.resource->descInfo;
-
-    VkDescriptorImageInfo imageInfo{};
-    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    imageInfo.imageView = inDescSet == Texturing::Checker ? checkerTex.resource->view.resource->view : colorGradientTex.resource->view.resource->view;
-    imageInfo.sampler = texSampler.resource->sampler;
-
-    writes[2] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    writes[2].dstSet = rename.objBufSamplerDescSet.resource->descSet;
-    writes[2].descriptorCount = 1;
-    writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    writes[2].dstArrayElement = 0;
-    writes[2].dstBinding = 2;
-    writes[2].pImageInfo = &imageInfo;
-
-    vkUpdateDescriptorSets(device, ARRAYSIZE(writes), writes, 0, nullptr);
-  }
 }
 
 
@@ -349,9 +295,9 @@ void RenderSolidMS::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Ve
   auto * vCtx = app->vCtx;
   auto device = vCtx->device;
 
-  if (!vanillaPipeline || vanillaPipeline.resource->pass != pass) buildPipelines(pass);
+  auto & frame = vCtx->frameManager->frame();
 
-  if (inDescSet != texturing) updateDescriptorSets();
+  if (!vanillaPipeline || vanillaPipeline.resource->pass != pass) buildPipelines(pass);
 
   VkViewport vp = {};
   vp.x = viewport.x;
@@ -378,35 +324,75 @@ void RenderSolidMS::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Ve
     }
 
     {
-      MappedBuffer<ObjectBuffer> map(vCtx, rename.objectBuffer);
-      map.mem->MVP = MVP;
-      map.mem->Ncol0 = Vec4f(N.cols[0], 0.f);
-      map.mem->Ncol1 = Vec4f(N.cols[1], 0.f);
-      map.mem->Ncol2 = Vec4f(N.cols[2], 0.f);
+      auto * mem = (ObjectBuffer*)rename.objectBuffer.resource->hostPtr;
+      mem->MVP = MVP;
+      mem->Ncol0 = Vec4f(N.cols[0], 0.f);
+      mem->Ncol1 = Vec4f(N.cols[1], 0.f);
+      mem->Ncol2 = Vec4f(N.cols[2], 0.f);
     }
 
-    {
+    if (texturing == Texturing::None) {
+
+      vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipe);
+
+      VkDescriptorSetAllocateInfo descAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+      descAllocInfo.descriptorPool = frame.descriptorPool.resource->pool;
+      descAllocInfo.descriptorSetCount = 1;
+      descAllocInfo.pSetLayouts = &vanillaPipeline.resource->descLayout;
+
+      VkDescriptorSet set = VK_NULL_HANDLE;
+      CHECK_VULKAN(vkAllocateDescriptorSets(device, &descAllocInfo, &set));
+
       VkWriteDescriptorSet writes[2];
-      writes[0] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-      writes[0].dstSet = rename.objBufDescSet.resource->descSet;
-      writes[0].descriptorCount = 1;
-      writes[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-      writes[0].pBufferInfo = &item.vtx.resource->descInfo;
-      writes[0].dstArrayElement = 0;
-      writes[0].dstBinding = 1;
-      writes[1] = writes[0];
-      writes[1].dstSet = rename.objBufSamplerDescSet.resource->descSet;
+      for (size_t i = 0; i < ARRAYSIZE(writes); i++) {
+        writes[i] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+        writes[i].dstSet = set;
+        writes[i].descriptorCount = 1;
+        writes[i].dstBinding = uint32_t(i);
+      }
+      writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      writes[0].pBufferInfo = &rename.objectBuffer.resource->descInfo;
+      writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      writes[1].pBufferInfo = &item.vtx.resource->descInfo;
       vkUpdateDescriptorSets(device, ARRAYSIZE(writes), writes, 0, nullptr);
-    }
 
-    if (texturing != Texturing::None) {
-      vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipe);
-      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipeLayout, 0, 1, &rename.objBufSamplerDescSet.resource->descSet, 0, NULL);
+      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &set, 0, NULL);
     }
     else {
-      vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipe);
-      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
+
+      vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipe);
+
+      VkDescriptorSetAllocateInfo descAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+      descAllocInfo.descriptorPool = frame.descriptorPool.resource->pool;
+      descAllocInfo.descriptorSetCount = 1;
+      descAllocInfo.pSetLayouts = &vanillaPipeline.resource->descLayout;
+
+      VkDescriptorSet set = VK_NULL_HANDLE;
+      CHECK_VULKAN(vkAllocateDescriptorSets(device, &descAllocInfo, &set));
+
+      VkDescriptorImageInfo imageInfo{};
+      imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+      imageInfo.imageView = inDescSet == Texturing::Checker ? checkerTex.resource->view.resource->view : colorGradientTex.resource->view.resource->view;
+      imageInfo.sampler = texSampler.resource->sampler;
+
+      VkWriteDescriptorSet writes[3];
+      for (size_t i = 0; i < ARRAYSIZE(writes); i++) {
+        writes[i] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+        writes[i].dstSet = set;
+        writes[i].descriptorCount = 1;
+        writes[i].dstBinding = uint32_t(i);
+      }
+      writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+      writes[0].pBufferInfo = &rename.objectBuffer.resource->descInfo;
+      writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      writes[1].pBufferInfo = &item.vtx.resource->descInfo;
+      writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+      writes[2].pImageInfo = &imageInfo;
+      vkUpdateDescriptorSets(device, ARRAYSIZE(writes), writes, 0, nullptr);
+
+      vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipeLayout, 0, 1, &set, 0, NULL);
     }
+
     if (item.indices) {
       vkCmdBindIndexBuffer(cmdBuf, item.indices.resource->buffer, 0, VK_INDEX_TYPE_UINT32);
       vkCmdDrawIndexed(cmdBuf, 3 * item.triangleCount, 1, 0, 0, 0);
