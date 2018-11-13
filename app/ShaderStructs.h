@@ -35,12 +35,16 @@ struct Vertex
 };
 static_assert(sizeof(Vertex) == 3 * 8);
 
-struct Meshlet
+struct alignas(16) Meshlet
 {
+  Vec3f center;
+  float radius;
+
   uint32_t offset;
   uint8_t vertexCount;
   uint8_t triangleCount;
 };
+static_assert(sizeof(Meshlet) == 2*16);
 
 struct ObjectBuffer
 {

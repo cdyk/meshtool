@@ -8,6 +8,8 @@ struct Vertex
 
 struct Meshlet
 {
+  vec3 center;
+  float radius;
   uint offset;
   uint8_t vertexCount;
   uint8_t triangleCount;

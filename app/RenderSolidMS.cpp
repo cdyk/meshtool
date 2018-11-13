@@ -122,7 +122,7 @@ namespace {
     auto N = meshlets.size32();
     auto M = ((N + 31) & ~31u) - N; // pad up to 32
     for (uint32_t i = 0; i < M; i++) {
-      meshlets.pushBack(Meshlet{ 0 });
+      meshlets.pushBack(Meshlet{Vec3f(0.f), 0 });
     }
     assert((meshlets.size32() % 32) == 0);
   }
@@ -283,23 +283,9 @@ void RenderSolidMS::update(Vector<Mesh*>& meshes)
             auto k = meshletData[meshlet.offset + i];
             P[i] = Vec3f(vtx[k].px, vtx[k].py, vtx[k].pz);
           }
-
-          Vec3f c0;
-          float r0;
-          boundingSphereNaive(c0, r0, P.data(), P.size());
-
-          Vec3f c1;
-          float r1;
-          boundingSphere(c1, r1, P.data(), P.size());
-
-
-          logger(0, "%.3f p=[%.2f %.2f %.2f] r=%.2f  p=[%.2f %.2f %.2f] r=%.2f", r1/r0, c0.x, c0.y, c0.z, r0, c1.x, c1.y, c1.z, r1);
-
+          boundingSphere(meshlet.center, meshlet.radius, P.data(), P.size());
         }
-
       }
-      
-
 
       meshData.meshletData = resources->createStorageBuffer(meshletData.byteSize());
       meshData.meshlets = resources->createStorageBuffer(meshlets.byteSize());
