@@ -115,6 +115,12 @@ namespace {
     if(meshletIndices)
       storeMeshlet(meshletData, meshlets, localindices, offset, meshletIndices);
 
+    auto N = meshlets.size32();
+    auto M = ((N + 31) & ~31u) - N; // pad up to 32
+    for (uint32_t i = 0; i < M; i++) {
+      meshlets.pushBack(Meshlet{ 0 });
+    }
+    assert((meshlets.size32() % 32) == 0);
   }
 
 }
@@ -132,7 +138,8 @@ void RenderSolidMS::init()
   auto * vCtx = app->vCtx;
   auto * resources = vCtx->resources;
 
-  vertexShader = resources->createShader(vanilla_vert, sizeof(vanilla_vert));
+  taskShader = resources->createShader(vanilla_task, sizeof(vanilla_task));
+  meshShader = resources->createShader(vanilla_mesh, sizeof(vanilla_mesh));
   solidShader = resources->createShader(vanilla_frag, sizeof(vanilla_frag));
   texturedShader = resources->createShader(textured_frag, sizeof(textured_frag));
 
@@ -185,8 +192,8 @@ void RenderSolidMS::update(Vector<Mesh*>& meshes)
       meshData.geometryGeneration = mesh->geometryGeneration;
       meshData.colorGeneration = mesh->colorGeneration;
 
-      meshData.triangleCount = mesh->triCount;
-      meshData.vtx = resources->createStorageBuffer(sizeof(Vertex) * 3 * meshData.triangleCount);
+      auto triangleCount = mesh->triCount;
+      meshData.vtx = resources->createStorageBuffer(sizeof(Vertex) * 3 * triangleCount);
 
       Vector<uint32_t> indices;
       auto vtxStaging = resources->createStagingBuffer(meshData.vtx.resource->requestedSize);
@@ -249,7 +256,7 @@ void RenderSolidMS::update(Vector<Mesh*>& meshes)
       }
 
       if (indices.empty()) {
-        indices.resize(3 * meshData.triangleCount);
+        indices.resize(3 * triangleCount);
         for (uint32_t i = 0; i < indices.size32(); i++) indices[i] = i;
       }
 
@@ -268,32 +275,16 @@ void RenderSolidMS::update(Vector<Mesh*>& meshes)
       Vector<Meshlet> meshlets;
 
       buildMeshlets(meshletData, meshlets, indices);
+      meshData.meshletData = resources->createStorageBuffer(meshletData.byteSize());
+      meshData.meshlets = resources->createStorageBuffer(meshlets.byteSize());
+      meshData.meshletCount = meshlets.size32();
+
+      frameManager->stageAndCopyBuffer(meshData.meshletData, meshletData.data(), meshletData.byteSize());
+      frameManager->stageAndCopyBuffer(meshData.meshlets, meshlets.data(), meshlets.byteSize());
 
       logger(0, "%d meshlets (%d tris per meshlet), %.1f uints per meshlet",
              meshlets.size(), indices.size() / (3 * meshlets.size()), float(meshletData.size()) / meshlets.size());
 
-      meshData.meshletData = resources->createStorageBuffer(meshletData.byteSize());
-      frameManager->stageAndCopyBuffer(meshData.meshletData, meshletData.data(), meshletData.byteSize());
-
-      meshData.meshlets = resources->createStorageBuffer(meshlets.byteSize());
-      frameManager->stageAndCopyBuffer(meshData.meshlets, meshlets.data(), meshlets.byteSize());
-
-
-      if (indices.any()) {
-#ifdef TRASH_INDICES
-        std::random_device rd;
-        std::mt19937 g(rd());
-        std::shuffle((Vec3f*)indices.begin(), (Vec3f*)indices.end(), g);
-#endif
-
-        meshData.indices = resources->createIndexDeviceBuffer(sizeof(uint32_t)*indices.size());
-        auto stage = resources->createStagingBuffer(sizeof(uint32_t)*indices.size());
-        std::memcpy(stage.resource->hostPtr, indices.data(), sizeof(uint32_t)*indices.size());
-        vCtx->frameManager->copyBuffer(meshData.indices, stage, sizeof(uint32_t)*indices.size());
-      }
-      else {
-        meshData.indices = RenderBufferHandle();
-      }
 
       logger(0, "RenderSolidMS: Updated MeshData item");
     }
@@ -314,23 +305,29 @@ void RenderSolidMS::buildPipelines(RenderPassHandle pass)
   auto * vCtx = app->vCtx;
   auto * resources = vCtx->resources;
 
-  VkDescriptorSetLayoutBinding objBufLayoutBinding[2];
-  objBufLayoutBinding[0] = {};
+  VkDescriptorSetLayoutBinding objBufLayoutBinding[4];
+  for (size_t i = 0; i < ARRAYSIZE(objBufLayoutBinding); i++) {
+    objBufLayoutBinding[i] = {};
+    objBufLayoutBinding[i].descriptorCount = 1;
+  }
   objBufLayoutBinding[0].binding = 0;
   objBufLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  objBufLayoutBinding[0].descriptorCount = 1;
-  objBufLayoutBinding[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-  objBufLayoutBinding[1] = {};
+  objBufLayoutBinding[0].stageFlags = VK_SHADER_STAGE_MESH_BIT_NV;
   objBufLayoutBinding[1].binding = 1;
   objBufLayoutBinding[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-  objBufLayoutBinding[1].descriptorCount = 1;
-  objBufLayoutBinding[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+  objBufLayoutBinding[1].stageFlags = VK_SHADER_STAGE_MESH_BIT_NV;
+  objBufLayoutBinding[2].binding = 3;
+  objBufLayoutBinding[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  objBufLayoutBinding[2].stageFlags = VK_SHADER_STAGE_MESH_BIT_NV;
+  objBufLayoutBinding[3].binding = 4;
+  objBufLayoutBinding[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  objBufLayoutBinding[3].stageFlags = VK_SHADER_STAGE_MESH_BIT_NV;
 
   VkDescriptorSetLayoutCreateInfo objBufLayoutInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
   objBufLayoutInfo.bindingCount = ARRAYSIZE(objBufLayoutBinding);
   objBufLayoutInfo.pBindings = objBufLayoutBinding;
 
-  VkDescriptorSetLayoutBinding objBufSamplerLayoutBinding[3];
+  VkDescriptorSetLayoutBinding objBufSamplerLayoutBinding[5];
   objBufSamplerLayoutBinding[0] = objBufLayoutBinding[0];
   objBufSamplerLayoutBinding[1] = objBufLayoutBinding[1];
   objBufSamplerLayoutBinding[2] = {};
@@ -338,6 +335,8 @@ void RenderSolidMS::buildPipelines(RenderPassHandle pass)
   objBufSamplerLayoutBinding[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
   objBufSamplerLayoutBinding[2].descriptorCount = 1;
   objBufSamplerLayoutBinding[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+  objBufSamplerLayoutBinding[3] = objBufLayoutBinding[2];
+  objBufSamplerLayoutBinding[4] = objBufLayoutBinding[3];
 
   VkDescriptorSetLayoutCreateInfo objBufSamplerLayoutInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
   objBufSamplerLayoutInfo.bindingCount = ARRAYSIZE(objBufSamplerLayoutBinding);
@@ -363,13 +362,13 @@ void RenderSolidMS::buildPipelines(RenderPassHandle pass)
                                               pipeLayoutInfo,
                                               objBufLayoutInfo,
                                               pass,
-                                              { vertexShader, solidShader },
+                                              { taskShader, meshShader, solidShader },
                                               cullBackDepthBiasRasInfo);
   texturedPipeline = resources->createPipeline({ }, { },
                                                pipeLayoutInfo,
                                                objBufSamplerLayoutInfo,
                                                pass,
-                                               { vertexShader, texturedShader },
+                                               { taskShader, meshShader, texturedShader },
                                                cullBackDepthBiasRasInfo);
 }
 
@@ -414,17 +413,28 @@ void RenderSolidMS::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Ve
 
       VkDescriptorSet set = frameManager->allocDescriptorSet(vanillaPipeline);
 
-      VkWriteDescriptorSet writes[2];
+      VkWriteDescriptorSet writes[4];
       for (size_t i = 0; i < ARRAYSIZE(writes); i++) {
         writes[i] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
         writes[i].dstSet = set;
         writes[i].descriptorCount = 1;
-        writes[i].dstBinding = uint32_t(i);
       }
+      writes[0].dstBinding = 0;
       writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
       writes[0].pBufferInfo = &objectBufferInfo;
+
+      writes[1].dstBinding = 1;
       writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       writes[1].pBufferInfo = &item.vtx.resource->descInfo;
+
+      writes[2].dstBinding = 3;
+      writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      writes[2].pBufferInfo = &item.meshletData.resource->descInfo;
+
+      writes[3].dstBinding = 4;
+      writes[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      writes[3].pBufferInfo = &item.meshlets.resource->descInfo;
+
       vkUpdateDescriptorSets(device, ARRAYSIZE(writes), writes, 0, nullptr);
 
       vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &set, 0, NULL);
@@ -458,14 +468,7 @@ void RenderSolidMS::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Ve
       vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipeLayout, 0, 1, &set, 0, NULL);
     }
 
-    if (item.indices) {
-      vkCmdBindIndexBuffer(cmdBuf, item.indices.resource->buffer, 0, VK_INDEX_TYPE_UINT32);
-      vkCmdDrawIndexed(cmdBuf, 3 * item.triangleCount, 1, 0, 0, 0);
-    }
-    else {
-      vkCmdDraw(cmdBuf, 3 * item.triangleCount, 1, 0, 0);
-    }
-
+    vCtx->vkCmdDrawMeshTasksNV(cmdBuf, (item.meshletCount + 31) / 32, 0);
   }
 }
 

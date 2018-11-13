@@ -11,20 +11,23 @@ layout(local_size_x=32) in;
 layout(triangles, max_vertices=64, max_primitives=126) out;
 
 
-layout(std140, binding = 0) uniform ObjBuf
-{
+layout(std140, binding = 0) uniform ObjBuf {
   mat4 MP;
   mat3 N;
 };
 
-layout(binding=1) readonly buffer Vertices
-{
+layout(binding=1) readonly buffer Vertices {
   Vertex vertices[];
 };
 
-layout(binding=2) readonly buffer Meshlets
-{
-	Meshlet meshletData[];
+// 2 is bound to texture atm.
+
+layout(binding=3) readonly buffer MeshletIndexData {
+	uint meshletIndexData[];
+};
+
+layout(binding=4) readonly buffer Meshlets {
+	Meshlet meshlets[];
 };
 
 in taskNV Task
@@ -42,11 +45,12 @@ void main() {
 	uint tid = gl_LocalInvocationID.x;
 	uint gid = gl_WorkGroupID.x;
 	uint mIx = meshletIndices[gid];
-	uint vertexCount = uint(meshletData[mIx].vertexCount);
-	uint triangleCount = uint(meshletData[mIx].triangleCount);
+	uint vertexOffset = uint(meshlets[mIx].offset);
+	uint vertexCount = uint(meshlets[mIx].vertexCount);
+	uint triangleCount = uint(meshlets[mIx].triangleCount);
 
 	for(uint i = tid; i<vertexCount; i+=32) {
-		uint vIx = meshletData[gid].vertices[i];
+		uint vIx = meshletIndexData[vertexOffset + i];
 
 		vec3 pos = vec3(vertices[vIx].px,
 		                vertices[vIx].py,
@@ -54,10 +58,21 @@ void main() {
 		vec3 nrm = vec3((1.0/127.0)*int(vertices[vIx].nx) - 1.0,
 						(1.0/127.0)*int(vertices[vIx].ny) - 1.0,
 						(1.0/127.0)*int(vertices[vIx].nz) - 1.0);
+
 		vec4 col = vec4((1.0/255.0)*int(vertices[vIx].r),
 						(1.0/255.0)*int(vertices[vIx].g),
 						(1.0/255.0)*int(vertices[vIx].b),
 						(1.0/255.0)*int(vertices[vIx].a));
+#if 1
+		uint c = mIx;
+	    c = ((c >> 16) ^ c) * 0x45d9f3b;
+		c = ((c >> 16) ^ c) * 0x45d9f3b;
+		c = (c >> 16) ^ c;
+		col = vec4((1.0/255.0)*int((c>>16)&0xff),
+				   (1.0/255.0)*int((c>>8)&0xff),
+				   (1.0/255.0)*int((c)&0xff),
+				   1.f);
+#endif
 		vec2 tex = vec2(vertices[vIx].tu,
 						vertices[vIx].tv);
 
@@ -66,10 +81,11 @@ void main() {
 		texCoord[i] = tex;
 		gl_MeshVerticesNV[i].gl_Position = MP * vec4(pos, 1);
 	}
+	uint indexOffset = vertexOffset + vertexCount;
 	for(uint i = tid; i < 3*triangleCount; i+=32) {
-		gl_PrimitiveIndicesNV[i] = uint(meshletData[gid].indices[i]);
+		gl_PrimitiveIndicesNV[i] = meshletIndexData[indexOffset + i];
 	}
 	if(tid==0) {
-		gl_PrimitiveCountNV = uint(meshletData[gid].triangleCount);
+		gl_PrimitiveCountNV = triangleCount;
 	}
 }

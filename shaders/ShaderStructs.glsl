@@ -8,8 +8,7 @@ struct Vertex
 
 struct Meshlet
 {
-  uint vertices[64];
-  uint8_t indices[126 * 3];
+  uint offset;
   uint8_t vertexCount;
   uint8_t triangleCount;
 };

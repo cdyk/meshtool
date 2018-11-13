@@ -51,9 +51,6 @@ private:
     RenderBufferHandle meshletData;
     RenderBufferHandle meshlets;
     uint32_t meshletCount = 0;
-
-    RenderBufferHandle indices;
-    uint32_t triangleCount = 0;
   };
   Vector<MeshData> meshData;
   Vector<MeshData> newMeshData;
@@ -61,7 +58,8 @@ private:
   PipelineHandle vanillaPipeline;
   PipelineHandle texturedPipeline;
 
-  ShaderHandle vertexShader;
+  ShaderHandle taskShader;
+  ShaderHandle meshShader;
   ShaderHandle solidShader;
   ShaderHandle texturedShader;
 

@@ -56,6 +56,9 @@ public:
   PFN_vkCmdWriteAccelerationStructurePropertiesNVX vkCmdWriteAccelerationStructurePropertiesNVX = nullptr;
   PFN_vkCompileDeferredNVX vkCompileDeferredNVX = nullptr;
 
+  PFN_vkCmdDrawMeshTasksNV vkCmdDrawMeshTasksNV = nullptr;
+  PFN_vkCmdDrawMeshTasksIndirectNV vkCmdDrawMeshTasksIndirectNV = nullptr;
+  PFN_vkCmdDrawMeshTasksIndirectCountNV vkCmdDrawMeshTasksIndirectCountNV = nullptr;
 
   VkPhysicalDeviceProperties physicalDeviceProperties;
   VkPhysicalDeviceMemoryProperties memoryProperties;

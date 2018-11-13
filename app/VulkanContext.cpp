@@ -315,6 +315,15 @@ VulkanContext::VulkanContext(Logger logger,
       vkCompileDeferredNVX = (PFN_vkCompileDeferredNVX)vkGetInstanceProcAddr(instance, "vkCompileDeferredNVX");;
       assert(vkCompileDeferredNVX);
     }
+    if (nvMeshShader) {
+      vkCmdDrawMeshTasksNV = (PFN_vkCmdDrawMeshTasksNV)vkGetInstanceProcAddr(instance, "vkCmdDrawMeshTasksNV");
+      assert(vkCmdDrawMeshTasksNV);
+      vkCmdDrawMeshTasksIndirectNV = (PFN_vkCmdDrawMeshTasksIndirectNV)vkGetInstanceProcAddr(instance, "vkCmdDrawMeshTasksIndirectNV");
+      assert(vkCmdDrawMeshTasksIndirectNV);
+      vkCmdDrawMeshTasksIndirectCountNV = (PFN_vkCmdDrawMeshTasksIndirectCountNV)vkGetInstanceProcAddr(instance, "vkCmdDrawMeshTasksIndirectCountNV");
+      assert(vkCmdDrawMeshTasksIndirectCountNV);
+    }
+
     vkGetDeviceQueue(device, queueFamilyIndex, 0, &queue);
   }
   // create descriptoor pool
