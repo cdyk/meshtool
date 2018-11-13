@@ -3,8 +3,9 @@
 Small mesh processing tool that is easy for me to tweak. I needed a fast viewer of large OBJ files, so currently it just contains a pretty fast, but quite featureless, loader of OBJ files in addition to a generic viewer. Features and tools will come as I need them.
 
 It also doubles as my Vulkan playgrond. Currently includes:
-- Plain vanilla push-geometry renderer.
+- Plain simple pull-from-storage-buffer renderer.
 - A basic VK_NVX_raytracing-based path-trace renderer.
+- A basic VK_NV_mesh_shader renderer.
 
 ## Building dependencies
 
