@@ -180,11 +180,12 @@
   <ItemGroup>
     <CustomBuild Include="..\shaders\textured.frag">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslc.exe -c --target-env=vulkan1.1 -mfmt=c %(FullPath) -o %(FullPath).h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Message>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>

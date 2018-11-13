@@ -32,9 +32,9 @@ namespace {
 #include "vanilla.frag.h"
   };
 
-  uint32_t textured_frag[]
+  uint32_t textured_frag[] = {
 #include "textured.frag.h"
-    ;
+  };
 
   struct RGBA8
   {
