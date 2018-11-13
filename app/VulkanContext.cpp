@@ -286,6 +286,7 @@ VulkanContext::VulkanContext(Logger logger,
 
     CHECK_VULKAN(vkCreateDevice(physicalDevice, &deviceInfo, NULL, &device));
 
+
     if (nvxRaytracing) {
       vkCreateAccelerationStructureNVX = (PFN_vkCreateAccelerationStructureNVX)vkGetInstanceProcAddr(instance, "vkCreateAccelerationStructureNVX");;
       assert(vkCreateAccelerationStructureNVX);

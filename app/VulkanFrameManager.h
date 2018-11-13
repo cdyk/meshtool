@@ -26,6 +26,12 @@ public:
   void copyBufferToImage(ImageHandle dst, RenderBufferHandle src, uint32_t w, uint32_t h);
   void submitGraphics(VkCommandBuffer cmdBuf, bool wait = false);
 
+
+  void* allocUniformStore(VkDescriptorBufferInfo& bufferInfo, size_t size);
+
+  VkDescriptorSet allocDescriptorSet(PipelineHandle& pipe);
+
+
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   VkSurfaceFormatKHR surfaceFormat;
   VkPresentModeKHR presentMode;
@@ -36,6 +42,10 @@ public:
     CommandPoolHandle commandPool;
     DescriptorPoolHandle descriptorPool;
     VkCommandBuffer commandBuffer;
+    struct {
+      RenderBufferHandle buffer;
+      size_t fill = 0;
+    } uniformPool;
     FenceHandle fence;
     SemaphoreHandle imageAcquiredSemaphore;
     SemaphoreHandle renderCompleteSemaphore;

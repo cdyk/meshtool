@@ -39,25 +39,11 @@ private:
   };
   Vector<MeshData> meshData;
   Vector<MeshData> newMeshData;
-
   RenderBufferHandle coordSysVtxCol;
-
   ShaderHandle vertexShader;
   ShaderHandle fragmentShader;
-
   PipelineHandle pipeline;
-
   uint32_t viewport[4];
-  uint32_t frameCount;
-
-  struct Rename {
-    FenceHandle ready;
-    DescriptorSetHandle objBufDescSet;
-    RenderBufferHandle objectBuffer;
-  };
-  Vector<Rename> renaming;
-  unsigned renameNext = 0;
 
   void buildPipelines(RenderPassHandle pass);
-
 };

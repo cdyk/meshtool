@@ -22,7 +22,7 @@ public:
   };
 
   Texturing texturing = Texturing::None;
-  
+
   RenderSolidMS(Logger logger, App* app);
   ~RenderSolidMS();
 
@@ -31,7 +31,7 @@ public:
   void update(Vector<Mesh*>& meshes);
 
   void draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP);
-  
+
   RenderTextureManager* textureManager = nullptr;
 
 
@@ -54,8 +54,6 @@ private:
   Vector<MeshData> meshData;
   Vector<MeshData> newMeshData;
 
-  void updateDescriptorSets();
-
   PipelineHandle vanillaPipeline;
   PipelineHandle texturedPipeline;
 
@@ -64,22 +62,10 @@ private:
   ShaderHandle texturedShader;
 
   uint32_t viewport[4];
-  uint32_t frameCount;
 
   RenderTextureHandle checkerTex;
   RenderTextureHandle colorGradientTex;
-
-
   SamplerHandle texSampler;
-
-  struct Rename {
-    FenceHandle ready;
-    DescriptorSetHandle objBufDescSet;
-    DescriptorSetHandle objBufSamplerDescSet;
-    RenderBufferHandle objectBuffer;
-  };
-  Vector<Rename> renaming;
-  unsigned renameNext = 0;
 
   void buildPipelines(RenderPassHandle pass);
 

@@ -70,11 +70,6 @@ void RenderSolidMS::init()
   solidShader = resources->createShader(vanilla_frag, sizeof(vanilla_frag));
   texturedShader = resources->createShader(textured_frag, sizeof(textured_frag));
 
-  renaming.resize(10);
-  for (size_t i = 0; i < renaming.size(); i++) {
-    renaming[i].objectBuffer = vCtx->resources->createUniformBuffer(sizeof(ObjectBuffer));
-  }
-
   checkerTex = textureManager->loadTexture(TextureSource::Checker);
   colorGradientTex = textureManager->loadTexture(TextureSource::ColorGradient);
 
@@ -294,8 +289,7 @@ void RenderSolidMS::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Ve
 {
   auto * vCtx = app->vCtx;
   auto device = vCtx->device;
-
-  auto & frame = vCtx->frameManager->frame();
+  auto * frameManager = vCtx->frameManager;
 
   if (!vanillaPipeline || vanillaPipeline.resource->pass != pass) buildPipelines(pass);
 
@@ -317,31 +311,19 @@ void RenderSolidMS::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Ve
 
   for (auto & item : meshData) {
 
-    auto & rename = renaming[renameNext];
-    renameNext = (renameNext + 1);
-    if (renaming.size() <= renameNext) {
-      renameNext = 0;
-    }
+    VkDescriptorBufferInfo objectBufferInfo;
+    auto* objectBuffer = (ObjectBuffer*)vCtx->frameManager->allocUniformStore(objectBufferInfo, sizeof(ObjectBuffer));
+    objectBuffer->MVP = MVP;
+    objectBuffer->Ncol0 = Vec4f(N.cols[0], 0.f);
+    objectBuffer->Ncol1 = Vec4f(N.cols[1], 0.f);
+    objectBuffer->Ncol2 = Vec4f(N.cols[2], 0.f);
 
-    {
-      auto * mem = (ObjectBuffer*)rename.objectBuffer.resource->hostPtr;
-      mem->MVP = MVP;
-      mem->Ncol0 = Vec4f(N.cols[0], 0.f);
-      mem->Ncol1 = Vec4f(N.cols[1], 0.f);
-      mem->Ncol2 = Vec4f(N.cols[2], 0.f);
-    }
 
     if (texturing == Texturing::None) {
 
       vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipe);
 
-      VkDescriptorSetAllocateInfo descAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-      descAllocInfo.descriptorPool = frame.descriptorPool.resource->pool;
-      descAllocInfo.descriptorSetCount = 1;
-      descAllocInfo.pSetLayouts = &vanillaPipeline.resource->descLayout;
-
-      VkDescriptorSet set = VK_NULL_HANDLE;
-      CHECK_VULKAN(vkAllocateDescriptorSets(device, &descAllocInfo, &set));
+      VkDescriptorSet set = frameManager->allocDescriptorSet(vanillaPipeline);
 
       VkWriteDescriptorSet writes[2];
       for (size_t i = 0; i < ARRAYSIZE(writes); i++) {
@@ -351,7 +333,7 @@ void RenderSolidMS::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Ve
         writes[i].dstBinding = uint32_t(i);
       }
       writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-      writes[0].pBufferInfo = &rename.objectBuffer.resource->descInfo;
+      writes[0].pBufferInfo = &objectBufferInfo;
       writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       writes[1].pBufferInfo = &item.vtx.resource->descInfo;
       vkUpdateDescriptorSets(device, ARRAYSIZE(writes), writes, 0, nullptr);
@@ -362,13 +344,7 @@ void RenderSolidMS::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Ve
 
       vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipe);
 
-      VkDescriptorSetAllocateInfo descAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-      descAllocInfo.descriptorPool = frame.descriptorPool.resource->pool;
-      descAllocInfo.descriptorSetCount = 1;
-      descAllocInfo.pSetLayouts = &vanillaPipeline.resource->descLayout;
-
-      VkDescriptorSet set = VK_NULL_HANDLE;
-      CHECK_VULKAN(vkAllocateDescriptorSets(device, &descAllocInfo, &set));
+      VkDescriptorSet set = frameManager->allocDescriptorSet(texturedPipeline);
 
       VkDescriptorImageInfo imageInfo{};
       imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -383,7 +359,7 @@ void RenderSolidMS::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Ve
         writes[i].dstBinding = uint32_t(i);
       }
       writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-      writes[0].pBufferInfo = &rename.objectBuffer.resource->descInfo;
+      writes[0].pBufferInfo = &objectBufferInfo;
       writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       writes[1].pBufferInfo = &item.vtx.resource->descInfo;
       writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;

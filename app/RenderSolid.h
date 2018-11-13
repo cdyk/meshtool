@@ -62,19 +62,10 @@ private:
   ShaderHandle texturedShader;
 
   uint32_t viewport[4];
-  uint32_t frameCount;
 
   RenderTextureHandle checkerTex;
   RenderTextureHandle colorGradientTex;
-
-
   SamplerHandle texSampler;
-
-  struct Rename {
-    RenderBufferHandle objectBuffer;
-  };
-  Vector<Rename> renaming;
-  unsigned renameNext = 0;
 
   void buildPipelines(RenderPassHandle pass);
 

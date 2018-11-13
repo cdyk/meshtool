@@ -53,12 +53,6 @@ void RenderTangents::init()
   vertexShader = resources->createShader(coordSysVS, sizeof(coordSysVS));
   fragmentShader = resources->createShader(flatPS, sizeof(flatPS));
 
-  renaming.resize(10);
-  for (size_t i = 0; i < renaming.size(); i++) {
-    renaming[i].ready = vCtx->resources->createFence(true);
-    renaming[i].objectBuffer = vCtx->resources->createUniformBuffer(sizeof(ObjectBuffer));
-  }
-  
   coordSysVtxCol = vCtx->resources->createVertexDeviceBuffer(2*sizeof(Vec3f) * 6);
   auto coordSysStaging = vCtx->resources->createStagingBuffer(coordSysVtxCol.resource->requestedSize);
   {
@@ -239,27 +233,12 @@ void RenderTangents::buildPipelines(RenderPassHandle pass)
     logger(0, "Built RenderTangents pipeline.");
   }
 
-  for(auto & rename : renaming) {
-    rename.objBufDescSet = resources->createDescriptorSet(pipeline.resource->descLayout);
-
-    VkWriteDescriptorSet writes[1];
-    writes[0] = {};
-    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writes[0].pNext = nullptr;
-    writes[0].dstSet = rename.objBufDescSet.resource->descSet;
-    writes[0].descriptorCount = 1;
-    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    writes[0].pBufferInfo = &rename.objectBuffer.resource->descInfo;
-    writes[0].dstArrayElement = 0;
-    writes[0].dstBinding = 0;
-    vkUpdateDescriptorSets(device, 1, writes, 0, nullptr);
-  }
-
 }
 
 void RenderTangents::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP)
 {
   auto * vCtx = app->vCtx;
+  auto * frameManager = vCtx->frameManager;
 
   if (!pipeline || pipeline.resource->pass != pass) buildPipelines(pass);
 
@@ -283,20 +262,22 @@ void RenderTangents::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const V
   }
 
   for (auto & item : meshData) {
+    VkDescriptorBufferInfo objectBufferInfo;
+    auto* objectBuffer = (ObjectBuffer*)vCtx->frameManager->allocUniformStore(objectBufferInfo, sizeof(ObjectBuffer));
+    objectBuffer->MVP = MVP;
+    objectBuffer->Ncol0 = Vec4f(N.cols[0], 0.f);
+    objectBuffer->Ncol1 = Vec4f(N.cols[1], 0.f);
+    objectBuffer->Ncol2 = Vec4f(N.cols[2], 0.f);
 
-    auto & rename = renaming[renameNext];
-    renameNext = (renameNext + 1);
-    if (renaming.size() <= renameNext) {
-      renameNext = 0;
-    }
+    VkDescriptorSet set = frameManager->allocDescriptorSet(pipeline);
 
-    {
-      auto * mem = (ObjectBuffer*)rename.objectBuffer.resource->hostPtr;
-      mem->MVP = MVP;
-      mem->Ncol0 = Vec4f(N.cols[0], 0.f);
-      mem->Ncol1 = Vec4f(N.cols[1], 0.f);
-      mem->Ncol2 = Vec4f(N.cols[2], 0.f);
-    }
+    VkWriteDescriptorSet writes[1];
+    writes[0] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+    writes[0].dstSet = set;
+    writes[0].descriptorCount = 1;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes[0].pBufferInfo = &objectBufferInfo;
+    vkUpdateDescriptorSets(vCtx->device, 1, writes, 0, nullptr);
     
 
     VkBuffer buffers[4] = {
@@ -308,7 +289,7 @@ void RenderTangents::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const V
     VkDeviceSize offsets[4] = { 0, 0, 0, 0 };
     vkCmdBindVertexBuffers(cmdBuf, 0, 4, buffers, offsets);
     vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.resource->pipe);
-    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
+    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.resource->pipeLayout, 0, 1, &set, 0, NULL);
     vkCmdDraw(cmdBuf, 6, 3 * item.triangleCount, 0, 0);
    
   }

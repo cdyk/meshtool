@@ -59,6 +59,8 @@ void VulkanFrameManager::init()
     descPoolInfo.pPoolSizes = poolSizes.data();
     frame.descriptorPool = res->createDescriptorPool(&descPoolInfo);
 
+    frame.uniformPool.buffer = res->createUniformBuffer(16 * 1024 * 1024);  // 16mb
+
     frame.imageAcquiredSemaphore = res->createSemaphore();
     frame.renderCompleteSemaphore = res->createSemaphore();
     frame.fence = res->createFence(true);
@@ -71,6 +73,40 @@ void VulkanFrameManager::init()
     frame.hasTimings = false;
   }
 }
+
+void* VulkanFrameManager::allocUniformStore(VkDescriptorBufferInfo& bufferInfo, size_t size)
+{
+  //VkPhysicalDeviceLimits::minUniformBufferOffsetAlignment
+  auto align = vCtx->physicalDeviceProperties.limits.minUniformBufferOffsetAlignment;
+  assert(align && (align & (align - 1)) == 0 && "minUniformBufferOffsetAlignment is either zero or not a power of two.");
+
+  auto & f = frame();
+  auto offset = f.uniformPool.fill;
+  f.uniformPool.fill = (f.uniformPool.fill + size + (align - 1u)) & ~(align - 1u);
+  assert(f.uniformPool.fill < f.uniformPool.buffer.resource->alignedSize);
+
+  bufferInfo.buffer = f.uniformPool.buffer.resource->buffer;
+  bufferInfo.offset = offset;
+  bufferInfo.range = f.uniformPool.fill - offset;
+  return (char*)f.uniformPool.buffer.resource->hostPtr + offset;
+}
+
+VkDescriptorSet  VulkanFrameManager::allocDescriptorSet(PipelineHandle& pipe)
+{
+  auto & f = frame();
+  auto device = vCtx->device;
+
+  VkDescriptorSetAllocateInfo descAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+  descAllocInfo.descriptorPool = f.descriptorPool.resource->pool;
+  descAllocInfo.descriptorSetCount = 1;
+  descAllocInfo.pSetLayouts = &pipe.resource->descLayout;
+
+  VkDescriptorSet set = VK_NULL_HANDLE;
+  CHECK_VULKAN(vkAllocateDescriptorSets(device, &descAllocInfo, &set));
+
+  return set;
+}
+
 
 VkSurfaceFormatKHR VulkanFrameManager::chooseFormat(Vector<VkFormat>& requestedFormats, VkColorSpaceKHR requestedColorSpace)
 {
@@ -186,6 +222,7 @@ void VulkanFrameManager::startFrame()
   if (frameIndex < framesInFlight) frameIndex = 0;
 
   auto & f = frame();
+  f.uniformPool.fill = 0;
 
   CHECK_VULKAN(vkAcquireNextImageKHR(vCtx->device,
                                      swapChain.resource->swapChain, UINT64_MAX,
