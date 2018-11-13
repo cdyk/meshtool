@@ -67,6 +67,9 @@
     <ClCompile Include="..\core\VertexCache.cpp">
       <Filter>src</Filter>
     </ClCompile>
+    <ClCompile Include="..\core\Bounds.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\core\Common.h">
@@ -112,6 +115,9 @@
       <Filter>src</Filter>
     </ClInclude>
     <ClInclude Include="..\core\Tasks.h">
+      <Filter>src</Filter>
+    </ClInclude>
+    <ClInclude Include="..\core\Bounds.h">
       <Filter>src</Filter>
     </ClInclude>
   </ItemGroup>

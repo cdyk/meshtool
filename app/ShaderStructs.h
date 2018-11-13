@@ -10,6 +10,7 @@ struct Vertex
   uint16_t tu, tv;
   uint8_t r, g, b, a;
 
+  Vertex() {}
 
   Vertex(const Vec3f& p,
          const Vec3f& n,

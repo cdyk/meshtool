@@ -123,6 +123,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\core\adt\KeyedHeap.cpp" />
+    <ClCompile Include="..\core\Bounds.cpp" />
     <ClCompile Include="..\core\Common.cpp" />
     <ClCompile Include="..\core\HandlePicking.cpp" />
     <ClCompile Include="..\core\LinAlgOps.cpp" />
@@ -141,6 +142,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\core\adt\KeyedHeap.h" />
+    <ClInclude Include="..\core\Bounds.h" />
     <ClInclude Include="..\core\Common.h" />
     <ClInclude Include="..\core\Half.h" />
     <ClInclude Include="..\core\HandlePicking.h" />

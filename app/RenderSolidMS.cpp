@@ -10,6 +10,7 @@
 #include "Half.h"
 #include "VertexCache.h"
 #include "ShaderStructs.h"
+#include "Bounds.h"
 
 //#define TRASH_INDICES
 #ifdef TRASH_INDICES
@@ -199,63 +200,59 @@ void RenderSolidMS::update(Vector<Mesh*>& meshes)
       meshData.vtx = resources->createStorageBuffer(sizeof(Vertex) * 3 * triangleCount);
 
       Vector<uint32_t> indices;
-      auto vtxStaging = resources->createStagingBuffer(meshData.vtx.resource->requestedSize);
+      Vector<Vertex> vtx(3 * triangleCount);
 
-      {
-        auto * mem = (Vertex*)vtxStaging.resource->hostPtr;
-        if (mesh->nrmCount) {
-          if (false && mesh->texCount) {
-            for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
-              mem[i] = Vertex(mesh->vtx[mesh->triVtxIx[i]],
-                              mesh->nrm[mesh->triNrmIx[i]],
-                              10.f*mesh->tex[mesh->triTexIx[i]],
-                              mesh->currentColor[i / 3]);
-            }
+      if (mesh->nrmCount) {
+        if (false && mesh->texCount) {
+          for (unsigned i = 0; i < 3 * mesh->triCount; i++) {
+            vtx[i] = Vertex(mesh->vtx[mesh->triVtxIx[i]],
+                            mesh->nrm[mesh->triNrmIx[i]],
+                            10.f*mesh->tex[mesh->triTexIx[i]],
+                            mesh->currentColor[i / 3]);
           }
-          else {
+        }
+        else {
 
-            Vector<uint32_t> newVertices;
+          Vector<uint32_t> newVertices;
 
-            uniqueIndices(logger, indices, newVertices, mesh->triVtxIx, mesh->triNrmIx, 3 * mesh->triCount);
+          uniqueIndices(logger, indices, newVertices, mesh->triVtxIx, mesh->triNrmIx, 3 * mesh->triCount);
 
-            for (uint32_t i = 0; i < newVertices.size32(); i++) {
-              auto ix = newVertices[i];
-              mem[i] = Vertex(mesh->vtx[mesh->triVtxIx[ix]],
-                              mesh->nrm[mesh->triNrmIx[ix]],
-                              Vec2f(0.5f),
-                              0xdddddd);
+          for (uint32_t i = 0; i < newVertices.size32(); i++) {
+            auto ix = newVertices[i];
+            vtx[i] = Vertex(mesh->vtx[mesh->triVtxIx[ix]],
+                            mesh->nrm[mesh->triNrmIx[ix]],
+                            Vec2f(0.5f),
+                            0xdddddd);
+          }
+        }
+      }
+      else {
+        if (mesh->texCount) {
+          for (unsigned i = 0; i < mesh->triCount; i++) {
+            Vec3f p[3];
+            for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
+            auto n = cross(p[1] - p[0], p[2] - p[0]);
+            for (unsigned k = 0; k < 3; k++) {
+              vtx[3 * i + k] = Vertex(p[k],
+                                      n,
+                                      10.f*mesh->tex[mesh->triTexIx[3 * i + k]],
+                                      mesh->currentColor[i]);
             }
           }
         }
         else {
-          if (mesh->texCount) {
-            for (unsigned i = 0; i < mesh->triCount; i++) {
-              Vec3f p[3];
-              for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
-              auto n = cross(p[1] - p[0], p[2] - p[0]);
-              for (unsigned k = 0; k < 3; k++) {
-                mem[3 * i + k] = Vertex(p[k],
-                                        n,
-                                        10.f*mesh->tex[mesh->triTexIx[3 * i + k]],
-                                        mesh->currentColor[i]);
-              }
-            }
-          }
-          else {
-            for (unsigned i = 0; i < mesh->triCount; i++) {
-              Vec3f p[3];
-              for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
-              auto n = cross(p[1] - p[0], p[2] - p[0]);
-              for (unsigned k = 0; k < 3; k++) {
-                mem[3 * i + k] = Vertex(p[k],
-                                        n,
-                                        Vec2f(0.5f),
-                                        mesh->currentColor[i]);
-              }
+          for (unsigned i = 0; i < mesh->triCount; i++) {
+            Vec3f p[3];
+            for (unsigned k = 0; k < 3; k++) p[k] = mesh->vtx[mesh->triVtxIx[3 * i + k]];
+            auto n = cross(p[1] - p[0], p[2] - p[0]);
+            for (unsigned k = 0; k < 3; k++) {
+              vtx[3 * i + k] = Vertex(p[k],
+                                      n,
+                                      Vec2f(0.5f),
+                                      mesh->currentColor[i]);
             }
           }
         }
-        vCtx->frameManager->copyBuffer(meshData.vtx, vtxStaging, meshData.vtx.resource->requestedSize);
       }
 
       if (indices.empty()) {
@@ -276,12 +273,39 @@ void RenderSolidMS::update(Vector<Mesh*>& meshes)
 
       Vector<uint32_t> meshletData;
       Vector<Meshlet> meshlets;
+      Vector<Vec3f> P;
 
       buildMeshlets(meshletData, meshlets, indices);
+      for (auto & meshlet : meshlets) {
+        if (meshlet.vertexCount) {
+          P.resize(meshlet.vertexCount);
+          for (uint32_t i = 0; i < meshlet.vertexCount; i++) {
+            auto k = meshletData[meshlet.offset + i];
+            P[i] = Vec3f(vtx[k].px, vtx[k].py, vtx[k].pz);
+          }
+
+          Vec3f c0;
+          float r0;
+          boundingSphereNaive(c0, r0, P.data(), P.size());
+
+          Vec3f c1;
+          float r1;
+          boundingSphere(c1, r1, P.data(), P.size());
+
+
+          logger(0, "%.3f p=[%.2f %.2f %.2f] r=%.2f  p=[%.2f %.2f %.2f] r=%.2f", r1/r0, c0.x, c0.y, c0.z, r0, c1.x, c1.y, c1.z, r1);
+
+        }
+
+      }
+      
+
+
       meshData.meshletData = resources->createStorageBuffer(meshletData.byteSize());
       meshData.meshlets = resources->createStorageBuffer(meshlets.byteSize());
       meshData.meshletCount = meshlets.size32();
 
+      frameManager->stageAndCopyBuffer(meshData.vtx, vtx.data(), vtx.byteSize());
       frameManager->stageAndCopyBuffer(meshData.meshletData, meshletData.data(), meshletData.byteSize());
       frameManager->stageAndCopyBuffer(meshData.meshlets, meshlets.data(), meshlets.byteSize());
 
