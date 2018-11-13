@@ -325,7 +325,7 @@ void RenderSolidMS::buildPipelines(RenderPassHandle pass)
   }
   objBufLayoutBinding[0].binding = 0;
   objBufLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  objBufLayoutBinding[0].stageFlags = VK_SHADER_STAGE_MESH_BIT_NV;
+  objBufLayoutBinding[0].stageFlags = VK_SHADER_STAGE_MESH_BIT_NV | VK_SHADER_STAGE_TASK_BIT_NV;
   objBufLayoutBinding[1].binding = 1;
   objBufLayoutBinding[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
   objBufLayoutBinding[1].stageFlags = VK_SHADER_STAGE_MESH_BIT_NV;
@@ -334,7 +334,7 @@ void RenderSolidMS::buildPipelines(RenderPassHandle pass)
   objBufLayoutBinding[2].stageFlags = VK_SHADER_STAGE_MESH_BIT_NV;
   objBufLayoutBinding[3].binding = 4;
   objBufLayoutBinding[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-  objBufLayoutBinding[3].stageFlags = VK_SHADER_STAGE_MESH_BIT_NV;
+  objBufLayoutBinding[3].stageFlags = VK_SHADER_STAGE_MESH_BIT_NV | VK_SHADER_STAGE_TASK_BIT_NV;
 
   VkDescriptorSetLayoutCreateInfo objBufLayoutInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
   objBufLayoutInfo.bindingCount = ARRAYSIZE(objBufLayoutBinding);

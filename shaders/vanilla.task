@@ -1,8 +1,11 @@
 #version 450
-#extension GL_EXT_shader_16bit_storage: require
-#extension GL_EXT_shader_8bit_storage: require
+#extension GL_EXT_shader_16bit_storage : require
+#extension GL_EXT_shader_8bit_storage : require
+#extension GL_KHR_shader_subgroup_ballot : require
 #extension GL_GOOGLE_include_directive : require
 #extension GL_NV_mesh_shader: require
+
+#include "ShaderStructs.glsl"
 
 layout(local_size_x=32) in;
 
@@ -11,15 +14,32 @@ out taskNV Task
 	uint meshletIndices[32];
 };
 
+layout(std140, binding = 0) uniform ObjBuf {
+  mat4 MP;
+  mat3 N;
+};
+
+layout(binding=4) readonly buffer Meshlets {
+	Meshlet meshlets[];
+};
+
 
 void main()
 {
 	uint tid = gl_LocalInvocationID.x;
+	uint meshlet = 32*gl_WorkGroupID.x + tid;
 
-	meshletIndices[tid] = 32*gl_WorkGroupID.x + tid;
+	vec4 c = MP * vec4(meshlets[meshlet].center, 1);
+
+	bool keep = 0.f <= c.x;
+
+	uvec4 vote = subgroupBallot(keep);
+
+	uint oIx = subgroupBallotExclusiveBitCount(vote);
+	meshletIndices[oIx] = meshlet;
 	
 	if(gl_LocalInvocationID.x == 0) {
-		gl_TaskCountNV = 32;
+		gl_TaskCountNV = subgroupBallotBitCount(vote);
 	}
 }
 

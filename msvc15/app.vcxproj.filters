@@ -185,8 +185,10 @@
     <CustomBuild Include="..\shaders\textured.frag">
       <Filter>shaders</Filter>
     </CustomBuild>
-    <CustomBuild Include="..\shaders\vanilla.task" />
     <CustomBuild Include="..\shaders\vanilla.mesh">
+      <Filter>shaders</Filter>
+    </CustomBuild>
+    <CustomBuild Include="..\shaders\vanilla.task">
       <Filter>shaders</Filter>
     </CustomBuild>
   </ItemGroup>
