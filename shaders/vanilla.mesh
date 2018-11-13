@@ -82,8 +82,8 @@ void main() {
 		gl_MeshVerticesNV[i].gl_Position = MP * vec4(pos, 1);
 	}
 	uint indexOffset = vertexOffset + vertexCount;
-	for(uint i = tid; i < 3*triangleCount; i+=32) {
-		gl_PrimitiveIndicesNV[i] = meshletIndexData[indexOffset + i];
+	for(uint i = tid; i < (3*triangleCount+3)/4; i+=32) {
+		writePackedPrimitiveIndices4x8NV(4*i, meshletIndexData[indexOffset + i]);
 	}
 	if(tid==0) {
 		gl_PrimitiveCountNV = triangleCount;

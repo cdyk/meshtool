@@ -28,10 +28,6 @@ namespace {
 #include "vanilla.mesh.h"
   };
 
-  uint32_t vanilla_vert[] = {
-#include "vanilla.vert.h"
-  };
-
   uint32_t vanilla_frag[] = {
 #include "vanilla.frag.h"
   };
@@ -67,9 +63,16 @@ namespace {
     meshlet.vertexCount = meshletData.size32() - offset;
     meshlet.triangleCount = meshletIndices / 3;
     meshlets.pushBack(meshlet);
+
+    auto o = meshletData.size32();
+    meshletData.resize(o + (meshletIndices + 3) / 4);
+
+    auto * p = (uint8_t*)(meshletData.data() + o);
+    auto * q = (uint8_t*)(meshletData.data() + meshletData.size());
     for (uint32_t i = 0; i < meshletIndices; i++) {
-      meshletData.pushBack(localindices[i]);
+      *p++ = localindices[i];
     }
+    while (p < q) *p++ = 0;
   }
 
   void buildMeshlets(Vector<uint32_t>& meshletData, Vector<Meshlet>& meshlets, const Vector<uint32_t>& indices)
