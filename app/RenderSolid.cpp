@@ -20,15 +20,15 @@
 
 namespace {
 
-  uint32_t vanilla_vert[]
+  uint32_t vanilla_vert[] = {
 #include "vanilla.vert.h"
-  ;
+  };
 
-  uint32_t vanilla_frag[]
+  uint32_t vanilla_frag[] = {
 #include "vanilla.frag.h"
-  ;
+  };
 
-  uint32_t textured_frag[] 
+  uint32_t textured_frag[]
 #include "textured.frag.h"
   ;
 

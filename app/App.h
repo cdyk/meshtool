@@ -74,7 +74,7 @@ public:
   float menuHeight = 0.f;
 
   TriangleColor triangleColor = TriangleColor::TriangleOrder;
-  RenderMode renderMode = RenderMode::Normal;
+  RenderMode renderMode = RenderMode::MeshShader;
 
   bool viewSolid = true;
   bool viewLines = true;

@@ -185,9 +185,16 @@
     <CustomBuild Include="..\shaders\textured.frag">
       <Filter>shaders</Filter>
     </CustomBuild>
+    <CustomBuild Include="..\shaders\vanilla.task" />
+    <CustomBuild Include="..\shaders\vanilla.mesh">
+      <Filter>shaders</Filter>
+    </CustomBuild>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\shaders\raytrace.common.glsl">
+      <Filter>shaders</Filter>
+    </None>
+    <None Include="..\shaders\vanilla.task.glsl">
       <Filter>shaders</Filter>
     </None>
   </ItemGroup>
