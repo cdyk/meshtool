@@ -9,6 +9,7 @@
 #include "Common.h"
 #include "VulkanContext.h"
 #include "RenderSolid.h"
+#include "RenderSolidMS.h"
 #include "RenderOutlines.h"
 #include "RenderNormals.h"
 #include "RenderTangents.h"
@@ -228,10 +229,10 @@ void App::render(const Vec4f& viewport)
   auto * frameMgr = vCtx->frameManager;
   frameMgr->startFrame();
 
-  raytrace = raytrace && vCtx->nvxRaytracing;
+  if (renderMode == RenderMode::MeshShader && !vCtx->nvMeshShader) renderMode = RenderMode::Normal;
+  if (renderMode == RenderMode::Raytracing && !vCtx->nvxRaytracing) renderMode = RenderMode::Normal;
 
-  bool reallySolid = !raytrace && viewSolid;
-  if (reallySolid) {
+  if (viewSolid && renderMode == RenderMode::Normal) {
     if (!renderSolid) {
       renderSolid = new RenderSolid(logger, this);
       renderSolid->init();
@@ -242,6 +243,33 @@ void App::render(const Vec4f& viewport)
     delete renderSolid;
     renderSolid = nullptr;
   }
+
+  if (viewSolid && renderMode == RenderMode::MeshShader) {
+    if (!renderSolidMS) {
+      renderSolidMS = new RenderSolidMS(logger, this);
+      renderSolidMS->init();
+    }
+    renderSolidMS->update(items.meshes);
+  }
+  else if (renderSolidMS) {
+    delete renderSolidMS;
+    renderSolidMS = nullptr;
+  }
+
+  if (viewSolid && renderMode == RenderMode::Raytracing) {
+    if (raycaster == nullptr) {
+      raycaster = new Raycaster(logger, this);
+      raycaster->init();
+    }
+    raycaster->update(items.meshes);
+  }
+  else if (raycaster) {
+    delete raycaster;
+    raycaster = nullptr;
+  }
+
+
+
 
   bool reallyLines = viewLines;
   for (auto * mesh : items.meshes) {
@@ -285,17 +313,6 @@ void App::render(const Vec4f& viewport)
   }
 
 
-  if (raytrace) {
-    if (raycaster == nullptr) {
-      raycaster = new Raycaster(logger, this);
-      raycaster->init();
-    }
-    raycaster->update(items.meshes);
-  }
-  else if (raycaster) {
-    delete raycaster;
-    raycaster = nullptr;
-  }
 
   auto & frame = vCtx->frameManager->frame();
   if (frame.hasTimings) {
@@ -339,7 +356,10 @@ void App::render(const Vec4f& viewport)
 
 
     vkCmdBeginRenderPass(cmdBuf, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
-    if (renderSolid) renderSolid->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP);
+    if (viewSolid) {
+      if (renderMode == RenderMode::Normal) renderSolid->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP);
+      else if (renderMode == RenderMode::MeshShader) renderSolidMS->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP);
+    }
     if (renderOutlines) renderOutlines->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP, viewOutlines, viewLines);
     if (renderNormals) renderNormals->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP);
     if (renderTangents) renderTangents->draw(cmdBuf, rendererPass, viewport, Mat3f(M), MVP);
@@ -360,7 +380,7 @@ void App::render(const Vec4f& viewport)
 
   vkCmdEndRenderPass(cmdBuf);
 
-  if (raytrace) {
+  if (renderMode == RenderMode::Raytracing) {
     raycaster->draw(cmdBuf, viewport, Mat3f(Minv), PMinv);
   }
 

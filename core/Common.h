@@ -209,6 +209,7 @@ public:
 
   size_t size() const { return fill; }
   uint32_t size32() const { return uint32_t(fill); }
+  size_t byteSize() const { return fill * sizeof(T); }
 
 private:
   size_t fill = 0;

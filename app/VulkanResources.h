@@ -12,6 +12,14 @@ struct DescriptorSet : ResourceBase
 };
 typedef ResourceHandle<DescriptorSet> DescriptorSetHandle;
 
+struct DescriptorPool : ResourceBase
+{
+  DescriptorPool(ResourceManagerBase& manager) : ResourceBase(manager) {}
+  VkDescriptorPool pool = VK_NULL_HANDLE;
+};
+typedef ResourceHandle<DescriptorPool> DescriptorPoolHandle;
+
+
 struct Shader : ResourceBase
 {
   Shader(ResourceManagerBase& manager) : ResourceBase(manager) {}
@@ -25,6 +33,7 @@ struct Buffer : ResourceBase
   Buffer(ResourceManagerBase& manager) : ResourceBase(manager) {}
   VkBuffer buffer = VK_NULL_HANDLE;
   VkDeviceMemory mem = VK_NULL_HANDLE;
+  void * hostPtr = nullptr;
   size_t requestedSize = 0;
   size_t alignedSize = 0;
   VkDescriptorBufferInfo descInfo;
@@ -151,6 +160,7 @@ public:
   RenderBufferHandle createVertexDeviceBuffer(size_t initialSize) { return createBuffer(initialSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT); }
   RenderBufferHandle createIndexDeviceBuffer(size_t initialSize) { return createBuffer(initialSize, VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT); }
   RenderBufferHandle createUniformBuffer(size_t initialSize) { return createBuffer(initialSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT); }
+  RenderBufferHandle createStorageBuffer(size_t size) { return createBuffer(size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT); }
 
   DescriptorSetHandle createDescriptorSet(VkDescriptorSetLayout descLayout);
 
@@ -166,6 +176,8 @@ public:
   ImageViewHandle createImageView(ImageHandle, VkImageViewCreateInfo& imageViewCreateInfo);
 
   SamplerHandle createSampler(VkSamplerCreateInfo& samplerCreateInfo);
+
+  DescriptorPoolHandle createDescriptorPool(const VkDescriptorPoolCreateInfo* info);
 
   FrameBufferHandle createFrameBuffer(RenderPassHandle pass, uint32_t w, uint32_t h, Vector<ImageViewHandle>& attachments);
   CommandPoolHandle createCommandPool(uint32_t queueFamilyIx);
@@ -187,6 +199,7 @@ private:
 
   ResourceManager<Buffer> bufferResources;
   ResourceManager<DescriptorSet> descriptorSetResources;
+  ResourceManager<DescriptorPool> descriptorPoolResources;
   ResourceManager<Shader> shaderResources;
   ResourceManager<Pipeline> pipelineResources;
   ResourceManager<RenderPass> renderPassResources;
@@ -199,34 +212,4 @@ private:
   ResourceManager<Semaphore> semaphoreResources;
   ResourceManager<SwapChain> swapChainResources;
   ResourceManager<AccelerationStructure> accelerationStructures;
-
-};
-
-struct MappedBufferBase
-{
-  MappedBufferBase() = delete;
-  MappedBufferBase(const MappedBufferBase&) = delete;
-
-  VulkanContext* vCtx;
-  RenderBufferHandle h;
-  MappedBufferBase(void** ptr, VulkanContext* vCtx, RenderBufferHandle h);
-  ~MappedBufferBase();
-
-};
-
-template<typename T>
-struct MappedBuffer : MappedBufferBase
-{
-  MappedBuffer(VulkanContext* vCtx, RenderBufferHandle h) : MappedBufferBase((void**)&mem, vCtx, h) {}
-
-  T* mem;
-};
-
-struct DebugScope : NonCopyable
-{
-  VulkanContext* vCtx;
-  VkCommandBuffer cmdBuf;
-
-  DebugScope(VulkanContext* vCtx, VkCommandBuffer cmdBuf, const char* name);
-  ~DebugScope();
 };

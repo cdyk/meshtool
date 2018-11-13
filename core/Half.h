@@ -2,12 +2,12 @@
 #include <cinttypes>
 
 
-uint16_t buildHalf(unsigned sign, unsigned exp, unsigned mantissa)
+inline uint16_t buildHalf(unsigned sign, unsigned exp, unsigned mantissa)
 {
   return (sign << 15) | (exp << 10) | mantissa;
 }
 
-uint16_t halfFromFloat(float f)
+inline uint16_t halfFromFloat(float f)
 {
   union {
     float f;

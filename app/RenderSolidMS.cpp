@@ -1,7 +1,7 @@
 #include <cassert>
 #include "Common.h"
 #include "App.h"
-#include "RenderSolid.h"
+#include "RenderSolidMS.h"
 #include "Mesh.h"
 #include "MeshIndexing.h"
 #include "VulkanContext.h"
@@ -20,8 +20,12 @@
 
 namespace {
 
-  uint32_t vanilla_vert[] = {
-#include "vanilla.vert.h"
+  uint32_t vanilla_task[] = {
+#include "vanilla.task.h"
+  };
+
+  uint32_t vanilla_mesh[] = {
+#include "vanilla.mesh.h"
   };
 
   uint32_t vanilla_frag[] = {
@@ -30,7 +34,7 @@ namespace {
 
   uint32_t textured_frag[]
 #include "textured.frag.h"
-  ;
+    ;
 
   struct RGBA8
   {
@@ -51,9 +55,80 @@ namespace {
   };
   static_assert(sizeof(Vec3fRGBA8) == 4 * sizeof(uint32_t));
 
+
+  void storeMeshlet(Vector<uint32_t>& meshletData, Vector<Meshlet>& meshlets, const uint8_t* localindices, const uint32_t offset, const uint32_t meshletIndices)
+  {
+    Meshlet meshlet{};
+    meshlet.offset = offset;
+    meshlet.vertexCount = meshletData.size32() - offset;
+    meshlet.triangleCount = meshletIndices / 3;
+    meshlets.pushBack(meshlet);
+
+    auto o = meshletData.size32();
+    meshletData.resize(o + (meshletIndices + 3) / 4);
+
+    auto * p = (uint8_t*)(meshletData.data() + o);
+    auto * q = (uint8_t*)(meshletData.data() + meshletData.size());
+    for (uint32_t i = 0; i < meshletIndices; i++) {
+      *p++ = localindices[i];
+    }
+    while (p < q) *p++ = 0;
+  }
+
+  void buildMeshlets(Vector<uint32_t>& meshletData, Vector<Meshlet>& meshlets, const Vector<uint32_t>& indices)
+  {
+    meshletData.clear();
+    meshlets.clear();
+
+
+    uint32_t offset = 0;
+    Map localVertices;
+
+    uint32_t meshletIndices = 0;
+    uint8_t localindices[126 * 3 + 3];
+    for (uint32_t iIn = 0; iIn < indices.size32(); ) {
+
+      auto tmp = meshletData.size32();
+      for (uint32_t k = 0; k < 3; k++) {
+        auto vIx = indices[iIn + k];
+        uint64_t key = vIx + 1;
+        uint64_t val = 0;
+        if (!localVertices.get(val, key)) {
+          val = (meshletData.size32() - offset);
+          meshletData.pushBack(vIx);
+          localVertices.insert(key, val);
+        }
+        localindices[meshletIndices++] = uint8_t(val);
+      }
+
+      if (64 < (meshletData.size32() - offset) || 126 * 3 < meshletIndices) {
+        meshletData.resize(tmp);
+        meshletIndices -= 3;
+
+        storeMeshlet(meshletData, meshlets, localindices, offset, meshletIndices);
+
+        localVertices.clear();
+        meshletIndices = 0;
+        offset = meshletData.size32();
+      }
+      else {
+        iIn += 3;
+      }
+    }
+    if(meshletIndices)
+      storeMeshlet(meshletData, meshlets, localindices, offset, meshletIndices);
+
+    auto N = meshlets.size32();
+    auto M = ((N + 31) & ~31u) - N; // pad up to 32
+    for (uint32_t i = 0; i < M; i++) {
+      meshlets.pushBack(Meshlet{ 0 });
+    }
+    assert((meshlets.size32() % 32) == 0);
+  }
+
 }
 
-RenderSolid::RenderSolid(Logger logger, App* app) :
+RenderSolidMS::RenderSolidMS(Logger logger, App* app) :
   logger(logger),
   app(app),
   textureManager(new RenderTextureManager(app->vCtx))
@@ -61,15 +136,16 @@ RenderSolid::RenderSolid(Logger logger, App* app) :
 
 }
 
-void RenderSolid::init()
+void RenderSolidMS::init()
 {
   auto * vCtx = app->vCtx;
   auto * resources = vCtx->resources;
 
-  vertexShader = resources->createShader(vanilla_vert, sizeof(vanilla_vert));
+  taskShader = resources->createShader(vanilla_task, sizeof(vanilla_task));
+  meshShader = resources->createShader(vanilla_mesh, sizeof(vanilla_mesh));
   solidShader = resources->createShader(vanilla_frag, sizeof(vanilla_frag));
   texturedShader = resources->createShader(textured_frag, sizeof(textured_frag));
-  
+
   checkerTex = textureManager->loadTexture(TextureSource::Checker);
   colorGradientTex = textureManager->loadTexture(TextureSource::ColorGradient);
 
@@ -89,13 +165,14 @@ void RenderSolid::init()
   texSampler = vCtx->resources->createSampler(samplerInfo);
 }
 
-RenderSolid::~RenderSolid()
+RenderSolidMS::~RenderSolidMS()
 {
 }
 
-void RenderSolid::update(Vector<Mesh*>& meshes)
+void RenderSolidMS::update(Vector<Mesh*>& meshes)
 {
   auto * vCtx = app->vCtx;
+  auto * frameManager = vCtx->frameManager;
   auto * resources = vCtx->resources;
 
   newMeshData.clear();
@@ -118,8 +195,8 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
       meshData.geometryGeneration = mesh->geometryGeneration;
       meshData.colorGeneration = mesh->colorGeneration;
 
-      meshData.triangleCount = mesh->triCount;
-      meshData.vtx = resources->createStorageBuffer(sizeof(Vertex) * 3 * meshData.triangleCount);
+      auto triangleCount = mesh->triCount;
+      meshData.vtx = resources->createStorageBuffer(sizeof(Vertex) * 3 * triangleCount);
 
       Vector<uint32_t> indices;
       auto vtxStaging = resources->createStagingBuffer(meshData.vtx.resource->requestedSize);
@@ -181,14 +258,13 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
         vCtx->frameManager->copyBuffer(meshData.vtx, vtxStaging, meshData.vtx.resource->requestedSize);
       }
 
-      if (indices.any()) {
-#ifdef TRASH_INDICES
-        std::random_device rd;
-        std::mt19937 g(rd());
-        std::shuffle((Vec3f*)indices.begin(), (Vec3f*)indices.end(), g);
-#endif
-        Vector<uint32_t> reindices(indices.size());
+      if (indices.empty()) {
+        indices.resize(3 * triangleCount);
+        for (uint32_t i = 0; i < indices.size32(); i++) indices[i] = i;
+      }
 
+      {
+        Vector<uint32_t> reindices(indices.size());
         float fifo4, fifo8, fifo16, fifo32;
         getAverageCacheMissRatioPerTriangle(fifo4, fifo8, fifo16, fifo32, indices.data(), indices.size32());
         logger(0, "IN  AMCR FIFO4=%.2f, FIFO8=%.2f, FIFO16=%.2f, FIFO32=%.2f", fifo4, fifo8, fifo16, fifo32);
@@ -196,17 +272,24 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
         getAverageCacheMissRatioPerTriangle(fifo4, fifo8, fifo16, fifo32, reindices.data(), indices.size32());
         logger(0, "OPT AMCR FIFO4=%.2f, FIFO8=%.2f, FIFO16=%.2f, FIFO32=%.2f", fifo4, fifo8, fifo16, fifo32);
         indices.swap(reindices);
-
-        meshData.indices = resources->createIndexDeviceBuffer(sizeof(uint32_t)*indices.size());
-        auto stage = resources->createStagingBuffer(sizeof(uint32_t)*indices.size());
-        std::memcpy(stage.resource->hostPtr, indices.data(), sizeof(uint32_t)*indices.size());
-        vCtx->frameManager->copyBuffer(meshData.indices, stage, sizeof(uint32_t)*indices.size());
-      }
-      else {
-        meshData.indices = RenderBufferHandle();
       }
 
-      logger(0, "RenderSolid: Updated MeshData item");
+      Vector<uint32_t> meshletData;
+      Vector<Meshlet> meshlets;
+
+      buildMeshlets(meshletData, meshlets, indices);
+      meshData.meshletData = resources->createStorageBuffer(meshletData.byteSize());
+      meshData.meshlets = resources->createStorageBuffer(meshlets.byteSize());
+      meshData.meshletCount = meshlets.size32();
+
+      frameManager->stageAndCopyBuffer(meshData.meshletData, meshletData.data(), meshletData.byteSize());
+      frameManager->stageAndCopyBuffer(meshData.meshlets, meshlets.data(), meshlets.byteSize());
+
+      logger(0, "%d meshlets (%d tris per meshlet), %.1f uints per meshlet",
+             meshlets.size(), indices.size() / (3 * meshlets.size()), float(meshletData.size()) / meshlets.size());
+
+
+      logger(0, "RenderSolidMS: Updated MeshData item");
     }
   }
   meshData.swap(newMeshData);
@@ -220,28 +303,34 @@ void RenderSolid::update(Vector<Mesh*>& meshes)
 }
 
 
-void RenderSolid::buildPipelines(RenderPassHandle pass)
+void RenderSolidMS::buildPipelines(RenderPassHandle pass)
 {
   auto * vCtx = app->vCtx;
   auto * resources = vCtx->resources;
 
-  VkDescriptorSetLayoutBinding objBufLayoutBinding[2];
-  objBufLayoutBinding[0] = {};
+  VkDescriptorSetLayoutBinding objBufLayoutBinding[4];
+  for (size_t i = 0; i < ARRAYSIZE(objBufLayoutBinding); i++) {
+    objBufLayoutBinding[i] = {};
+    objBufLayoutBinding[i].descriptorCount = 1;
+  }
   objBufLayoutBinding[0].binding = 0;
   objBufLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-  objBufLayoutBinding[0].descriptorCount = 1;
-  objBufLayoutBinding[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-  objBufLayoutBinding[1] = {};
+  objBufLayoutBinding[0].stageFlags = VK_SHADER_STAGE_MESH_BIT_NV;
   objBufLayoutBinding[1].binding = 1;
   objBufLayoutBinding[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-  objBufLayoutBinding[1].descriptorCount = 1;
-  objBufLayoutBinding[1].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+  objBufLayoutBinding[1].stageFlags = VK_SHADER_STAGE_MESH_BIT_NV;
+  objBufLayoutBinding[2].binding = 3;
+  objBufLayoutBinding[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  objBufLayoutBinding[2].stageFlags = VK_SHADER_STAGE_MESH_BIT_NV;
+  objBufLayoutBinding[3].binding = 4;
+  objBufLayoutBinding[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  objBufLayoutBinding[3].stageFlags = VK_SHADER_STAGE_MESH_BIT_NV;
 
   VkDescriptorSetLayoutCreateInfo objBufLayoutInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
   objBufLayoutInfo.bindingCount = ARRAYSIZE(objBufLayoutBinding);
   objBufLayoutInfo.pBindings = objBufLayoutBinding;
 
-  VkDescriptorSetLayoutBinding objBufSamplerLayoutBinding[3];
+  VkDescriptorSetLayoutBinding objBufSamplerLayoutBinding[5];
   objBufSamplerLayoutBinding[0] = objBufLayoutBinding[0];
   objBufSamplerLayoutBinding[1] = objBufLayoutBinding[1];
   objBufSamplerLayoutBinding[2] = {};
@@ -249,6 +338,8 @@ void RenderSolid::buildPipelines(RenderPassHandle pass)
   objBufSamplerLayoutBinding[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
   objBufSamplerLayoutBinding[2].descriptorCount = 1;
   objBufSamplerLayoutBinding[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+  objBufSamplerLayoutBinding[3] = objBufLayoutBinding[2];
+  objBufSamplerLayoutBinding[4] = objBufLayoutBinding[3];
 
   VkDescriptorSetLayoutCreateInfo objBufSamplerLayoutInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO };
   objBufSamplerLayoutInfo.bindingCount = ARRAYSIZE(objBufSamplerLayoutBinding);
@@ -274,18 +365,18 @@ void RenderSolid::buildPipelines(RenderPassHandle pass)
                                               pipeLayoutInfo,
                                               objBufLayoutInfo,
                                               pass,
-                                              { vertexShader, solidShader },
+                                              { taskShader, meshShader, solidShader },
                                               cullBackDepthBiasRasInfo);
   texturedPipeline = resources->createPipeline({ }, { },
                                                pipeLayoutInfo,
                                                objBufSamplerLayoutInfo,
                                                pass,
-                                               { vertexShader, texturedShader },
+                                               { taskShader, meshShader, texturedShader },
                                                cullBackDepthBiasRasInfo);
 }
 
 
-void RenderSolid::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP)
+void RenderSolidMS::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP)
 {
   auto * vCtx = app->vCtx;
   auto device = vCtx->device;
@@ -325,17 +416,28 @@ void RenderSolid::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4
 
       VkDescriptorSet set = frameManager->allocDescriptorSet(vanillaPipeline);
 
-      VkWriteDescriptorSet writes[2];
+      VkWriteDescriptorSet writes[4];
       for (size_t i = 0; i < ARRAYSIZE(writes); i++) {
         writes[i] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
         writes[i].dstSet = set;
         writes[i].descriptorCount = 1;
-        writes[i].dstBinding = uint32_t(i);
       }
+      writes[0].dstBinding = 0;
       writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
       writes[0].pBufferInfo = &objectBufferInfo;
+
+      writes[1].dstBinding = 1;
       writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
       writes[1].pBufferInfo = &item.vtx.resource->descInfo;
+
+      writes[2].dstBinding = 3;
+      writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      writes[2].pBufferInfo = &item.meshletData.resource->descInfo;
+
+      writes[3].dstBinding = 4;
+      writes[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+      writes[3].pBufferInfo = &item.meshlets.resource->descInfo;
+
       vkUpdateDescriptorSets(device, ARRAYSIZE(writes), writes, 0, nullptr);
 
       vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, vanillaPipeline.resource->pipeLayout, 0, 1, &set, 0, NULL);
@@ -369,14 +471,7 @@ void RenderSolid::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4
       vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, texturedPipeline.resource->pipeLayout, 0, 1, &set, 0, NULL);
     }
 
-    if (item.indices) {
-      vkCmdBindIndexBuffer(cmdBuf, item.indices.resource->buffer, 0, VK_INDEX_TYPE_UINT32);
-      vkCmdDrawIndexed(cmdBuf, 3 * item.triangleCount, 1, 0, 0, 0);
-    }
-    else {
-      vkCmdDraw(cmdBuf, 3 * item.triangleCount, 1, 0, 0);
-    }
-  
+    vCtx->vkCmdDrawMeshTasksNV(cmdBuf, (item.meshletCount + 31) / 32, 0);
   }
 }
 

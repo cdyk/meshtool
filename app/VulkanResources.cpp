@@ -9,6 +9,7 @@ namespace {
   void destroyBuffer(void* data, Buffer* buffer)
   {
     auto device = ((VulkanContext*)data)->device;
+    if (buffer->hostPtr) vkUnmapMemory(device, buffer->mem);
     if (buffer->buffer) vkDestroyBuffer(device, buffer->buffer, nullptr);
     if (buffer->mem) vkFreeMemory(device, buffer->mem, nullptr);
   }
@@ -18,6 +19,16 @@ namespace {
     auto device = ((VulkanContext*)data)->device;
     auto descPool = ((VulkanContext*)data)->descPool;
     if (descSet->descSet) vkFreeDescriptorSets(device, descPool, 1, &descSet->descSet);
+  }
+
+  void destroyDescriptorPool(void* data, DescriptorPool* pool)
+  {
+    if (pool) {
+      auto device = ((VulkanContext*)data)->device;
+      auto descPool = ((VulkanContext*)data)->descPool;
+      vkDestroyDescriptorPool(device, pool->pool, nullptr);
+      pool->pool = nullptr;
+    }
   }
 
   void destroyShader(void* data, Shader* shader)
@@ -123,6 +134,7 @@ VulkanResources::VulkanResources(VulkanContext* vCtx, Logger logger) :
   logger(logger),
   bufferResources(destroyBuffer, vCtx),
   descriptorSetResources(destroyDescriptorSet, vCtx),
+  descriptorPoolResources(destroyDescriptorPool, vCtx),
   shaderResources(destroyShader, vCtx),
   pipelineResources(destroyPipeline, vCtx),
   renderPassResources(destroyRenderPass, vCtx),
@@ -156,11 +168,8 @@ VulkanResources::~VulkanResources()
 
 void VulkanResources::copyHostMemToBuffer(RenderBufferHandle buffer, void* src, size_t size)
 {
-  void * dst = nullptr;
-  CHECK_VULKAN(vkMapMemory(vCtx->device, buffer.resource->mem, 0, buffer.resource->alignedSize, 0, &dst));
-  assert(dst);
-  std::memcpy(dst, src, size);
-  vkUnmapMemory(vCtx->device, buffer.resource->mem);
+  assert(buffer.resource->hostPtr);
+  std::memcpy(buffer.resource->hostPtr, src, size);
 }
 
 
@@ -335,6 +344,14 @@ PipelineHandle VulkanResources::createPipeline(const Vector<VkVertexInputBinding
   return pipeHandle;
 }
 
+DescriptorPoolHandle VulkanResources::createDescriptorPool(const VkDescriptorPoolCreateInfo* info)
+{
+  auto handle = descriptorPoolResources.createResource();
+  auto device = vCtx->device;
+  CHECK_VULKAN(vkCreateDescriptorPool(device, info, nullptr, &handle.resource->pool));
+  return handle;
+}
+
 RenderBufferHandle VulkanResources::createBuffer()
 {
   return bufferResources.createResource();
@@ -342,11 +359,10 @@ RenderBufferHandle VulkanResources::createBuffer()
 
 RenderBufferHandle VulkanResources::createBuffer(size_t requestedSize, VkBufferUsageFlags usageFlags, VkMemoryPropertyFlags properties)
 {
+  auto device = vCtx->device;
   auto bufHandle = bufferResources.createResource();
   auto * buf = bufHandle.resource;
   buf->requestedSize = requestedSize;
-
-  //VkBuffer& buffer, VkDeviceMemory& bufferMem, size_t& actualSize,
 
   VkBufferCreateInfo bufferCI = {};
   bufferCI.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -357,8 +373,7 @@ RenderBufferHandle VulkanResources::createBuffer(size_t requestedSize, VkBufferU
   bufferCI.pQueueFamilyIndices = nullptr;
   bufferCI.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
   bufferCI.flags = 0;
-  auto rv = vkCreateBuffer(vCtx->device, &bufferCI, nullptr, &buf->buffer);
-  assert(rv == VK_SUCCESS);
+  CHECK_VULKAN(vkCreateBuffer(device, &bufferCI, nullptr, &buf->buffer));
 
   VkMemoryRequirements memReqs;
   vkGetBufferMemoryRequirements(vCtx->device, buf->buffer, &memReqs);
@@ -369,19 +384,17 @@ RenderBufferHandle VulkanResources::createBuffer(size_t requestedSize, VkBufferU
   allocInfo.pNext = NULL;
   allocInfo.memoryTypeIndex = 0;
   allocInfo.allocationSize = memReqs.size;
-  auto rvb = getMemoryTypeIndex(allocInfo.memoryTypeIndex, memReqs.memoryTypeBits,
-                                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
-  assert(rvb);
-
-  rv = vkAllocateMemory(vCtx->device, &allocInfo, NULL, &buf->mem);
-  assert(rv == VK_SUCCESS);
-
-  rv = vkBindBufferMemory(vCtx->device, buf->buffer, buf->mem, 0);
-  assert(rv == VK_SUCCESS);
+  CHECK_BOOL(getMemoryTypeIndex(allocInfo.memoryTypeIndex, memReqs.memoryTypeBits, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT));
+  CHECK_VULKAN(vkAllocateMemory(device, &allocInfo, NULL, &buf->mem));
+  CHECK_VULKAN(vkBindBufferMemory(device, buf->buffer, buf->mem, 0));
 
   buf->descInfo.buffer = buf->buffer;
   buf->descInfo.offset = 0;
   buf->descInfo.range = VK_WHOLE_SIZE;
+
+  if (properties & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) {
+    CHECK_VULKAN(vkMapMemory(device, buf->mem, 0, buf->alignedSize, 0, &buf->hostPtr));
+  }
 
   return bufHandle;
 }
@@ -779,34 +792,4 @@ uint32_t VulkanResources::getMemoryTypeIndex(uint32_t typeBits, VkMemoryProperty
   }
   assert(!"Failed to find suitable memory.");
   return ~0;
-}
-
-
-MappedBufferBase::MappedBufferBase(void** ptr, VulkanContext* vCtx, RenderBufferHandle h)
-  : vCtx(vCtx), h(h)
-{
-  auto rv = vkMapMemory(vCtx->device, h.resource->mem, 0, h.resource->alignedSize, 0, ptr);
-  assert(rv == VK_SUCCESS);
-
-}
-
-MappedBufferBase::~MappedBufferBase()
-{
-  vkUnmapMemory(vCtx->device, h.resource->mem);
-}
-
-DebugScope::DebugScope(VulkanContext* vCtx, VkCommandBuffer cmdBuf, const char* name) :
-  vCtx(vCtx),
-  cmdBuf(cmdBuf)
-{
-  // dependes on VK_EXT_debug_report
-  //VkDebugMarkerMarkerInfoEXT info = {};
-  //info.sType = VK_STRUCTURE_TYPE_DEBUG_MARKER_MARKER_INFO_EXT;
-  //info.pMarkerName = name;
-  //vCtx->vkCmdDebugMarkerBeginEXT(cmdBuf, &info);
-}
-
-DebugScope::~DebugScope()
-{
-  //vCtx->vkCmdDebugMarkerEndEXT(cmdBuf);
 }

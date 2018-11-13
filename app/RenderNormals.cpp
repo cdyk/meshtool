@@ -61,12 +61,6 @@ void RenderNormals::init()
   vertexShader = resources->createShader(coordSysVS, sizeof(coordSysVS));
   fragmentShader = resources->createShader(flatPS, sizeof(flatPS));
 
-  renaming.resize(10);
-  for (size_t i = 0; i < renaming.size(); i++) {
-    renaming[i].ready = vCtx->resources->createFence(true);
-    renaming[i].objectBuffer = vCtx->resources->createUniformBuffer(sizeof(ObjectBuffer));
-  }
-  
 }
 
 RenderNormals::~RenderNormals()
@@ -105,14 +99,14 @@ void RenderNormals::update(Vector<Mesh*>& meshes)
 
       auto vtxNrmStaging = resources->createStagingBuffer(meshData.vtxNrm.resource->requestedSize);
       {
-        MappedBuffer<Vertex> vtxNrmMap(vCtx, vtxNrmStaging);
+        auto * mem = (Vertex*)vtxNrmStaging.resource->hostPtr;
         for (unsigned t = 0; t < mesh->triCount; t++) {
           bool selected = mesh->selected[mesh->TriObjIx[t]];
           for (unsigned i = 0; i < 3; i++) {
             auto k = 3 * t + i;
-            vtxNrmMap.mem[k].p = mesh->vtx[mesh->triVtxIx[k]];
-            vtxNrmMap.mem[k].n = mesh->nrm[mesh->triNrmIx[k]];
-            vtxNrmMap.mem[k].color = selected ? 0xffff88 : 0xff4444;
+            mem[k].p = mesh->vtx[mesh->triVtxIx[k]];
+            mem[k].n = mesh->nrm[mesh->triNrmIx[k]];
+            mem[k].color = selected ? 0xffff88 : 0xff4444;
           }
         }
       }
@@ -189,27 +183,12 @@ void RenderNormals::buildPipelines(RenderPassHandle pass)
     logger(0, "Built RenderNormals pipeline.");
   }
 
-  for(auto & rename : renaming) {
-    rename.objBufDescSet = resources->createDescriptorSet(pipeline.resource->descLayout);
-
-    VkWriteDescriptorSet writes[1];
-    writes[0] = {};
-    writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    writes[0].pNext = nullptr;
-    writes[0].dstSet = rename.objBufDescSet.resource->descSet;
-    writes[0].descriptorCount = 1;
-    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    writes[0].pBufferInfo = &rename.objectBuffer.resource->descInfo;
-    writes[0].dstArrayElement = 0;
-    writes[0].dstBinding = 0;
-    vkUpdateDescriptorSets(device, 1, writes, 0, nullptr);
-  }
-
 }
 
 void RenderNormals::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Vec4f& viewport, const Mat3f& N, const Mat4f& MVP)
 {
   auto * vCtx = app->vCtx;
+  auto * frameManager = vCtx->frameManager;
 
   if (!pipeline || pipeline.resource->pass != pass) buildPipelines(pass);
 
@@ -233,30 +212,32 @@ void RenderNormals::draw(VkCommandBuffer cmdBuf, RenderPassHandle pass, const Ve
   }
 
   for (auto & item : meshData) {
-
-    auto & rename = renaming[renameNext];
-    renameNext = (renameNext + 1);
-    if (renaming.size() <= renameNext) {
-      renameNext = 0;
-    }
-
-    {
-      MappedBuffer<ObjectBuffer> map(vCtx, rename.objectBuffer);
-      map.mem->MVP = MVP;
-      map.mem->Ncol0 = Vec4f(N.cols[0], 0.f);
-      map.mem->Ncol1 = Vec4f(N.cols[1], 0.f);
-      map.mem->Ncol2 = Vec4f(N.cols[2], 0.f);
-      map.mem->scale = 0.01f;
-    }
     
+    VkDescriptorBufferInfo objectBufferInfo;
+    auto* objectBuffer = (ObjectBuffer*)vCtx->frameManager->allocUniformStore(objectBufferInfo, sizeof(ObjectBuffer));
+    objectBuffer->MVP = MVP;
+    objectBuffer->Ncol0 = Vec4f(N.cols[0], 0.f);
+    objectBuffer->Ncol1 = Vec4f(N.cols[1], 0.f);
+    objectBuffer->Ncol2 = Vec4f(N.cols[2], 0.f);
+    objectBuffer->scale = 0.01f;
+
+    VkDescriptorSet set = frameManager->allocDescriptorSet(pipeline);
+
+    VkWriteDescriptorSet writes[1];
+    writes[0] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+    writes[0].dstSet = set;
+    writes[0].descriptorCount = 1;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes[0].pBufferInfo = &objectBufferInfo;
+    vkUpdateDescriptorSets(vCtx->device, 1, writes, 0, nullptr);
 
     VkBuffer buffers[1] = { item.vtxNrm.resource->buffer };
     VkDeviceSize offsets[1] = { 0 };
     vkCmdBindVertexBuffers(cmdBuf, 0, 1, buffers, offsets);
     vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.resource->pipe);
-    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.resource->pipeLayout, 0, 1, &rename.objBufDescSet.resource->descSet, 0, NULL);
+    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.resource->pipeLayout, 0, 1, &set, 0, NULL);
     vkCmdDraw(cmdBuf, 2, item.vertexCount, 0, 0);
-   
+  
   }
 }
 

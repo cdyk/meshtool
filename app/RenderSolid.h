@@ -54,8 +54,6 @@ private:
   Vector<MeshData> meshData;
   Vector<MeshData> newMeshData;
 
-  void updateDescriptorSets();
-
   PipelineHandle vanillaPipeline;
   PipelineHandle texturedPipeline;
 
@@ -64,22 +62,10 @@ private:
   ShaderHandle texturedShader;
 
   uint32_t viewport[4];
-  uint32_t frameCount;
 
   RenderTextureHandle checkerTex;
   RenderTextureHandle colorGradientTex;
-
-
   SamplerHandle texSampler;
-
-  struct Rename {
-    FenceHandle ready;
-    DescriptorSetHandle objBufDescSet;
-    DescriptorSetHandle objBufSamplerDescSet;
-    RenderBufferHandle objectBuffer;
-  };
-  Vector<Rename> renaming;
-  unsigned renameNext = 0;
 
   void buildPipelines(RenderPassHandle pass);
 

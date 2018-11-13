@@ -97,6 +97,7 @@
     <ClCompile Include="..\app\RenderNormals.cpp" />
     <ClCompile Include="..\app\RenderSolid.cpp" />
     <ClCompile Include="..\app\RenderOutlines.cpp" />
+    <ClCompile Include="..\app\RenderSolidMS.cpp" />
     <ClCompile Include="..\app\RenderTangents.cpp" />
     <ClCompile Include="..\app\RenderTextureManager.cpp" />
     <ClCompile Include="..\app\VulkanContext.cpp" />
@@ -117,8 +118,10 @@
     <ClInclude Include="..\app\RenderSolid.h" />
     <ClInclude Include="..\app\RenderOutlines.h" />
     <ClInclude Include="..\app\RenderResource.h" />
+    <ClInclude Include="..\app\RenderSolidMS.h" />
     <ClInclude Include="..\app\RenderTangents.h" />
     <ClInclude Include="..\app\RenderTextureManager.h" />
+    <ClInclude Include="..\app\ShaderStructs.h" />
     <ClInclude Include="..\app\VulkanContext.h" />
     <ClInclude Include="..\app\VulkanFrameManager.h" />
     <ClInclude Include="..\app\ImGuiRenderer.h" />
@@ -131,24 +134,29 @@
     <ClInclude Include="..\libs\imgui\imstb_rectpack.h" />
     <ClInclude Include="..\libs\imgui\imstb_textedit.h" />
     <ClInclude Include="..\libs\imgui\imstb_truetype.h" />
+    <ClInclude Include="..\shaders\ShaderStructs.glsl" />
     <ClInclude Include="..\shaders\raytrace.binding.h" />
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="..\shaders\vanillaPS.glsl">
+    <CustomBuild Include="..\shaders\vanilla.frag">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslc.exe -c --target-env=vulkan1.1 -mfmt=c %(FullPath) -o %(FullPath).h</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslc.exe -c --target-env=vulkan1.1 -mfmt=c %(FullPath) -o %(FullPath).h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Message>
     </CustomBuild>
-    <CustomBuild Include="..\shaders\vanillaVS.glsl">
+    <CustomBuild Include="..\shaders\vanilla.vert">
       <FileType>Document</FileType>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslc.exe -c --target-env=vulkan1.1 -mfmt=c %(FullPath) -o %(FullPath).h</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslc.exe -c --target-env=vulkan1.1 -mfmt=c %(FullPath) -o %(FullPath).h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
       <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
       <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Message>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
@@ -170,12 +178,13 @@
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="..\shaders\texturedPS.glsl">
+    <CustomBuild Include="..\shaders\textured.frag">
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslc.exe -c --target-env=vulkan1.1 -mfmt=c %(FullPath) -o %(FullPath).h</Command>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslc.exe -c --target-env=vulkan1.1 -mfmt=c %(FullPath) -o %(FullPath).h</Command>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Command>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Message>
     </CustomBuild>
   </ItemGroup>
   <ItemGroup>
@@ -246,6 +255,27 @@
       <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslangValidator.exe %(FullPath) -V -x -o %(FullPath).h</Message>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator.exe %(FullPath) -V -x -o %(FullPath).h</Command>
       <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator.exe %(FullPath) -V -x -o %(FullPath).h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="..\shaders\vanilla.mesh">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
+    </CustomBuild>
+    <CustomBuild Include="..\shaders\vanilla.task">
+      <FileType>Document</FileType>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath).h</Outputs>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <BuildInParallel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</BuildInParallel>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Command>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">glslangValidator.exe %(FullPath) --target-env vulkan1.1  -V -x -o %(FullPath).h</Message>
       <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath).h</Outputs>
     </CustomBuild>
   </ItemGroup>

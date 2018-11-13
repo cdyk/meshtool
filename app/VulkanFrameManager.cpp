@@ -28,6 +28,21 @@ void VulkanFrameManager::init()
   auto * res = vCtx->resources;
   auto device = vCtx->device;
 
+  Vector<VkDescriptorPoolSize> poolSizes =
+  {
+      { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
+      { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000 },
+      { VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000 },
+      { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+      { VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+      { VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+      { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000 },
+      { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000 },
+      { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+      { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+      { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
+  };
+
   frameData.resize(framesInFlight);
   for (auto & frame : frameData) {
     frame.commandPool = res->createCommandPool(vCtx->queueFamilyIndex);
@@ -37,6 +52,14 @@ void VulkanFrameManager::init()
     cmdAllocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     cmdAllocInfo.commandBufferCount = 1;
     CHECK_VULKAN(vkAllocateCommandBuffers(vCtx->device, &cmdAllocInfo, &frame.commandBuffer));
+
+    VkDescriptorPoolCreateInfo descPoolInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+    descPoolInfo.maxSets = 1000 * poolSizes.size32();
+    descPoolInfo.poolSizeCount = poolSizes.size32();
+    descPoolInfo.pPoolSizes = poolSizes.data();
+    frame.descriptorPool = res->createDescriptorPool(&descPoolInfo);
+
+    frame.uniformPool.buffer = res->createUniformBuffer(16 * 1024 * 1024);  // 16mb
 
     frame.imageAcquiredSemaphore = res->createSemaphore();
     frame.renderCompleteSemaphore = res->createSemaphore();
@@ -50,6 +73,40 @@ void VulkanFrameManager::init()
     frame.hasTimings = false;
   }
 }
+
+void* VulkanFrameManager::allocUniformStore(VkDescriptorBufferInfo& bufferInfo, size_t size)
+{
+  //VkPhysicalDeviceLimits::minUniformBufferOffsetAlignment
+  auto align = vCtx->physicalDeviceProperties.limits.minUniformBufferOffsetAlignment;
+  assert(align && (align & (align - 1)) == 0 && "minUniformBufferOffsetAlignment is either zero or not a power of two.");
+
+  auto & f = frame();
+  auto offset = f.uniformPool.fill;
+  f.uniformPool.fill = (f.uniformPool.fill + size + (align - 1u)) & ~(align - 1u);
+  assert(f.uniformPool.fill < f.uniformPool.buffer.resource->alignedSize);
+
+  bufferInfo.buffer = f.uniformPool.buffer.resource->buffer;
+  bufferInfo.offset = offset;
+  bufferInfo.range = f.uniformPool.fill - offset;
+  return (char*)f.uniformPool.buffer.resource->hostPtr + offset;
+}
+
+VkDescriptorSet  VulkanFrameManager::allocDescriptorSet(PipelineHandle& pipe)
+{
+  auto & f = frame();
+  auto device = vCtx->device;
+
+  VkDescriptorSetAllocateInfo descAllocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+  descAllocInfo.descriptorPool = f.descriptorPool.resource->pool;
+  descAllocInfo.descriptorSetCount = 1;
+  descAllocInfo.pSetLayouts = &pipe.resource->descLayout;
+
+  VkDescriptorSet set = VK_NULL_HANDLE;
+  CHECK_VULKAN(vkAllocateDescriptorSets(device, &descAllocInfo, &set));
+
+  return set;
+}
+
 
 VkSurfaceFormatKHR VulkanFrameManager::chooseFormat(Vector<VkFormat>& requestedFormats, VkColorSpaceKHR requestedColorSpace)
 {
@@ -159,15 +216,21 @@ void VulkanFrameManager::resize(uint32_t w, uint32_t h)
 
 void VulkanFrameManager::startFrame()
 {
+  auto device = vCtx->device;
+
   frameIndex = frameIndex + 1;
   if (frameIndex < framesInFlight) frameIndex = 0;
+
+  auto & f = frame();
+  f.uniformPool.fill = 0;
 
   CHECK_VULKAN(vkAcquireNextImageKHR(vCtx->device,
                                      swapChain.resource->swapChain, UINT64_MAX,
                                      frame().imageAcquiredSemaphore.resource->semaphore, VK_NULL_HANDLE, &swapChainIndex));
-  CHECK_VULKAN(vkWaitForFences(vCtx->device, 1, &frame().fence.resource->fence, VK_TRUE, UINT64_MAX));
-  CHECK_VULKAN(vkResetFences(vCtx->device, 1, &frame().fence.resource->fence));
-  CHECK_VULKAN(vkResetCommandPool(vCtx->device, frame().commandPool.resource->cmdPool, 0));
+  CHECK_VULKAN(vkWaitForFences(device, 1, &f.fence.resource->fence, VK_TRUE, UINT64_MAX));
+  CHECK_VULKAN(vkResetFences(device, 1, &f.fence.resource->fence));
+  CHECK_VULKAN(vkResetCommandPool(device, f.commandPool.resource->cmdPool, 0));
+  CHECK_VULKAN(vkResetDescriptorPool(device, f.descriptorPool.resource->pool, 0));
 }
 
 void VulkanFrameManager::presentFrame()
@@ -204,12 +267,9 @@ void  VulkanFrameManager::stageAndCopyBuffer(RenderBufferHandle dst, const void*
   auto device = vCtx->device;
 
   auto staging = vCtx->resources->createStagingBuffer(size);
+  assert(staging.resource->hostPtr);
 
-  void * ptr = nullptr;
-  CHECK_VULKAN(vkMapMemory(device, staging.resource->mem, 0, size, 0, &ptr));
-  std::memcpy(ptr, src, size);
-  vkUnmapMemory(device, staging.resource->mem);
-
+  std::memcpy(staging.resource->hostPtr, src, size);
   copyBuffer(dst, staging, size);
 }
 

@@ -19,7 +19,7 @@ RenderTextureHandle RenderTextureManager::loadTexture(TextureSource source)
 
   res->stagingBuffer = vCtx->resources->createStagingBuffer(texW*texH * 4);
   {
-    MappedBuffer<uint8_t> map(vCtx, res->stagingBuffer);
+    auto * mem = (uint8_t*)res->stagingBuffer.resource->hostPtr;
     switch (source) {
 
     case TextureSource::Checker:
@@ -27,10 +27,10 @@ RenderTextureHandle RenderTextureManager::loadTexture(TextureSource source)
         for (unsigned i = 0; i < texW; i++) {
           auto g = ((i / (texW / 10) + j / (texH / 10))) & 1 ? 0 : 20;
           auto f = ((i / (texW / 2) + j / (texH / 2))) & 1 ? 150 : 235;
-          map.mem[4 * (texW*j + i) + 0] = f + g;
-          map.mem[4 * (texW*j + i) + 1] = f + g;
-          map.mem[4 * (texW*j + i) + 2] = f + g;
-          map.mem[4 * (texW*j + i) + 3] = 255;
+          mem[4 * (texW*j + i) + 0] = f + g;
+          mem[4 * (texW*j + i) + 1] = f + g;
+          mem[4 * (texW*j + i) + 2] = f + g;
+          mem[4 * (texW*j + i) + 3] = 255;
         }
       }
       break;
@@ -38,10 +38,10 @@ RenderTextureHandle RenderTextureManager::loadTexture(TextureSource source)
     case TextureSource::ColorGradient:
       for (unsigned j = 0; j < texH; j++) {
         for (unsigned i = 0; i < texW; i++) {
-          map.mem[4 * (texW*j + i) + 0] = (255 * (i)) / (texW);
-          map.mem[4 * (texW*j + i) + 1] = (255 * (j)) / (texH);
-          map.mem[4 * (texW*j + i) + 2] = 0;
-          map.mem[4 * (texW*j + i) + 3] = 255;
+          mem[4 * (texW*j + i) + 0] = (255 * (i)) / (texW);
+          mem[4 * (texW*j + i) + 1] = (255 * (j)) / (texH);
+          mem[4 * (texW*j + i) + 2] = 0;
+          mem[4 * (texW*j + i) + 3] = 255;
         }
       }
       break;

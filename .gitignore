@@ -1,5 +1,9 @@
 *.glsl.h
 *.vert.h
+*.frag.h
+*.mesh.h
+*.task.h
+
 
 # Prerequisites
 *.d
