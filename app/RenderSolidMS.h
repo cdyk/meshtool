@@ -48,6 +48,10 @@ private:
 
     RenderBufferHandle vtx;
 
+    RenderBufferHandle meshletData;
+    RenderBufferHandle meshlets;
+    uint32_t meshletCount = 0;
+
     RenderBufferHandle indices;
     uint32_t triangleCount = 0;
   };

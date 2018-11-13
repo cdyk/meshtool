@@ -34,6 +34,12 @@ struct Vertex
 };
 static_assert(sizeof(Vertex) == 3 * 8);
 
+struct Meshlet
+{
+  uint32_t offset;
+  uint8_t vertexCount;
+  uint8_t triangleCount;
+};
 
 struct ObjectBuffer
 {

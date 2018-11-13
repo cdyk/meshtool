@@ -59,6 +59,64 @@ namespace {
   };
   static_assert(sizeof(Vec3fRGBA8) == 4 * sizeof(uint32_t));
 
+
+  void storeMeshlet(Vector<uint32_t>& meshletData, Vector<Meshlet>& meshlets, const uint8_t* localindices, const uint32_t offset, const uint32_t meshletIndices)
+  {
+    Meshlet meshlet{};
+    meshlet.offset = offset;
+    meshlet.vertexCount = meshletData.size32() - offset;
+    meshlet.triangleCount = meshletIndices / 3;
+    meshlets.pushBack(meshlet);
+    for (uint32_t i = 0; i < meshletIndices; i++) {
+      meshletData.pushBack(localindices[i]);
+    }
+  }
+
+  void buildMeshlets(Vector<uint32_t>& meshletData, Vector<Meshlet>& meshlets, const Vector<uint32_t>& indices)
+  {
+    meshletData.clear();
+    meshlets.clear();
+
+
+    uint32_t offset = 0;
+    Map localVertices;
+
+    uint32_t meshletIndices = 0;
+    uint8_t localindices[126 * 3 + 3];
+    for (uint32_t iIn = 0; iIn < indices.size32(); ) {
+
+      auto tmp = meshletData.size32();
+      for (uint32_t k = 0; k < 3; k++) {
+        auto vIx = indices[iIn + k];
+        uint64_t key = vIx + 1;
+        uint64_t val = 0;
+        if (!localVertices.get(val, key)) {
+          val = (meshletData.size32() - offset);
+          meshletData.pushBack(vIx);
+          localVertices.insert(key, val);
+        }
+        localindices[meshletIndices++] = uint8_t(val);
+      }
+
+      if (64 < (meshletData.size32() - offset) || 126 * 3 < meshletIndices) {
+        meshletData.resize(tmp);
+        meshletIndices -= 3;
+
+        storeMeshlet(meshletData, meshlets, localindices, offset, meshletIndices);
+
+        localVertices.clear();
+        meshletIndices = 0;
+        offset = meshletData.size32();
+      }
+      else {
+        iIn += 3;
+      }
+    }
+    if(meshletIndices)
+      storeMeshlet(meshletData, meshlets, localindices, offset, meshletIndices);
+
+  }
+
 }
 
 RenderSolidMS::RenderSolidMS(Logger logger, App* app) :
@@ -104,6 +162,7 @@ RenderSolidMS::~RenderSolidMS()
 void RenderSolidMS::update(Vector<Mesh*>& meshes)
 {
   auto * vCtx = app->vCtx;
+  auto * frameManager = vCtx->frameManager;
   auto * resources = vCtx->resources;
 
   newMeshData.clear();
@@ -189,14 +248,13 @@ void RenderSolidMS::update(Vector<Mesh*>& meshes)
         vCtx->frameManager->copyBuffer(meshData.vtx, vtxStaging, meshData.vtx.resource->requestedSize);
       }
 
-      if (indices.any()) {
-#ifdef TRASH_INDICES
-        std::random_device rd;
-        std::mt19937 g(rd());
-        std::shuffle((Vec3f*)indices.begin(), (Vec3f*)indices.end(), g);
-#endif
-        Vector<uint32_t> reindices(indices.size());
+      if (indices.empty()) {
+        indices.resize(3 * meshData.triangleCount);
+        for (uint32_t i = 0; i < indices.size32(); i++) indices[i] = i;
+      }
 
+      {
+        Vector<uint32_t> reindices(indices.size());
         float fifo4, fifo8, fifo16, fifo32;
         getAverageCacheMissRatioPerTriangle(fifo4, fifo8, fifo16, fifo32, indices.data(), indices.size32());
         logger(0, "IN  AMCR FIFO4=%.2f, FIFO8=%.2f, FIFO16=%.2f, FIFO32=%.2f", fifo4, fifo8, fifo16, fifo32);
@@ -204,6 +262,29 @@ void RenderSolidMS::update(Vector<Mesh*>& meshes)
         getAverageCacheMissRatioPerTriangle(fifo4, fifo8, fifo16, fifo32, reindices.data(), indices.size32());
         logger(0, "OPT AMCR FIFO4=%.2f, FIFO8=%.2f, FIFO16=%.2f, FIFO32=%.2f", fifo4, fifo8, fifo16, fifo32);
         indices.swap(reindices);
+      }
+
+      Vector<uint32_t> meshletData;
+      Vector<Meshlet> meshlets;
+
+      buildMeshlets(meshletData, meshlets, indices);
+
+      logger(0, "%d meshlets (%d tris per meshlet), %.1f uints per meshlet",
+             meshlets.size(), indices.size() / (3 * meshlets.size()), float(meshletData.size()) / meshlets.size());
+
+      meshData.meshletData = resources->createStorageBuffer(meshletData.byteSize());
+      frameManager->stageAndCopyBuffer(meshData.meshletData, meshletData.data(), meshletData.byteSize());
+
+      meshData.meshlets = resources->createStorageBuffer(meshlets.byteSize());
+      frameManager->stageAndCopyBuffer(meshData.meshlets, meshlets.data(), meshlets.byteSize());
+
+
+      if (indices.any()) {
+#ifdef TRASH_INDICES
+        std::random_device rd;
+        std::mt19937 g(rd());
+        std::shuffle((Vec3f*)indices.begin(), (Vec3f*)indices.end(), g);
+#endif
 
         meshData.indices = resources->createIndexDeviceBuffer(sizeof(uint32_t)*indices.size());
         auto stage = resources->createStagingBuffer(sizeof(uint32_t)*indices.size());
