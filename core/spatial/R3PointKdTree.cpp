@@ -295,6 +295,9 @@ void KdTree::R3StaticTree::getNearestNeighboursRecurse(Vector<QueryResult>& resu
         if (n < K) {
           result.resize(n + 1);
         }
+        else {
+          n = K - 1;
+        }
 
         auto i = n;
         for (; 0 < i && d2 < result[i - 1].distanceSquared; i--) {
@@ -322,6 +325,8 @@ void KdTree::R3StaticTree::getNearestNeighboursRecurse(Vector<QueryResult>& resu
 void KdTree::R3StaticTree::getNearestNeighbours(Vector<QueryResult>& result, const Vec3f& origin, uint32_t K)
 {
   result.resize(0);
+  if (points.empty()) return;
+
   result.reserve(K);
   getNearestNeighboursRecurse(result, 0, origin, K);
 }
