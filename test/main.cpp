@@ -422,6 +422,12 @@ int main(int argc, char** argv)
       avgRadius *= 1.f / P.size32();
 
 
+      logger(0, "Find single nearest test");
+      for (unsigned j = 0; j < P.size32(); j++) {
+        auto result = kdTree.getNearest(P[j]);
+        assert(result.ix == j);
+      }
+
       logger(0, "Find points within radius test.");
       for (unsigned j = 0; j < P.size32(); j++) {
 

@@ -330,3 +330,36 @@ void KdTree::R3StaticTree::getNearestNeighbours(Vector<QueryResult>& result, con
   result.reserve(K);
   getNearestNeighboursRecurse(result, 0, origin, K);
 }
+
+
+void KdTree::R3StaticTree::getNearestRecurse(QueryResult& result, uint32_t nodeIx, const Vec3f& origin)
+{
+  auto & node = nodes[nodeIx];
+  if (node.kind == NodeKind::Leaf) {
+    for (uint32_t j = node.leaf.rangeBegin; j < node.leaf.rangeEnd; j++) {
+      auto & point = points[j];
+      auto d2 = distanceSquared(origin, point.p);
+      if (d2 < result.distanceSquared) {
+        result.ix = point.ix;
+        result.distanceSquared = d2;
+      }
+    }
+  }
+  else {
+    assert(node.kind == NodeKind::Inner);
+    auto d = origin[node.inner.axis] - node.inner.split;
+    getNearestRecurse(result, node.inner.children[d < 0.f ? 0 : 1], origin);
+    if (result.ix == ~0u || d * d < result.distanceSquared) {
+      getNearestRecurse(result, node.inner.children[d < 0.f ? 1 : 0], origin);
+    }
+  }
+}
+
+KdTree::QueryResult KdTree::R3StaticTree::getNearest(const Vec3f& origin)
+{
+  KdTree::QueryResult result;
+  result.ix = ~0u;
+  result.distanceSquared = FLT_MAX;
+  getNearestRecurse(result, 0, origin);
+  return result;
+}

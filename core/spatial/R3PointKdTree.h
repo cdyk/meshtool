@@ -55,6 +55,8 @@ namespace KdTree
 
     void getNearestNeighbours(Vector<QueryResult>& result, const Vec3f& origin, uint32_t K);
 
+    KdTree::QueryResult getNearest(const Vec3f& origin);
+
     Vector<R3Point> points;
     Vector<Node> nodes;
     BBox3f bbox;
@@ -68,6 +70,8 @@ namespace KdTree
     void getPointsWithinRadiusRecurse(Vector<QueryResult>& result, uint32_t nodeIndex, const Vec3f& origin, float radius);
 
     void getNearestNeighboursRecurse(Vector<QueryResult>& result, uint32_t nodeIx, const Vec3f& origin, uint32_t K);
+
+    void getNearestRecurse(QueryResult& result, uint32_t nodeIx, const Vec3f& origin);
 
   };
 
