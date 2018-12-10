@@ -22,7 +22,7 @@ private:
   Logger logger;
   App* app = nullptr;
 
-  VkPhysicalDeviceRaytracingPropertiesNVX rtProps;
+  VkPhysicalDeviceRayTracingPropertiesNV rtProps;
 
   ShaderHandle rgenShader;
   ShaderHandle chitShader;
@@ -54,7 +54,7 @@ private:
     RenderBufferHandle indices;
     RenderBufferHandle triangleData;
     AccelerationStructureHandle acc;
-    VkGeometryNVX geometry;
+    VkGeometryNV geometry;
 
     uint32_t vertexCount = 0;
     uint32_t triangleCount = 0;

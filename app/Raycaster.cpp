@@ -78,7 +78,7 @@ void Raycaster::init()
   VkDescriptorPoolSize poolSizes[] =
   {
     { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, renames.size32()},
-    { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX, renames.size32() },
+    { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV, renames.size32() },
     { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,  10 * renames.size32() },
     { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10 * renames.size32()}
   };
@@ -100,33 +100,33 @@ VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
   VkDescriptorSetLayoutBinding descSetLayoutBinding[5];
   descSetLayoutBinding[0] = {};
   descSetLayoutBinding[0].binding = BINDING_TOPLEVEL_ACC;
-  descSetLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
+  descSetLayoutBinding[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
   descSetLayoutBinding[0].descriptorCount = 1;
-  descSetLayoutBinding[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX | VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
+  descSetLayoutBinding[0].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV | VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
 
   descSetLayoutBinding[1] = {};
   descSetLayoutBinding[1].binding = BINDING_OUTPUT_IMAGE;
   descSetLayoutBinding[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
   descSetLayoutBinding[1].descriptorCount = 1;
-  descSetLayoutBinding[1].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+  descSetLayoutBinding[1].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV;
 
   descSetLayoutBinding[2] = {};
   descSetLayoutBinding[2].binding = BINDING_SCENE_BUF;
   descSetLayoutBinding[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
   descSetLayoutBinding[2].descriptorCount = 1;
-  descSetLayoutBinding[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX | VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX | VK_SHADER_STAGE_MISS_BIT_NVX;
+  descSetLayoutBinding[2].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV | VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV | VK_SHADER_STAGE_MISS_BIT_NV;
 
   descSetLayoutBinding[3] = {};
   descSetLayoutBinding[3].binding = BINDING_INPUT_IMAGE;
   descSetLayoutBinding[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
   descSetLayoutBinding[3].descriptorCount = 1;
-  descSetLayoutBinding[3].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NVX;
+  descSetLayoutBinding[3].stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_NV;
 
   descSetLayoutBinding[4] = {};
   descSetLayoutBinding[4].binding = BINDING_TRIANGLE_DATA;
   descSetLayoutBinding[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
   descSetLayoutBinding[4].descriptorCount = meshData.size32();
-  descSetLayoutBinding[4].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
+  descSetLayoutBinding[4].stageFlags = VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
 
   VkDescriptorBindingFlagsEXT flags[5] = { 0, 0, 0, 0, VK_DESCRIPTOR_BINDING_VARIABLE_DESCRIPTOR_COUNT_BIT_EXT };
 
@@ -153,12 +153,12 @@ void Raycaster::buildPipeline()
   auto * vCtx = app->vCtx;
   auto * resources = vCtx->resources;
 
-  rtProps = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAYTRACING_PROPERTIES_NVX };
+  rtProps = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PROPERTIES_NV };
   VkPhysicalDeviceProperties2 props2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
   props2.pNext = &rtProps;
   vkGetPhysicalDeviceProperties2(vCtx->physicalDevice, &props2);
 
-  logger(0, "rtprops.shaderHeaderSize=%d", rtProps.shaderHeaderSize);
+  logger(0, "rtprops.shaderGroupHandleSize=%d", rtProps.shaderGroupHandleSize);
   logger(0, "rtprops.maxRecursionDepth=%d", rtProps.maxRecursionDepth);
   logger(0, "rtprops.maxGeometryCount=%d", rtProps.maxGeometryCount);
 
@@ -171,8 +171,16 @@ void Raycaster::buildPipeline()
     chitShader.resource->stageCreateInfo,
     missShader.resource->stageCreateInfo,
   };
-  uint32_t groupNumbers[ARRAYSIZE(stages)] = { 0, 1, 2 };
+  //uint32_t groupNumbers[ARRAYSIZE(stages)] = { 0, 1, 2 };
 
+  VkRayTracingShaderGroupCreateInfoNV groups[] = {
+    // group0 -> rgen
+    {VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV, nullptr, VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV, 0, VK_SHADER_UNUSED_NV, VK_SHADER_UNUSED_NV, VK_SHADER_UNUSED_NV },
+    // group1 -> chit
+    {VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV, nullptr, VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV, VK_SHADER_UNUSED_NV, 1, VK_SHADER_UNUSED_NV, VK_SHADER_UNUSED_NV },
+    // group2 -> miss
+    {VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_NV, nullptr, VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_NV, 2, VK_SHADER_UNUSED_NV, VK_SHADER_UNUSED_NV, VK_SHADER_UNUSED_NV }
+  };
 
   pipeline = vCtx->resources->createPipeline();
   auto * pipe = pipeline.resource;
@@ -191,30 +199,24 @@ void Raycaster::buildPipeline()
 
   {
 
-    VkRaytracingPipelineCreateInfoNVX info = { VK_STRUCTURE_TYPE_RAYTRACING_PIPELINE_CREATE_INFO_NVX };
+    VkRayTracingPipelineCreateInfoNV info = { VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_NV };
     info.pStages = stages;
     info.stageCount = ARRAYSIZE(stages);
-    info.pGroupNumbers = groupNumbers;
+    info.pGroups = groups;
+    info.groupCount = ARRAYSIZE(groups);
     info.maxRecursionDepth = 10;
     info.layout = pipe->pipeLayout;
-    CHECK_VULKAN(vCtx->vkCreateRaytracingPipelinesNVX(vCtx->device, nullptr /*vCtx->pipelineCache*/, 1, &info, nullptr, &pipe->pipe));
+    info.basePipelineHandle = VK_NULL_HANDLE;
+    info.basePipelineIndex = 0;
+    CHECK_VULKAN(vCtx->vkCreateRayTracingPipelinesNV(vCtx->device, nullptr /*vCtx->pipelineCache*/, 1, &info, nullptr, &pipe->pipe));
   }
 
   //CHECK_VULKAN(vCtx->vkCompileDeferredNVX(vCtx->device, pipe->pipe, 0));
   { // shader binding table
-
     uint32_t groupCount = 3;
-    uint32_t tableSize = groupCount * rtProps.shaderHeaderSize;
-    
+    uint32_t tableSize = groupCount * rtProps.shaderGroupHandleSize;
     bindingTable = vCtx->resources->createBuffer(tableSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT);
-    {
-      CHECK_VULKAN(vCtx->vkGetRaytracingShaderHandlesNVX(vCtx->device, pipe->pipe, 0, groupCount, tableSize, bindingTable.resource->hostPtr));
-      //CHECK_VULKAN(vCtx->vkGetRaytracingShaderHandlesNVX(vCtx->device, pipe->pipe, 1, 1, bindingTableSize, ptr + 1 * rtProps.shaderHeaderSize));
-      //CHECK_VULKAN(vCtx->vkGetRaytracingShaderHandlesNVX(vCtx->device, pipe->pipe, 2, 1, bindingTableSize, ptr + 2 * rtProps.shaderHeaderSize));
-      // instanceShaderBindingTableRecordOffset stored in each instance of top-level acc struc
-      // geometry index is the geometry within the instance.
-      // instanceShaderBindingTableRecordOffset + hitProgramShaderBindingTableBaseIndex + geometryIndex × sbtRecordStride + sbtRecordOffset
-    }
+    CHECK_VULKAN(vCtx->vkGetRayTracingShaderGroupHandlesNV(vCtx->device, pipe->pipe, 0, groupCount, tableSize, bindingTable.resource->hostPtr));
   }
 
   
@@ -249,7 +251,7 @@ void Raycaster::buildDescriptorSets()
       CHECK_VULKAN(vkAllocateDescriptorSets(vCtx->device, &descAllocInfo, &rename.descSet));
     }
 
-    VkDescriptorAccelerationStructureInfoNVX descriptorAccelerationStructureInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_ACCELERATION_STRUCTURE_INFO_NVX };
+    VkWriteDescriptorSetAccelerationStructureNV descriptorAccelerationStructureInfo{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_NV };
     descriptorAccelerationStructureInfo.accelerationStructureCount = 1;
     descriptorAccelerationStructureInfo.pAccelerationStructures = &topAcc.resource->acc;
 
@@ -260,7 +262,7 @@ void Raycaster::buildDescriptorSets()
     writes[0].dstBinding = BINDING_TOPLEVEL_ACC;
     writes[0].dstArrayElement = 0;
     writes[0].descriptorCount = 1;
-    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NVX;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
     writes[0].pImageInfo = nullptr;
     writes[0].pBufferInfo = nullptr;
     writes[0].pTexelBufferView = nullptr;
@@ -366,10 +368,10 @@ bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData,  c
   }
 
   auto & geometry = meshData.geometry;
-  geometry = { VK_STRUCTURE_TYPE_GEOMETRY_NVX };
+  geometry = { VK_STRUCTURE_TYPE_GEOMETRY_NV };
 
-  geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NVX;
-  geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NVX;
+  geometry.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_NV;
+  geometry.geometry.triangles.sType = VK_STRUCTURE_TYPE_GEOMETRY_TRIANGLES_NV;
   geometry.geometry.triangles.pNext = nullptr;
   geometry.geometry.triangles.vertexData = meshData.vertices.resource->buffer;
   geometry.geometry.triangles.vertexOffset = 0;
@@ -383,10 +385,10 @@ bool Raycaster::updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData,  c
   geometry.geometry.triangles.transformData = VK_NULL_HANDLE;
   geometry.geometry.triangles.transformOffset = 0;
   geometry.geometry.aabbs = { };
-  geometry.geometry.aabbs.sType = VK_STRUCTURE_TYPE_GEOMETRY_AABB_NVX;
+  geometry.geometry.aabbs.sType = VK_STRUCTURE_TYPE_GEOMETRY_AABB_NV;
   geometry.flags = 0;
 
-  meshData.acc = vCtx->resources->createAccelerationStructure(VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NVX, 1, &geometry, 0);
+  meshData.acc = vCtx->resources->createAccelerationStructure(VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NV, 1, &geometry, 0);
   if (scratchSize < meshData.acc.resource->scratchReqs.size) scratchSize = meshData.acc.resource->scratchReqs.size;
 
   meshData.rebuild = true;
@@ -433,7 +435,7 @@ void Raycaster::update(Vector<Mesh*>& meshes)
     }
     auto geometryCount = meshData.size32();
 
-    Vector<VkGeometryNVX> geometries(geometryCount);
+    Vector<VkGeometryNV> geometries(geometryCount);
     Vector<Instance> instances(geometryCount);
 
     geometries.resize(geometryCount);
@@ -450,19 +452,19 @@ void Raycaster::update(Vector<Mesh*>& meshes)
       instance.instanceContributionToHitGroupIndex = 0;
       instance.flags = 0;// VK_GEOMETRY_INSTANCE_TRIANGLE_CULL_DISABLE_BIT_NVX;
       instance.accelerationStructureHandle = 0;
-      CHECK_VULKAN(vCtx->vkGetAccelerationStructureHandleNVX(vCtx->device, meshData[g].acc.resource->acc, sizeof(uint64_t), &instance.accelerationStructureHandle));
+      CHECK_VULKAN(vCtx->vkGetAccelerationStructureHandleNV(vCtx->device, meshData[g].acc.resource->acc, sizeof(uint64_t), &instance.accelerationStructureHandle));
     }
-    auto instanceBuffer = vCtx->resources->createBuffer(sizeof(Instance)*geometryCount, VK_BUFFER_USAGE_RAYTRACING_BIT_NVX, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    auto instanceBuffer = vCtx->resources->createBuffer(sizeof(Instance)*geometryCount, VK_BUFFER_USAGE_RAY_TRACING_BIT_NV, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
     vCtx->resources->copyHostMemToBuffer(instanceBuffer, instances.data(), sizeof(Instance)*geometryCount);
 
-    topAcc = vCtx->resources->createAccelerationStructure(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NVX, 0, nullptr, uint32_t(instances.size()));
+    topAcc = vCtx->resources->createAccelerationStructure(VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV, 0, nullptr, uint32_t(instances.size()));
     if (scratchSize < topAcc.resource->scratchReqs.size) scratchSize = topAcc.resource->scratchReqs.size;
 
-    auto scratchBuffer = vCtx->resources->createBuffer(scratchSize, VK_BUFFER_USAGE_RAYTRACING_BIT_NVX, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    auto scratchBuffer = vCtx->resources->createBuffer(scratchSize, VK_BUFFER_USAGE_RAY_TRACING_BIT_NV, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
 
     VkMemoryBarrier memoryBarrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
-    memoryBarrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX;
-    memoryBarrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NVX | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NVX;
+    memoryBarrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NV | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NV;
+    memoryBarrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_NV | VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_NV;
 
     auto cmdBuf = vCtx->frameManager->createPrimaryCommandBuffer();
     VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
@@ -471,21 +473,29 @@ void Raycaster::update(Vector<Mesh*>& meshes)
     for (unsigned g = 0; g < geometryCount; g++) {
       if (meshData[g].rebuild) {
         meshData[g].rebuild = false;
-        vCtx->vkCmdBuildAccelerationStructureNVX(cmdBuf, VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NVX,
-                                                 0, VK_NULL_HANDLE, 0,
-                                                 (uint32_t)geometries.size(), &geometries[0],
-                                                 0,
-                                                 //VK_BUILD_ACCELERATION_STRUCTURE_LOW_MEMORY_BIT_NVX,
-                                                 //VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_NVX,
-                                                 VK_FALSE, meshData[g].acc.resource->acc, VK_NULL_HANDLE, scratchBuffer.resource->buffer, 0);
-        vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, 0, 1, &memoryBarrier, 0, 0, 0, 0);
+        {
+          VkAccelerationStructureInfoNV asInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
+          asInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_NV;
+          asInfo.flags = 0;
+          asInfo.instanceCount = 0;
+          asInfo.pGeometries = &geometries[g];
+          asInfo.geometryCount = 1;// (uint32_t)geometries.size();
+          vCtx->vkCmdBuildAccelerationStructureNV(cmdBuf, &asInfo, VK_NULL_HANDLE, 0, VK_FALSE, meshData[g].acc.resource->acc, VK_NULL_HANDLE, scratchBuffer.resource->buffer, 0);
+        }
+        vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_NV, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_NV, 0, 1, &memoryBarrier, 0, 0, 0, 0);
       }
     }
-    vCtx->vkCmdBuildAccelerationStructureNVX(cmdBuf, VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NVX,
-                                             1, instanceBuffer.resource->buffer, 0,
-                                             0, nullptr,
-                                             0, VK_FALSE, topAcc.resource->acc, VK_NULL_HANDLE, scratchBuffer.resource->buffer, 0);
-    vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, VK_PIPELINE_STAGE_RAYTRACING_BIT_NVX, 0, 1, &memoryBarrier, 0, 0, 0, 0);
+
+    {
+      VkAccelerationStructureInfoNV asInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV };
+      asInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_NV;
+      asInfo.flags = 0;
+      asInfo.instanceCount = geometryCount;
+      asInfo.geometryCount = 0;
+
+      vCtx->vkCmdBuildAccelerationStructureNV(cmdBuf, &asInfo, instanceBuffer.resource->buffer, 0, VK_FALSE, topAcc.resource->acc, VK_NULL_HANDLE, scratchBuffer.resource->buffer, 0);
+    }
+    vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_NV, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_NV, 0, 1, &memoryBarrier, 0, 0, 0, 0);
     vkEndCommandBuffer(cmdBuf);
 
     VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
@@ -638,14 +648,14 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
                          0, 0, nullptr, 0, nullptr, 2, imageMemoryBarriers);
   }
   {
-    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, pipeline.resource->pipe);
-    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_RAYTRACING_NVX, pipeline.resource->pipeLayout, 0, 1, &rename.descSet, 0, 0);
-    vCtx->vkCmdTraceRaysNVX(cmdBuf,
-                            bindingTable.resource->buffer, 0,      // raygen
-                            bindingTable.resource->buffer, 2 * rtProps.shaderHeaderSize, rtProps.shaderHeaderSize,   // miss
-                            bindingTable.resource->buffer, 1 * rtProps.shaderHeaderSize, rtProps.shaderHeaderSize,   // hit
-                            w, h);
-
+    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, pipeline.resource->pipe);
+    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, pipeline.resource->pipeLayout, 0, 1, &rename.descSet, 0, 0);
+    vCtx->vkCmdTraceRaysNV(cmdBuf,
+                           bindingTable.resource->buffer, 0,      // raygen
+                           bindingTable.resource->buffer, 2 * rtProps.shaderGroupHandleSize, rtProps.shaderGroupHandleSize,   // miss
+                           bindingTable.resource->buffer, 1 * rtProps.shaderGroupHandleSize, rtProps.shaderGroupHandleSize,   // hit
+                           VK_NULL_HANDLE, 0, 0,
+                           w, h, 1);
   }
   { // Prep for blitting
     VkImageMemoryBarrier imageMemoryBarriers[2];

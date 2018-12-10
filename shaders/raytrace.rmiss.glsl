@@ -1,7 +1,7 @@
 #version 460
-#extension GL_NVX_raytracing : require
+#extension GL_NV_ray_tracing : require
 
-layout(location = 0) rayPayloadInNVX vec3 color;
+layout(location = 0) rayPayloadInNV vec3 color;
 
 layout(std140, binding = 2) uniform SceneBuf{
   mat4 Pinv;
@@ -24,5 +24,5 @@ vec3 irradiance(vec3 d)
 void main() {
 
 
-  color = irradiance(gl_WorldRayDirectionNVX);
+  color = irradiance(gl_WorldRayDirectionNV);
 }

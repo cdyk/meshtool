@@ -1,5 +1,5 @@
 #version 460
-#extension GL_NVX_raytracing : require
+#extension GL_NV_ray_tracing : require
 #extension GL_EXT_shader_8bit_storage : require
 #extension GL_EXT_nonuniform_qualifier : require
 //#extension GL_KHX_shader_explicit_arithmetic_types : require
@@ -8,9 +8,9 @@
 
 #include "raytrace.common.glsl"
 
-layout(location = 0) rayPayloadInNVX Payload payloadIn;
-layout(location = 1) rayPayloadNVX Payload payload;
-layout(location = 2) hitAttributeNVX vec3 hitAttribute;
+layout(location = 0) rayPayloadInNV Payload payloadIn;
+layout(location = 1) rayPayloadNV Payload payload;
+layout(location = 2) hitAttributeNV vec3 hitAttribute;
 
 void main() {
 
@@ -23,7 +23,7 @@ void main() {
            w0 * vec3(data.n1x, data.n1y, data.n1z) +
            w1 * vec3(data.n2x, data.n2y, data.n2z);
 
-  vec3 o = gl_WorldRayOriginNVX + gl_WorldRayDirectionNVX * gl_HitTNVX;
+  vec3 o = gl_WorldRayOriginNV + gl_WorldRayDirectionNV * gl_HitTNV;
   vec3 d = normalize(vec3(sceneBuf.lx, sceneBuf.ly, sceneBuf.lz));
 
   vec3 u, v, w;
@@ -36,8 +36,8 @@ void main() {
   //d_w = vec3(sceneBuf.lx, sceneBuf.ly, sceneBuf.lz);
 
   payload.state = state;
-  traceNVX(topLevel,
-           gl_RayFlagsOpaqueNVX | gl_RayFlagsCullBackFacingTrianglesNVX,   // rayFlags    gl_RayFlagsTerminateOnFirstHitNVX;
+  traceNV(topLevel,
+           gl_RayFlagsOpaqueNV | gl_RayFlagsCullBackFacingTrianglesNV,   // rayFlags    gl_RayFlagsTerminateOnFirstHitNV;
            ~0u,                    // cullMask
            0,                      // stbRecordOffset
            0,                      // stbRecordStride

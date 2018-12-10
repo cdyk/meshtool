@@ -123,7 +123,7 @@ typedef ResourceHandle<SwapChain> SwapChainHandle;
 struct AccelerationStructure : public ResourceBase
 {
   AccelerationStructure(ResourceManagerBase& manager) : ResourceBase(manager) {}
-  VkAccelerationStructureNVX acc = VK_NULL_HANDLE;
+  VkAccelerationStructureNV acc = VK_NULL_HANDLE;
   VkDeviceMemory structureMem = VK_NULL_HANDLE;
   VkMemoryRequirements scratchReqs{ 0 };
 };
@@ -186,7 +186,7 @@ public:
   SwapChainHandle createSwapChain(SwapChainHandle oldSwapChain, VkSwapchainCreateInfoKHR& swapChainInfo);
 
   AccelerationStructureHandle createAccelerationStructure();
-  AccelerationStructureHandle createAccelerationStructure(VkAccelerationStructureTypeNVX type, uint32_t geometryCount, VkGeometryNVX* geometries, uint32_t instanceCount);
+  AccelerationStructureHandle createAccelerationStructure(VkAccelerationStructureTypeNV type, uint32_t geometryCount, VkGeometryNV* geometries, uint32_t instanceCount);
 
   bool getMemoryTypeIndex(uint32_t& index, uint32_t typeBits, uint32_t requirements);
   uint32_t getMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags requirements);

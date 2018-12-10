@@ -1,6 +1,6 @@
 #include "raytrace.binding.h"
 
-layout(binding = BINDING_TOPLEVEL_ACC) uniform accelerationStructureNVX topLevel;
+layout(binding = BINDING_TOPLEVEL_ACC) uniform accelerationStructureNV topLevel;
 
 layout(binding = BINDING_OUTPUT_IMAGE, rgba32f) uniform writeonly image2D image;
 layout(binding = BINDING_INPUT_IMAGE, rgba32f) uniform readonly image2D imageIn;

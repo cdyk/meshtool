@@ -143,8 +143,8 @@ VulkanContext::VulkanContext(Logger logger,
         auto &e = extensionProps[k];
         logger(0, "Device %d: extension \"%s\", spec version=%d",i, e.extensionName, e.specVersion);
 
-        if (std::strcmp(e.extensionName, VK_NVX_RAYTRACING_EXTENSION_NAME) == 0) {
-          nvxRaytracing = true;
+        if (std::strcmp(e.extensionName, VK_NV_RAY_TRACING_EXTENSION_NAME) == 0) {
+          nvRayTracing = true;
         }
         else if (std::strcmp(e.extensionName, VK_NV_MESH_SHADER_EXTENSION_NAME) == 0) {
           nvMeshShader = true;
@@ -233,8 +233,8 @@ VulkanContext::VulkanContext(Logger logger,
     requestedDeviceExtensions.pushBack(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
     requestedDeviceExtensions.pushBack(VK_KHR_16BIT_STORAGE_EXTENSION_NAME);
     requestedDeviceExtensions.pushBack(VK_KHR_8BIT_STORAGE_EXTENSION_NAME);
-    if (nvxRaytracing) {
-      requestedDeviceExtensions.pushBack(VK_NVX_RAYTRACING_EXTENSION_NAME);
+    if (nvRayTracing) {
+      requestedDeviceExtensions.pushBack(VK_NV_RAY_TRACING_EXTENSION_NAME);
       requestedDeviceExtensions.pushBack(VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME);
     }
     if (nvMeshShader) {
@@ -257,7 +257,7 @@ VulkanContext::VulkanContext(Logger logger,
     features2.pNext = &features8;
 
     VkPhysicalDeviceDescriptorIndexingFeaturesEXT descriptorIndexing = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT };
-    if (nvxRaytracing) {
+    if (nvRayTracing) {
       enabledFeatures.vertexPipelineStoresAndAtomics = 1;
       descriptorIndexing.pNext = features2.pNext;
       features2.pNext = &descriptorIndexing;
@@ -287,33 +287,33 @@ VulkanContext::VulkanContext(Logger logger,
     CHECK_VULKAN(vkCreateDevice(physicalDevice, &deviceInfo, NULL, &device));
 
 
-    if (nvxRaytracing) {
-      vkCreateAccelerationStructureNVX = (PFN_vkCreateAccelerationStructureNVX)vkGetInstanceProcAddr(instance, "vkCreateAccelerationStructureNVX");;
-      assert(vkCreateAccelerationStructureNVX);
-      vkDestroyAccelerationStructureNVX = (PFN_vkDestroyAccelerationStructureNVX)vkGetInstanceProcAddr(instance, "vkDestroyAccelerationStructureNVX");;
-      assert(vkDestroyAccelerationStructureNVX);
-      vkGetAccelerationStructureMemoryRequirementsNVX = (PFN_vkGetAccelerationStructureMemoryRequirementsNVX)vkGetInstanceProcAddr(instance, "vkGetAccelerationStructureMemoryRequirementsNVX");;
-      assert(vkGetAccelerationStructureMemoryRequirementsNVX);
-      vkGetAccelerationStructureScratchMemoryRequirementsNVX = (PFN_vkGetAccelerationStructureScratchMemoryRequirementsNVX)vkGetInstanceProcAddr(instance, "vkGetAccelerationStructureScratchMemoryRequirementsNVX");;
-      assert(vkGetAccelerationStructureScratchMemoryRequirementsNVX);
-      vkBindAccelerationStructureMemoryNVX = (PFN_vkBindAccelerationStructureMemoryNVX)vkGetInstanceProcAddr(instance, "vkBindAccelerationStructureMemoryNVX");;
-      assert(vkBindAccelerationStructureMemoryNVX);
-      vkCmdBuildAccelerationStructureNVX = (PFN_vkCmdBuildAccelerationStructureNVX)vkGetInstanceProcAddr(instance, "vkCmdBuildAccelerationStructureNVX");;
-      assert(vkCmdBuildAccelerationStructureNVX);
-      vkCmdCopyAccelerationStructureNVX = (PFN_vkCmdCopyAccelerationStructureNVX)vkGetInstanceProcAddr(instance, "vkCmdCopyAccelerationStructureNVX");;
-      assert(vkCmdCopyAccelerationStructureNVX);
-      vkCmdTraceRaysNVX = (PFN_vkCmdTraceRaysNVX)vkGetInstanceProcAddr(instance, "vkCmdTraceRaysNVX");;
-      assert(vkCmdTraceRaysNVX);
-      vkCreateRaytracingPipelinesNVX = (PFN_vkCreateRaytracingPipelinesNVX)vkGetInstanceProcAddr(instance, "vkCreateRaytracingPipelinesNVX");;
-      assert(vkCreateRaytracingPipelinesNVX);
-      vkGetRaytracingShaderHandlesNVX = (PFN_vkGetRaytracingShaderHandlesNVX)vkGetInstanceProcAddr(instance, "vkGetRaytracingShaderHandlesNVX");;
-      assert(vkGetRaytracingShaderHandlesNVX);
-      vkGetAccelerationStructureHandleNVX = (PFN_vkGetAccelerationStructureHandleNVX)vkGetInstanceProcAddr(instance, "vkGetAccelerationStructureHandleNVX");;
-      assert(vkGetAccelerationStructureHandleNVX);
-      vkCmdWriteAccelerationStructurePropertiesNVX = (PFN_vkCmdWriteAccelerationStructurePropertiesNVX)vkGetInstanceProcAddr(instance, "vkCmdWriteAccelerationStructurePropertiesNVX");;
-      assert(vkCmdWriteAccelerationStructurePropertiesNVX);
-      vkCompileDeferredNVX = (PFN_vkCompileDeferredNVX)vkGetInstanceProcAddr(instance, "vkCompileDeferredNVX");;
-      assert(vkCompileDeferredNVX);
+    if (nvRayTracing) {
+      vkCreateAccelerationStructureNV = (PFN_vkCreateAccelerationStructureNV)vkGetInstanceProcAddr(instance, "vkCreateAccelerationStructureNV");
+      assert(vkCreateAccelerationStructureNV);
+      vkDestroyAccelerationStructureNV = (PFN_vkDestroyAccelerationStructureNV)vkGetInstanceProcAddr(instance, "vkDestroyAccelerationStructureNV");
+      assert(vkDestroyAccelerationStructureNV);
+      vkGetAccelerationStructureMemoryRequirementsNV = (PFN_vkGetAccelerationStructureMemoryRequirementsNV)vkGetInstanceProcAddr(instance, "vkGetAccelerationStructureMemoryRequirementsNV");
+      assert(vkGetAccelerationStructureMemoryRequirementsNV);
+      //vkGetAccelerationStructureScratchMemoryRequirementsNV = (PFN_vkGetAccelerationStructureScratchMemoryRequirementsNV)vkGetInstanceProcAddr(instance, "vkGetAccelerationStructureScratchMemoryRequirementsNV");;
+      //assert(vkGetAccelerationStructureScratchMemoryRequirementsNV);
+      vkBindAccelerationStructureMemoryNV = (PFN_vkBindAccelerationStructureMemoryNV)vkGetInstanceProcAddr(instance, "vkBindAccelerationStructureMemoryNV");
+      assert(vkBindAccelerationStructureMemoryNV);
+      vkCmdBuildAccelerationStructureNV = (PFN_vkCmdBuildAccelerationStructureNV)vkGetInstanceProcAddr(instance, "vkCmdBuildAccelerationStructureNV");
+      assert(vkCmdBuildAccelerationStructureNV);
+      vkCmdCopyAccelerationStructureNV = (PFN_vkCmdCopyAccelerationStructureNV)vkGetInstanceProcAddr(instance, "vkCmdCopyAccelerationStructureNV");
+      assert(vkCmdCopyAccelerationStructureNV);
+      vkCmdTraceRaysNV = (PFN_vkCmdTraceRaysNV)vkGetInstanceProcAddr(instance, "vkCmdTraceRaysNV");
+      assert(vkCmdTraceRaysNV);
+      vkCreateRayTracingPipelinesNV = (PFN_vkCreateRayTracingPipelinesNV)vkGetInstanceProcAddr(instance, "vkCreateRayTracingPipelinesNV");
+      assert(vkCreateRayTracingPipelinesNV);
+      vkGetRayTracingShaderGroupHandlesNV = (PFN_vkGetRayTracingShaderGroupHandlesNV)vkGetInstanceProcAddr(instance, "vkGetRayTracingShaderGroupHandlesNV");
+      assert(vkGetRayTracingShaderGroupHandlesNV);
+      vkGetAccelerationStructureHandleNV = (PFN_vkGetAccelerationStructureHandleNV)vkGetInstanceProcAddr(instance, "vkGetAccelerationStructureHandleNV");
+      assert(vkGetAccelerationStructureHandleNV);
+      //vkCmdWriteAccelerationStructurePropertiesNV = (PFN_vkCmdWriteAccelerationStructurePropertiesNV)vkGetInstanceProcAddr(instance, "vkCmdWriteAccelerationStructurePropertiesNV");;
+      //assert(vkCmdWriteAccelerationStructurePropertiesNV);
+      vkCompileDeferredNV = (PFN_vkCompileDeferredNV)vkGetInstanceProcAddr(instance, "vkCompileDeferredNV");
+      assert(vkCompileDeferredNV);
     }
     if (nvMeshShader) {
       vkCmdDrawMeshTasksNV = (PFN_vkCmdDrawMeshTasksNV)vkGetInstanceProcAddr(instance, "vkCmdDrawMeshTasksNV");

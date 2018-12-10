@@ -268,7 +268,7 @@ namespace {
           };
           if (ImGui::MenuItem("Normal", "R", &sel[0])) app->renderMode = RenderMode::Normal;
           if (ImGui::MenuItem("Mesh shader", "R", &sel[1], app->vCtx->nvMeshShader)) app->renderMode = RenderMode::MeshShader;
-          if (ImGui::MenuItem("Raytracing", "R", &sel[2], app->vCtx->nvxRaytracing)) app->renderMode = RenderMode::Raytracing;
+          if (ImGui::MenuItem("Raytracing", "R", &sel[2], app->vCtx->nvRayTracing)) app->renderMode = RenderMode::Raytracing;
           ImGui::EndMenu();
         }
         if (ImGui::BeginMenu("Color")) {

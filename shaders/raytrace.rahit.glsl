@@ -1,5 +1,5 @@
 #version 460
-#extension GL_NVX_raytracing : require
+#extension GL_NV_ray_tracing : require
 
 void main()
 {

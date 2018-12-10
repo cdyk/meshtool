@@ -111,7 +111,7 @@ namespace {
   {
     auto* vCtx = (VulkanContext*)data;
     if (accStr->acc) {
-      vCtx->vkDestroyAccelerationStructureNVX(vCtx->device, accStr->acc, nullptr);
+      vCtx->vkDestroyAccelerationStructureNV(vCtx->device, accStr->acc, nullptr);
       accStr->acc = VK_NULL_HANDLE;
     }
     if (accStr->structureMem) {
@@ -431,12 +431,12 @@ namespace {
       //case SpvExecutionModelKernel: return VK_SHADER_STAGE;
     case SpvExecutionModelTaskNV: return VK_SHADER_STAGE_TASK_BIT_NV;
     case SpvExecutionModelMeshNV: return VK_SHADER_STAGE_MESH_BIT_NV;
-    case SpvExecutionModelRayGenerationNVX: return VK_SHADER_STAGE_RAYGEN_BIT_NVX;
-    case SpvExecutionModelIntersectionNVX: return VK_SHADER_STAGE_INTERSECTION_BIT_NVX;
-    case SpvExecutionModelAnyHitNVX: return VK_SHADER_STAGE_ANY_HIT_BIT_NVX;
-    case SpvExecutionModelClosestHitNVX: return VK_SHADER_STAGE_CLOSEST_HIT_BIT_NVX;
-    case SpvExecutionModelMissNVX: return VK_SHADER_STAGE_MISS_BIT_NVX;
-    case SpvExecutionModelCallableNVX: return VK_SHADER_STAGE_CALLABLE_BIT_NVX;
+    case SpvExecutionModelRayGenerationNV: return VK_SHADER_STAGE_RAYGEN_BIT_NV;
+    case SpvExecutionModelIntersectionNV: return VK_SHADER_STAGE_INTERSECTION_BIT_NV;
+    case SpvExecutionModelAnyHitNV: return VK_SHADER_STAGE_ANY_HIT_BIT_NV;
+    case SpvExecutionModelClosestHitNV: return VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV;
+    case SpvExecutionModelMissNV: return VK_SHADER_STAGE_MISS_BIT_NV;
+    case SpvExecutionModelCallableNV: return VK_SHADER_STAGE_CALLABLE_BIT_NV;
     default:
       assert(false && "Unsupported execution model");
       return (VkShaderStageFlagBits)0;
@@ -711,7 +711,7 @@ AccelerationStructureHandle VulkanResources::createAccelerationStructure()
   return accelerationStructures.createResource();
 }
 
-AccelerationStructureHandle VulkanResources::createAccelerationStructure(VkAccelerationStructureTypeNVX type, uint32_t geometryCount, VkGeometryNVX* geometries, uint32_t instanceCount)
+AccelerationStructureHandle VulkanResources::createAccelerationStructure(VkAccelerationStructureTypeNV type, uint32_t geometryCount, VkGeometryNV* geometries, uint32_t instanceCount)
 {
   auto handle = accelerationStructures.createResource();
   auto * r = handle.resource;
@@ -720,23 +720,23 @@ AccelerationStructureHandle VulkanResources::createAccelerationStructure(VkAccel
   //VkDeviceMemory scratchMem = VK_NULL_HANDLE;
   //VkBuffer scratchBuffer = VK_NULL_HANDLE;
 
-  VkAccelerationStructureCreateInfoNVX accelerationStructureInfo;
-  accelerationStructureInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NVX;
-  accelerationStructureInfo.pNext = nullptr;
-  accelerationStructureInfo.type = type;
-  accelerationStructureInfo.flags = 0;
-  accelerationStructureInfo.compactedSize = 0;
-  accelerationStructureInfo.instanceCount = instanceCount;
-  accelerationStructureInfo.geometryCount = geometryCount;
-  accelerationStructureInfo.pGeometries = geometries;
-  CHECK_VULKAN(vCtx->vkCreateAccelerationStructureNVX(vCtx->device, &accelerationStructureInfo, nullptr, &r->acc));
+  VkAccelerationStructureCreateInfoNV asInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_NV };
+  asInfo.compactedSize = 0;
+  asInfo.info.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_INFO_NV;
+  asInfo.info.type = type;
+  asInfo.info.flags = 0;
+  asInfo.info.instanceCount = instanceCount;
+  asInfo.info.geometryCount = geometryCount;
+  asInfo.info.pGeometries = geometries;
+  CHECK_VULKAN(vCtx->vkCreateAccelerationStructureNV(vCtx->device, &asInfo, nullptr, &r->acc));
 
   VkMemoryRequirements2 memoryRequirements;
-  VkAccelerationStructureMemoryRequirementsInfoNVX memoryRequirementsInfo;
-  memoryRequirementsInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NVX;
-  memoryRequirementsInfo.pNext = nullptr;
-  memoryRequirementsInfo.accelerationStructure = r->acc;
-  vCtx->vkGetAccelerationStructureMemoryRequirementsNVX(vCtx->device, &memoryRequirementsInfo, &memoryRequirements);
+  {
+    VkAccelerationStructureMemoryRequirementsInfoNV mrInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NV };
+    mrInfo.accelerationStructure = r->acc;
+    mrInfo.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_OBJECT_NV;
+    vCtx->vkGetAccelerationStructureMemoryRequirementsNV(vCtx->device, &mrInfo, &memoryRequirements);
+  }
 
   VkMemoryAllocateInfo memoryAllocateInfo;
   memoryAllocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
@@ -745,22 +745,21 @@ AccelerationStructureHandle VulkanResources::createAccelerationStructure(VkAccel
   memoryAllocateInfo.memoryTypeIndex = getMemoryTypeIndex(memoryRequirements.memoryRequirements.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
   CHECK_VULKAN(vkAllocateMemory(vCtx->device, &memoryAllocateInfo, nullptr, &r->structureMem));
 
-  VkBindAccelerationStructureMemoryInfoNVX bindInfo;
-  bindInfo.sType = VK_STRUCTURE_TYPE_BIND_ACCELERATION_STRUCTURE_MEMORY_INFO_NVX;
-  bindInfo.pNext = nullptr;
+  VkBindAccelerationStructureMemoryInfoNV bindInfo{ VK_STRUCTURE_TYPE_BIND_ACCELERATION_STRUCTURE_MEMORY_INFO_NV };
   bindInfo.accelerationStructure = r->acc;
   bindInfo.memory = r->structureMem;
   bindInfo.memoryOffset = 0;
   bindInfo.deviceIndexCount = 0;
   bindInfo.pDeviceIndices = nullptr;
-  CHECK_VULKAN(vCtx->vkBindAccelerationStructureMemoryNVX(vCtx->device, 1, &bindInfo));
+  CHECK_VULKAN(vCtx->vkBindAccelerationStructureMemoryNV(vCtx->device, 1, &bindInfo));
 
   VkMemoryRequirements2 scratchMemReq;
-  //VkAccelerationStructureMemoryRequirementsInfoNVX memoryRequirementsInfo;
-  memoryRequirementsInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NVX;
-  memoryRequirementsInfo.pNext = nullptr;
-  memoryRequirementsInfo.accelerationStructure = r->acc;
-  vCtx->vkGetAccelerationStructureScratchMemoryRequirementsNVX(vCtx->device, &memoryRequirementsInfo, &scratchMemReq);
+  {
+    VkAccelerationStructureMemoryRequirementsInfoNV mrInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_INFO_NV };
+    mrInfo.accelerationStructure = r->acc;
+    mrInfo.type = VK_ACCELERATION_STRUCTURE_MEMORY_REQUIREMENTS_TYPE_BUILD_SCRATCH_NV;
+    vCtx->vkGetAccelerationStructureMemoryRequirementsNV(vCtx->device, &mrInfo, &scratchMemReq);
+  }
   r->scratchReqs = scratchMemReq.memoryRequirements;
 
   return handle;
