@@ -42,6 +42,10 @@ void VulkanFrameManager::init()
       { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
       { VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000 }
   };
+  if (vCtx->nvRayTracing) {
+    poolSizes.pushBack(VkDescriptorPoolSize{ VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV, 1000 });
+  }
+
 
   frameData.resize(framesInFlight);
   for (auto & frame : frameData) {
@@ -106,6 +110,32 @@ VkDescriptorSet  VulkanFrameManager::allocDescriptorSet(PipelineHandle& pipe)
 
   return set;
 }
+
+VkDescriptorSet VulkanFrameManager::allocVariableDescriptorSet(uint32_t* counts, uint32_t N, PipelineHandle& pipe)
+{
+  auto & f = frame();
+  auto device = vCtx->device;
+
+  // an array of descriptor counts, with each member specifying the number of descriptors in a
+  // variable descriptor count binding in the corresponding descriptor set being allocated.
+
+  VkDescriptorSetVariableDescriptorCountAllocateInfoEXT varDescInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT };
+  varDescInfo.descriptorSetCount = N;
+  varDescInfo.pDescriptorCounts = counts;
+
+  VkDescriptorSetAllocateInfo descAllocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+  descAllocInfo.pNext = &varDescInfo;
+  descAllocInfo.descriptorPool = f.descriptorPool.resource->pool;
+  descAllocInfo.descriptorSetCount = 1;
+  descAllocInfo.pSetLayouts = &pipe.resource->descLayout;
+
+
+  VkDescriptorSet set = VK_NULL_HANDLE;
+  CHECK_VULKAN(vkAllocateDescriptorSets(device, &descAllocInfo, &set));
+
+  return set;
+}
+
 
 
 VkSurfaceFormatKHR VulkanFrameManager::chooseFormat(Vector<VkFormat>& requestedFormats, VkColorSpaceKHR requestedColorSpace)

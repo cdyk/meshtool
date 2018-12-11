@@ -605,6 +605,88 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
   auto & rename = renames[renameIndex];
 
   auto * vCtx = app->vCtx;
+
+  VkDescriptorSet set = VK_NULL_HANDLE;
+  {
+    VkDescriptorBufferInfo sceneBufferInfo;
+
+    auto l = normalize(mul(Ninv, Vec3f(1, 1, 0.2f)));
+    auto u = normalize(mul(Ninv, Vec3f(0, 1, 0)));
+
+    auto* sceneBuffer = (SceneBuffer*)vCtx->frameManager->allocUniformStore(sceneBufferInfo, sizeof(SceneBuffer));
+    sceneBuffer->Pinv = Pinv;
+    sceneBuffer->lx = l.x;
+    sceneBuffer->ly = l.y;
+    sceneBuffer->lz = l.z;
+    sceneBuffer->ux = u.x;
+    sceneBuffer->uy = u.y;
+    sceneBuffer->uz = u.z;
+    sceneBuffer->rndState = rndState;
+    sceneBuffer->stationaryFrames = stationaryFrames;
+
+    //VkDescriptorSet set = vCtx->frameManager->allocDescriptorSet(pipeline);
+
+    uint32_t varDescCount = meshData.size32();
+
+    set = vCtx->frameManager->allocVariableDescriptorSet(&varDescCount, 1, pipeline);
+
+    Vector<VkWriteDescriptorSet> writes(5);
+    for (auto & write : writes) {
+      write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+      write.dstSet = set;
+      write.dstArrayElement = 0;
+      write.descriptorCount = 1;
+    }
+
+    // ----
+    VkWriteDescriptorSetAccelerationStructureNV descriptorAccelerationStructureInfo{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_NV };
+    descriptorAccelerationStructureInfo.accelerationStructureCount = 1;
+    descriptorAccelerationStructureInfo.pAccelerationStructures = &topAcc.resource->acc;
+
+    writes[0].pNext = &descriptorAccelerationStructureInfo;
+    writes[0].dstBinding = BINDING_TOPLEVEL_ACC;
+    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
+
+    // ----
+    VkDescriptorImageInfo outImageInfo{};
+    outImageInfo.imageView = rename.offscreenView.resource->view;
+    outImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    writes[1].dstBinding = BINDING_OUTPUT_IMAGE;
+    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    writes[1].pImageInfo = &outImageInfo;
+
+    // ----
+    writes[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    writes[2].pBufferInfo = &sceneBufferInfo;
+    writes[2].dstBinding = BINDING_SCENE_BUF;
+
+    // ----
+    VkDescriptorImageInfo inImageInfo{};
+    inImageInfo.imageView = prevRename.offscreenView.resource->view;
+    inImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+    writes[3].dstBinding = BINDING_INPUT_IMAGE;
+    writes[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+    writes[3].pImageInfo = &inImageInfo;
+
+    // ----
+    Vector<VkDescriptorBufferInfo> bufInfo(meshData.size32());
+    for (uint32_t g = 0; g < meshData.size32(); g++) {
+      bufInfo[g].buffer = meshData[g].triangleData.resource->buffer;
+      bufInfo[g].offset = 0;
+      bufInfo[g].range = VK_WHOLE_SIZE;
+  }
+    writes[4].dstArrayElement = 0;
+    writes[4].descriptorCount = bufInfo.size32();
+    writes[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    writes[4].pBufferInfo = bufInfo.data();
+    writes[4].dstBinding = BINDING_TRIANGLE_DATA;
+
+    vkUpdateDescriptorSets(vCtx->device, writes.size32(), writes.data(), 0, nullptr);
+  }
+
+
   {
     auto l = normalize(mul(Ninv, Vec3f(1, 1, 0.2f)));
     auto u = normalize(mul(Ninv, Vec3f(0, 1, 0)));
@@ -649,7 +731,8 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
   }
   {
     vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, pipeline.resource->pipe);
-    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, pipeline.resource->pipeLayout, 0, 1, &rename.descSet, 0, 0);
+    //vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, pipeline.resource->pipeLayout, 0, 1, &rename.descSet, 0, 0);
+    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, pipeline.resource->pipeLayout, 0, 1, &set, 0, 0);
     vCtx->vkCmdTraceRaysNV(cmdBuf,
                            bindingTable.resource->buffer, 0,      // raygen
                            bindingTable.resource->buffer, 2 * rtProps.shaderGroupHandleSize, rtProps.shaderGroupHandleSize,   // miss

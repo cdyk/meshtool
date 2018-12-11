@@ -31,6 +31,8 @@ public:
 
   VkDescriptorSet allocDescriptorSet(PipelineHandle& pipe);
 
+  VkDescriptorSet allocVariableDescriptorSet(uint32_t* counts, uint32_t N, PipelineHandle& pipe);
+
 
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   VkSurfaceFormatKHR surfaceFormat;
