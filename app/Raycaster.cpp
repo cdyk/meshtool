@@ -141,9 +141,6 @@ VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
   layoutCreateInfo.pBindings = descSetLayoutBinding;
   CHECK_VULKAN(vkCreateDescriptorSetLayout(vCtx->device, &layoutCreateInfo, nullptr, &layout));
   CHECK_VULKAN(vkResetDescriptorPool(vCtx->device, descPool, 0));
-  for (auto & rename : renames) {
-    rename.descSet = VK_NULL_HANDLE;
-  }
   return layout;
 }
 
@@ -220,78 +217,6 @@ void Raycaster::buildPipeline()
   }
 
   
-}
-
-
-void Raycaster::buildDescriptorSets()
-{
-  auto * vCtx = app->vCtx;
-  auto * pipe = pipeline.resource;
-
-  
-
-  for (auto & rename : renames) {
-    rename.sceneBuffer = vCtx->resources->createUniformBuffer(sizeof(SceneBuffer));
-
-    if (!rename.descSet) {
-
-      // an array of descriptor counts, with each member specifying the number of descriptors in a
-      // variable descriptor count binding in the corresponding descriptor set being allocated.
-      uint32_t varDescCount = meshData.size32();
-
-      VkDescriptorSetVariableDescriptorCountAllocateInfoEXT varDescInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_VARIABLE_DESCRIPTOR_COUNT_ALLOCATE_INFO_EXT };
-      varDescInfo.descriptorSetCount = 1;
-      varDescInfo.pDescriptorCounts = &varDescCount;
-
-      VkDescriptorSetAllocateInfo descAllocInfo{ VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-      descAllocInfo.pNext = &varDescInfo;
-      descAllocInfo.descriptorPool = descPool;
-      descAllocInfo.descriptorSetCount = 1;
-      descAllocInfo.pSetLayouts = &pipe->descLayout;
-      CHECK_VULKAN(vkAllocateDescriptorSets(vCtx->device, &descAllocInfo, &rename.descSet));
-    }
-
-    VkWriteDescriptorSetAccelerationStructureNV descriptorAccelerationStructureInfo{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_NV };
-    descriptorAccelerationStructureInfo.accelerationStructureCount = 1;
-    descriptorAccelerationStructureInfo.pAccelerationStructures = &topAcc.resource->acc;
-
-    Vector<VkWriteDescriptorSet> writes(3);
-    writes[0] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    writes[0].pNext = &descriptorAccelerationStructureInfo;
-    writes[0].dstSet = rename.descSet;
-    writes[0].dstBinding = BINDING_TOPLEVEL_ACC;
-    writes[0].dstArrayElement = 0;
-    writes[0].descriptorCount = 1;
-    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
-    writes[0].pImageInfo = nullptr;
-    writes[0].pBufferInfo = nullptr;
-    writes[0].pTexelBufferView = nullptr;
-
-    writes[1] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    writes[1].dstSet = rename.descSet;
-    writes[1].descriptorCount = 1;
-    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    writes[1].pBufferInfo = &rename.sceneBuffer.resource->descInfo;
-    writes[1].dstArrayElement = 0;
-    writes[1].dstBinding = BINDING_SCENE_BUF;
-
-    Vector<VkDescriptorBufferInfo> bufInfo(meshData.size32());
-    for (uint32_t g = 0; g < meshData.size32(); g++) {
-      bufInfo[g].buffer = meshData[g].triangleData.resource->buffer;
-      bufInfo[g].offset = 0;
-      bufInfo[g].range = VK_WHOLE_SIZE;
-    }
-    writes[2] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    writes[2].dstSet = rename.descSet;
-    writes[2].descriptorCount = bufInfo.size32();
-    writes[2].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    writes[2].pBufferInfo = bufInfo.data();
-    writes[2].dstArrayElement = 0;
-    writes[2].dstBinding = BINDING_TRIANGLE_DATA;
-
-    vkUpdateDescriptorSets(vCtx->device, writes.size32(), writes.data(), 0, nullptr);
-  }
-
 }
 
 
@@ -512,7 +437,6 @@ void Raycaster::update(Vector<Mesh*>& meshes)
     //vkDeviceWaitIdle(vCtx->device);
 
     buildPipeline();
-    buildDescriptorSets();
   }
 
 }
@@ -550,36 +474,92 @@ void Raycaster::resize(const Vec4f& viewport)
     viewInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
     rename.offscreenView = resources->createImageView(rename.offscreenImage, viewInfo);
   }
+}
 
-  for(uint32_t i=0; i<renames.size32(); i++) {
-    auto & rename = renames[i];
-    auto & prevRename = renames[(i + renames.size32() - 1) % renames.size32()];
+VkDescriptorSet Raycaster::setupDescriptorSet(const Mat3f& Ninv, const Mat4f& Pinv, VkImageView outImageView, VkImageView inImageView)
+{
+  auto * vCtx = app->vCtx;
 
-    VkDescriptorImageInfo descImageInfoCurr{};
-    descImageInfoCurr.imageView = rename.offscreenView.resource->view;
-    descImageInfoCurr.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+  VkDescriptorSet set = VK_NULL_HANDLE;
 
-    VkDescriptorImageInfo descImageInfoPrev{};
-    descImageInfoPrev.imageView = prevRename.offscreenView.resource->view;
-    descImageInfoPrev.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+  VkDescriptorBufferInfo sceneBufferInfo;
 
-    VkWriteDescriptorSet descImageWrite[2];
-    descImageWrite[0] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    descImageWrite[0].dstSet = rename.descSet;
-    descImageWrite[0].dstBinding = BINDING_OUTPUT_IMAGE;
-    descImageWrite[0].dstArrayElement = 0;
-    descImageWrite[0].descriptorCount = 1;
-    descImageWrite[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    descImageWrite[0].pImageInfo = &descImageInfoCurr;
-    descImageWrite[1] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-    descImageWrite[1].dstSet = rename.descSet;
-    descImageWrite[1].dstBinding = BINDING_INPUT_IMAGE;
-    descImageWrite[1].dstArrayElement = 0;
-    descImageWrite[1].descriptorCount = 1;
-    descImageWrite[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    descImageWrite[1].pImageInfo = &descImageInfoPrev;
-    vkUpdateDescriptorSets(vCtx->device, ARRAYSIZE(descImageWrite), descImageWrite, 0, nullptr);
+  auto l = normalize(mul(Ninv, Vec3f(1, 1, 0.2f)));
+  auto u = normalize(mul(Ninv, Vec3f(0, 1, 0)));
+
+  auto* sceneBuffer = (SceneBuffer*)vCtx->frameManager->allocUniformStore(sceneBufferInfo, sizeof(SceneBuffer));
+  sceneBuffer->Pinv = Pinv;
+  sceneBuffer->lx = l.x;
+  sceneBuffer->ly = l.y;
+  sceneBuffer->lz = l.z;
+  sceneBuffer->ux = u.x;
+  sceneBuffer->uy = u.y;
+  sceneBuffer->uz = u.z;
+  sceneBuffer->rndState = rndState;
+  sceneBuffer->stationaryFrames = stationaryFrames;
+
+  //VkDescriptorSet set = vCtx->frameManager->allocDescriptorSet(pipeline);
+
+  uint32_t varDescCount = meshData.size32();
+
+  set = vCtx->frameManager->allocVariableDescriptorSet(&varDescCount, 1, pipeline);
+
+  Vector<VkWriteDescriptorSet> writes(5);
+  for (auto & write : writes) {
+    write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+    write.dstSet = set;
+    write.dstArrayElement = 0;
+    write.descriptorCount = 1;
   }
+
+  // ----
+  VkWriteDescriptorSetAccelerationStructureNV descriptorAccelerationStructureInfo{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_NV };
+  descriptorAccelerationStructureInfo.accelerationStructureCount = 1;
+  descriptorAccelerationStructureInfo.pAccelerationStructures = &topAcc.resource->acc;
+
+  writes[0].pNext = &descriptorAccelerationStructureInfo;
+  writes[0].dstBinding = BINDING_TOPLEVEL_ACC;
+  writes[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
+
+  // ----
+  VkDescriptorImageInfo outImageInfo{};
+  outImageInfo.imageView = outImageView;
+  outImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+  writes[1].dstBinding = BINDING_OUTPUT_IMAGE;
+  writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+  writes[1].pImageInfo = &outImageInfo;
+
+  // ----
+  writes[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+  writes[2].pBufferInfo = &sceneBufferInfo;
+  writes[2].dstBinding = BINDING_SCENE_BUF;
+
+  // ----
+  VkDescriptorImageInfo inImageInfo{};
+  inImageInfo.imageView = inImageView;
+  inImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+  writes[3].dstBinding = BINDING_INPUT_IMAGE;
+  writes[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+  writes[3].pImageInfo = &inImageInfo;
+
+  // ----
+  Vector<VkDescriptorBufferInfo> bufInfo(meshData.size32());
+  for (uint32_t g = 0; g < meshData.size32(); g++) {
+    bufInfo[g].buffer = meshData[g].triangleData.resource->buffer;
+    bufInfo[g].offset = 0;
+    bufInfo[g].range = VK_WHOLE_SIZE;
+  }
+  writes[4].dstArrayElement = 0;
+  writes[4].descriptorCount = bufInfo.size32();
+  writes[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+  writes[4].pBufferInfo = bufInfo.data();
+  writes[4].dstBinding = BINDING_TRIANGLE_DATA;
+
+  vkUpdateDescriptorSets(vCtx->device, writes.size32(), writes.data(), 0, nullptr);
+
+  return set;
 }
 
 
@@ -606,105 +586,12 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
 
   auto * vCtx = app->vCtx;
 
-  VkDescriptorSet set = VK_NULL_HANDLE;
-  {
-    VkDescriptorBufferInfo sceneBufferInfo;
-
-    auto l = normalize(mul(Ninv, Vec3f(1, 1, 0.2f)));
-    auto u = normalize(mul(Ninv, Vec3f(0, 1, 0)));
-
-    auto* sceneBuffer = (SceneBuffer*)vCtx->frameManager->allocUniformStore(sceneBufferInfo, sizeof(SceneBuffer));
-    sceneBuffer->Pinv = Pinv;
-    sceneBuffer->lx = l.x;
-    sceneBuffer->ly = l.y;
-    sceneBuffer->lz = l.z;
-    sceneBuffer->ux = u.x;
-    sceneBuffer->uy = u.y;
-    sceneBuffer->uz = u.z;
-    sceneBuffer->rndState = rndState;
-    sceneBuffer->stationaryFrames = stationaryFrames;
-
-    //VkDescriptorSet set = vCtx->frameManager->allocDescriptorSet(pipeline);
-
-    uint32_t varDescCount = meshData.size32();
-
-    set = vCtx->frameManager->allocVariableDescriptorSet(&varDescCount, 1, pipeline);
-
-    Vector<VkWriteDescriptorSet> writes(5);
-    for (auto & write : writes) {
-      write = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
-      write.dstSet = set;
-      write.dstArrayElement = 0;
-      write.descriptorCount = 1;
-    }
-
-    // ----
-    VkWriteDescriptorSetAccelerationStructureNV descriptorAccelerationStructureInfo{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_NV };
-    descriptorAccelerationStructureInfo.accelerationStructureCount = 1;
-    descriptorAccelerationStructureInfo.pAccelerationStructures = &topAcc.resource->acc;
-
-    writes[0].pNext = &descriptorAccelerationStructureInfo;
-    writes[0].dstBinding = BINDING_TOPLEVEL_ACC;
-    writes[0].descriptorType = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV;
-
-    // ----
-    VkDescriptorImageInfo outImageInfo{};
-    outImageInfo.imageView = rename.offscreenView.resource->view;
-    outImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    writes[1].dstBinding = BINDING_OUTPUT_IMAGE;
-    writes[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    writes[1].pImageInfo = &outImageInfo;
-
-    // ----
-    writes[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    writes[2].pBufferInfo = &sceneBufferInfo;
-    writes[2].dstBinding = BINDING_SCENE_BUF;
-
-    // ----
-    VkDescriptorImageInfo inImageInfo{};
-    inImageInfo.imageView = prevRename.offscreenView.resource->view;
-    inImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-
-    writes[3].dstBinding = BINDING_INPUT_IMAGE;
-    writes[3].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-    writes[3].pImageInfo = &inImageInfo;
-
-    // ----
-    Vector<VkDescriptorBufferInfo> bufInfo(meshData.size32());
-    for (uint32_t g = 0; g < meshData.size32(); g++) {
-      bufInfo[g].buffer = meshData[g].triangleData.resource->buffer;
-      bufInfo[g].offset = 0;
-      bufInfo[g].range = VK_WHOLE_SIZE;
-  }
-    writes[4].dstArrayElement = 0;
-    writes[4].descriptorCount = bufInfo.size32();
-    writes[4].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    writes[4].pBufferInfo = bufInfo.data();
-    writes[4].dstBinding = BINDING_TRIANGLE_DATA;
-
-    vkUpdateDescriptorSets(vCtx->device, writes.size32(), writes.data(), 0, nullptr);
-  }
-
-
-  {
-    auto l = normalize(mul(Ninv, Vec3f(1, 1, 0.2f)));
-    auto u = normalize(mul(Ninv, Vec3f(0, 1, 0)));
-
-    auto * mem = (SceneBuffer*)rename.sceneBuffer.resource->hostPtr;
-    mem->Pinv = Pinv;
-    mem->lx = l.x;
-    mem->ly = l.y;
-    mem->lz = l.z;
-    mem->ux = u.x;
-    mem->uy = u.y;
-    mem->uz = u.z;
-    mem->rndState = rndState;
-    mem->stationaryFrames = stationaryFrames;
-  }
-
   auto offscreenImage = rename.offscreenImage.resource->image;
   auto onscreenImage = vCtx->frameManager->backBufferImages[vCtx->frameManager->swapChainIndex];
+
+  VkDescriptorSet set = setupDescriptorSet(Ninv, Pinv,
+                                           rename.offscreenView.resource->view,
+                                           prevRename.offscreenView.resource->view);
 
   {
     VkImageMemoryBarrier imageMemoryBarriers[2];
@@ -731,7 +618,6 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
   }
   {
     vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, pipeline.resource->pipe);
-    //vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, pipeline.resource->pipeLayout, 0, 1, &rename.descSet, 0, 0);
     vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_NV, pipeline.resource->pipeLayout, 0, 1, &set, 0, 0);
     vCtx->vkCmdTraceRaysNV(cmdBuf,
                            bindingTable.resource->buffer, 0,      // raygen

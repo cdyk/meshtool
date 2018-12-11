@@ -31,13 +31,8 @@ private:
 
   VkDescriptorPool descPool = VK_NULL_HANDLE;
   struct Rename {
-    RenderBufferHandle sceneBuffer;
-
     ImageHandle offscreenImage;
     ImageViewHandle offscreenView;
-
-    VkDescriptorSet descSet = VK_NULL_HANDLE;
-
   };
   Vector<Rename> renames;
   uint32_t renameIndex = 0;
@@ -77,8 +72,10 @@ private:
   bool updateMeshData(VkDeviceSize& scratchSize, MeshData& meshData, const Mesh* mesh);
 
   void buildPipeline();
-  void buildDescriptorSets();
 
   VkDescriptorSetLayout buildDescriptorSetLayout();
+
+  VkDescriptorSet setupDescriptorSet(const Mat3f& Ninv, const Mat4f& Pinv, VkImageView outImage, VkImageView inImage);
+  
 
 };
