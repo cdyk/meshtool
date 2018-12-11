@@ -62,35 +62,10 @@ Raycaster::Raycaster(Logger logger, App* app) :
 
 Raycaster::~Raycaster()
 {
-  auto * device = app->vCtx->device;
-  if (descPool) {
-    vkDestroyDescriptorPool(device, descPool, nullptr);
-    descPool = VK_NULL_HANDLE;
-  }
-
 }
 
 void Raycaster::init()
 {
-  renames.resize(5);
-
-  auto * vCtx = app->vCtx;
-  VkDescriptorPoolSize poolSizes[] =
-  {
-    { VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, renames.size32()},
-    { VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_NV, renames.size32() },
-    { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,  10 * renames.size32() },
-    { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 10 * renames.size32()}
-  };
-
-  VkDescriptorPoolCreateInfo descriptorPoolCreateInfo;
-  descriptorPoolCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-  descriptorPoolCreateInfo.pNext = nullptr;
-  descriptorPoolCreateInfo.flags = 0;
-  descriptorPoolCreateInfo.maxSets = renames.size32();
-  descriptorPoolCreateInfo.poolSizeCount = ARRAYSIZE(poolSizes);
-  descriptorPoolCreateInfo.pPoolSizes = poolSizes;
-  CHECK_VULKAN(vkCreateDescriptorPool(vCtx->device, &descriptorPoolCreateInfo, nullptr, &descPool));
 }
 
 
@@ -140,7 +115,6 @@ VkDescriptorSetLayout Raycaster::buildDescriptorSetLayout()
   layoutCreateInfo.bindingCount = ARRAYSIZE(descSetLayoutBinding);
   layoutCreateInfo.pBindings = descSetLayoutBinding;
   CHECK_VULKAN(vkCreateDescriptorSetLayout(vCtx->device, &layoutCreateInfo, nullptr, &layout));
-  CHECK_VULKAN(vkResetDescriptorPool(vCtx->device, descPool, 0));
   return layout;
 }
 
@@ -454,8 +428,8 @@ void Raycaster::resize(const Vec4f& viewport)
 
   auto * vCtx = app->vCtx;
   auto * resources = vCtx->resources;
-  for (auto & rename : renames) {
 
+  for (unsigned i = 0; i < 2; i++) {
     VkImageCreateInfo imageInfo{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
     imageInfo.imageType = VK_IMAGE_TYPE_2D;
     imageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -467,12 +441,12 @@ void Raycaster::resize(const Vec4f& viewport)
     imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    rename.offscreenImage = resources->createImage(imageInfo);
+    offscreenImage[i] = resources->createImage(imageInfo);
 
     VkImageViewCreateInfo viewInfo{ VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO };
     viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
     viewInfo.subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
-    rename.offscreenView = resources->createImageView(rename.offscreenImage, viewInfo);
+    offscreenView[i] = resources->createImageView(offscreenImage[i], viewInfo);
   }
 }
 
@@ -565,6 +539,7 @@ VkDescriptorSet Raycaster::setupDescriptorSet(const Mat3f& Ninv, const Mat4f& Pi
 
 void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f& Ninv, const Mat4f& Pinv)
 {
+  auto * vCtx = app->vCtx;
   if (!topAcc) return;
 
   resize(viewport);
@@ -579,19 +554,15 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
 
   rndState = 1664525 * rndState + 1013904223;
 
-  auto & prevRename = renames[renameIndex];
-  renameIndex = renameIndex + 1;
-  if (renames.size32() <= renameIndex) renameIndex = 0;
-  auto & rename = renames[renameIndex];
-
-  auto * vCtx = app->vCtx;
-
-  auto offscreenImage = rename.offscreenImage.resource->image;
+  auto prevOffscreenImage = offscreenImage[offscreenIndex].resource->image;
+  auto prevOffscreenView = offscreenView[offscreenIndex].resource->view;
+  offscreenIndex = (offscreenIndex + 1) & 1;
+  auto currOffscreenImage = offscreenImage[offscreenIndex].resource->image;
+  auto currOffscreenView = offscreenView[offscreenIndex].resource->view;
   auto onscreenImage = vCtx->frameManager->backBufferImages[vCtx->frameManager->swapChainIndex];
 
-  VkDescriptorSet set = setupDescriptorSet(Ninv, Pinv,
-                                           rename.offscreenView.resource->view,
-                                           prevRename.offscreenView.resource->view);
+
+  VkDescriptorSet set = setupDescriptorSet(Ninv, Pinv, currOffscreenView, prevOffscreenView);
 
   {
     VkImageMemoryBarrier imageMemoryBarriers[2];
@@ -602,7 +573,7 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
     imageMemoryBarriers[0].newLayout = VK_IMAGE_LAYOUT_GENERAL;
     imageMemoryBarriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     imageMemoryBarriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    imageMemoryBarriers[0].image = prevRename.offscreenImage.resource->image;
+    imageMemoryBarriers[0].image = prevOffscreenImage;
     imageMemoryBarriers[0].subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
     imageMemoryBarriers[1] = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER }; // Prep for shader storage
     imageMemoryBarriers[1].srcAccessMask = 0;
@@ -611,7 +582,7 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
     imageMemoryBarriers[1].newLayout = VK_IMAGE_LAYOUT_GENERAL;
     imageMemoryBarriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     imageMemoryBarriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    imageMemoryBarriers[1].image = offscreenImage;
+    imageMemoryBarriers[1].image = currOffscreenImage;
     imageMemoryBarriers[1].subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
     vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                          0, 0, nullptr, 0, nullptr, 2, imageMemoryBarriers);
@@ -635,7 +606,7 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
     imageMemoryBarriers[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
     imageMemoryBarriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     imageMemoryBarriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    imageMemoryBarriers[0].image = offscreenImage;
+    imageMemoryBarriers[0].image = currOffscreenImage;
     imageMemoryBarriers[0].subresourceRange = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1 };
 
     imageMemoryBarriers[1] = { VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
@@ -652,6 +623,7 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
                          0, 0, nullptr, 0, nullptr, 2, imageMemoryBarriers);
   }
   { // blit
+#if 1
     VkImageBlit blit;
     blit.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
     blit.srcOffsets[0] = { 0, 0, 0 };
@@ -660,17 +632,19 @@ void Raycaster::draw(VkCommandBuffer cmdBuf, const Vec4f& viewport, const Mat3f&
     blit.dstOffsets[0] = { int32_t(viewport.x), int32_t(viewport.y), 0 };
     blit.dstOffsets[1] = { int32_t(viewport.x) + int32_t(w), int32_t(viewport.y) + int32_t(h), 1 };
     vkCmdBlitImage(cmdBuf,
-                   offscreenImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   currOffscreenImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                    onscreenImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                    1, &blit, VK_FILTER_NEAREST);
-    //VkImageCopy imageCopy{};
-    //imageCopy.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-    //imageCopy.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
-    //imageCopy.dstOffset = { int32_t(viewport.x), int32_t(viewport.y), 0 };
-    //imageCopy.extent = { w, h, 1 };
-    //vkCmdCopyImage(cmdBuf,
-    //               offscreenImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-    //               onscreenImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopy);
+#else
+    VkImageCopy imageCopy{};
+    imageCopy.srcSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+    imageCopy.dstSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1 };
+    imageCopy.dstOffset = { int32_t(viewport.x), int32_t(viewport.y), 0 };
+    imageCopy.extent = { w, h, 1 };
+    vkCmdCopyImage(cmdBuf,
+                   currOffscreenImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                   onscreenImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &imageCopy);
+#endif
   }
   { // Prop for presentiation
     VkImageMemoryBarrier imageMemoryBarrier;

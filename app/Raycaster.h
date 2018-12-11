@@ -29,13 +29,10 @@ private:
   ShaderHandle missShader;
   PipelineHandle pipeline;
 
-  VkDescriptorPool descPool = VK_NULL_HANDLE;
-  struct Rename {
-    ImageHandle offscreenImage;
-    ImageViewHandle offscreenView;
-  };
-  Vector<Rename> renames;
-  uint32_t renameIndex = 0;
+  ImageHandle offscreenImage[2];
+  ImageViewHandle offscreenView[2];
+  uint32_t offscreenIndex = 0;
+
   uint32_t rndState = 42;
   uint32_t stationaryFrames = 0;
   Mat4f prevPinv;
